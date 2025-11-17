@@ -15,7 +15,10 @@ export const authOptions = {
       async authorize(credentials): Promise<any> {
         await connectToDB();
         const shop = await Shop.findOne({ email: credentials?.email });
-        if (shop && bcrypt.compareSync(credentials?.password || "", shop.password)) {
+        if (
+          shop &&
+          bcrypt.compareSync(credentials?.password || "", shop.password)
+        ) {
           return {
             id: shop._id.toString(),
             name: shop.shopName,
@@ -41,6 +44,11 @@ export const authOptions = {
         sameSite: "lax",
         path: "/",
         secure: true,
+        // THIS LINE IS THE FIX
+        domain:
+          process.env.NODE_ENV === "production"
+            ? ".getbloomdirect.com"
+            : undefined,
       },
     },
   },
