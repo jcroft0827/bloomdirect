@@ -43,6 +43,16 @@ export async function POST(req: Request) {
       ${recipient.address}, ${recipient.city}, ${recipient.state} ${recipient.zip}</p>
       <p><strong>Card Message:</strong> ${recipient.message || "None"}</p>
       <p><strong>You receive:</strong> $${pricing.arrangement + pricing.delivery} (full amount)</p>
+      <p><strong>Payment:</strong> 
+      <a href="https://venmo.com/?txn=pay&recipients=${encodeURIComponent(fulfillShop.phone)}&amount=${pricing.arrangement + pricing.delivery}&note=BloomDirect%20Order%20%23${order._id}">
+      Pay with Venmo
+      </a> 
+      or 
+      <a href="https://cash.app/$cashtag?amount=${pricing.arrangement + pricing.delivery}">
+      Pay with Cash App
+      </a>
+      or Zelle to ${fulfillShop.phone}
+      </p>
       <p><strong>Deliver by:</strong> As discussed</p>
       <hr>
       <p><a href="http://localhost:3000/dashboard/incoming">View in BloomDirect →</a></p>
