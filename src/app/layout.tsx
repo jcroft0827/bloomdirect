@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "./globals.css";   // ← must be exactly this (no red squiggly now)
 
 // NO SessionProvider here anymore — we’ll add it only where needed
 
