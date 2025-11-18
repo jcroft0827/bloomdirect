@@ -7,6 +7,10 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  // ←←←←←←←←←←←←←←←←← THIS LINE FIXES VERCEL ←←←←←←←←←←←←←←←←←
+  future: {
+      lightningcss: false,   // ← disables native binary → uses WASM
+  }, 
   theme: {
     extend: {},  // Empty — colors/shadows are now in globals.css
   },
@@ -14,3 +18,4 @@ const config: Config = {
 };
 
 export default config;
+
