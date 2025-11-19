@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import getStripe from "@/lib/stripe";
 
 export default function DashboardClient() {
   const { data: session } = useSession();
@@ -108,11 +109,35 @@ export default function DashboardClient() {
                 Pro shops see live profit, unlimited orders, and get featured
                 first
               </p>
-              <form action="/api/checkout" method="POST">
+              <button
+                onClick={async () => {
+                  const stripe = await getStripe();
+                  if (!stripe) {
+                    alert("Stripe not loaded");
+                    return;
+                  }
+
+                  const response = await fetch("/api/checkout", {
+                    method: "POST",
+                  });
+                  const { id: sessionId } = await response.json();
+
+                  const { error } = await stripe.redirectToCheckout({
+                    sessionId,
+                  });
+                  if (error) {
+                    alert(error.message);
+                  }
+                }}
+                className="bg-white text-purple-600 font-black text-3xl px-16 py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl"
+              >
+                Upgrade to Pro — $29/month
+              </button>
+              {/* <form action="/api/checkout" method="POST">
                 <button className="bg-white text-purple-600 font-black text-3xl px-16 py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl">
                   Upgrade to Pro — $29/month
                 </button>
-              </form>
+              </form> */}
               <p className="mt-6 text-xl">
                 Cancel anytime • 400+ shops already Pro
               </p>
