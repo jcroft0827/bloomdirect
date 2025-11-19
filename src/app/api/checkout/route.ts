@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
   try {
     const stripe = new Stripe(stripeKey, {
-      apiVersion: "2024-11-20" as any,  // ← stable, works with all SDKs
+      apiVersion: "2025-10-29.clover" as any,  // ← stable, works with all SDKs
     });
 
     const checkoutSession = await stripe.checkout.sessions.create({
