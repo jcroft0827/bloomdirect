@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { signOut } from "next-auth/react";
 
 export default function DashboardClient() {
   const { data: session } = useSession();
@@ -12,6 +13,15 @@ export default function DashboardClient() {
     ordersReceived: 0,
     loading: true,
   });
+  const [pro, setPro] = useState(false)
+
+  useEffect(() => {  
+    if (session?.user?.isPro) {
+      setPro(true);
+    } else {
+      setPro(false);
+    };
+  })
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -36,7 +46,13 @@ export default function DashboardClient() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
       {/* Hero Header */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex flex-col items-center">
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-700 transition shadow-lg self-end mr-2 mt-2"
+        >
+          Log out
+        </button>
         <div className="max-w-7xl mx-auto px-6 py-16">
           <h1 className="text-4xl md:text-6xl font-bold mb-4">
             Welcome back, {session?.user?.name || "Florist"}!
@@ -45,9 +61,6 @@ export default function DashboardClient() {
             You’re saving thousands by skipping wire services.
           </p>
         </div>
-        <form action="/api/auth/signout" method="post">
-          <button className="text-sm underline">Log out</button>
-        </form>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12 -mt-8">
@@ -108,8 +121,15 @@ export default function DashboardClient() {
                 Pro shops see live profit, unlimited orders, and get featured
                 first
               </p>
-              {/* Simple form POST — no client-side Stripe */}
               <form action="/api/checkout" method="POST">
+                <input
+                  type="hidden"
+                  name="priceId"
+                  value={
+                    process.env.STRIPE_PRICE_ID ||
+                    "price_1SUum5DgUvbWeRnauCjeXu7X"
+                  } // Fallback for local
+                />
                 <button
                   type="submit"
                   className="bg-white text-purple-600 font-black text-3xl px-16 py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl"
@@ -117,6 +137,16 @@ export default function DashboardClient() {
                   Upgrade to Pro — $29/month
                 </button>
               </form>
+
+              {/* Simple form POST — no client-side Stripe */}
+              {/* <form action="/api/checkout" method="POST">
+                <button
+                  type="submit"
+                  className="bg-white text-purple-600 font-black text-3xl px-16 py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl"
+                >
+                  Upgrade to Pro — $29/month
+                </button>
+              </form> */}
               <p className="mt-6 text-xl">
                 Cancel anytime • 400+ shops already Pro
               </p>
@@ -152,7 +182,9 @@ export default function DashboardClient() {
           </Link>
         </div>
         {/* Pro Tip */}
-        <div className="mt-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-3xl p-8 border border-amber-200">
+        <div 
+          className={(pro ? "hidden" : "block") + " mt-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-3xl p-8 border border-amber-200"}
+        >
           <p className="text-2xl font-bold text-amber-900 mb-2">
             Pro shops average $1,200/month in extra profit
           </p>

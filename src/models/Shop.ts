@@ -11,6 +11,8 @@ const shopSchema = new mongoose.Schema({
   zip: String,
   phone: { type: String, required: true },
   deliveryRadius: { type: Number, default: 20 }, // miles
+  isPro: Boolean,
+  proSince: Date,
 });
 
 shopSchema.pre("save", function (next) {

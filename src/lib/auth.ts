@@ -24,6 +24,7 @@ export const authOptions = {
             name: shop.shopName,
             email: shop.email,
             shopId: shop._id.toString(),
+            isPro: Boolean(shop.isPro),      // ← Force boolean
           };
         }
         return null;
@@ -33,8 +34,6 @@ export const authOptions = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
-
-  // THIS IS ALL YOU NEED FOR WWW + HTTPS
   useSecureCookies: true,
   cookies: {
     sessionToken: {
@@ -44,7 +43,6 @@ export const authOptions = {
         sameSite: "lax",
         path: "/",
         secure: true,
-        // THIS LINE IS THE FIX
         domain:
           process.env.NODE_ENV === "production"
             ? ".getbloomdirect.com"
@@ -54,16 +52,22 @@ export const authOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user }: { token: any; user?: any }) {
-      if (user) token.shopId = user.shopId;
+    async jwt({ token, user }) {
+      if (user) {
+        token.shopId = user.shopId;
+        token.isPro = user.isPro;        // ← Direct copy
+      }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
-      if (token.shopId) session.user.shopId = token.shopId;
+
+    async session({ session, token }) {
+      session.user.id = token.sub!;
+      session.user.shopId = token.shopId as string;
+      session.user.isPro = Boolean(token.isPro); // ← Final safety net
       return session;
     },
-    // This one line fixes the "Error www.getbloomdirect.com" forever
-    async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
+
+    async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (new URL(url).origin === baseUrl) return url;
       return baseUrl;

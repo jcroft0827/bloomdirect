@@ -2,9 +2,12 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { connectToDB } from "@/lib/mongoose";
-import Shop from "@/models/Shop"; // Your user model
+import Shop from "@/models/Shop"; // ← your shop/user model
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // @ts-ignore — preview version
+  apiVersion: "2025-11-17.clover",
+});
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -19,26 +22,37 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    console.log(`Webhook signature verification failed.`, err.message);
-    return NextResponse.json({ error: "Webhook signature verification failed" }, { status: 400 });
+    console.log("Webhook signature verification failed:", err.message);
+    return new Response(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
   // Handle the event
-  switch (event.type) {
-    case "checkout.session.completed":
-      const session = event.data.object as Stripe.Checkout.Session;
-      if (session.payment_status === "paid") {
-        await connectToDB();
-        // Update your shop/user model
-        await Shop.findByIdAndUpdate(
-          session.client_reference_id, // Pass shopId as client_reference_id in checkout creation
-          { isPro: true, proSince: new Date() }
-        );
-      }
-      break;
-    default:
-      console.log(`Unhandled event type ${event.type}`);
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    const shopId = session.client_reference_id;
+    if (!shopId) {
+      console.log("No client_reference_id — skipping");
+      return new Response("No shopId", { status: 200 });
+    }
+
+    await connectToDB();
+    await Shop.findByIdAndUpdate(shopId, {
+      isPro: true,
+      proSince: new Date(),
+      stripeCustomerId: session.customer as string,
+      stripeSubscriptionId: session.subscription as string,
+    });
+
+    console.log(`Shop ${shopId} upgraded to Pro!`);
   }
 
-  return NextResponse.json({ received: true });
+  return new Response("Success", { status: 200 });
 }
+
+// Required for Stripe webhooks (raw body)
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};

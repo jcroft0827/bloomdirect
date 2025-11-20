@@ -4,42 +4,49 @@ import Stripe from "stripe";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // @ts-ignore — preview version (your account uses 2025-11-17.clover)
+  apiVersion: "2025-11-17.clover",
+});
 
-  if (!session?.user?.email) {
+export async function POST(req: Request) {
+  // Get the logged-in user from NextAuth
+  const userSession = await getServerSession(authOptions);
+
+  if (!userSession?.user?.email) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
-    return NextResponse.json({ error: "STRIPE_SECRET_KEY missing" }, { status: 500 });
+  // Read the priceId from the form POST (sent by your button)
+  const formData = await req.formData();
+  const priceId = formData.get("priceId") as string;
+
+  if (!priceId) {
+    return NextResponse.json({ error: "Missing price ID" }, { status: 400 });
   }
 
   try {
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: "2025-10-29.clover" as any,  // ← stable, works with all SDKs
-    });
-
+    // Create the Stripe Checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID!,
+          price: priceId,
           quantity: 1,
         },
       ],
       mode: "subscription",
       success_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_URL}/dashboard`,
-      customer_email: session.user.email,
-      client_reference_id: session.user.shopId?.toString(),
+      cancel_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?canceled=true`,
+      customer_email: userSession.user.email,
+      // This is what your webhook uses to know which shop paid
+      client_reference_id: userSession.user.shopId?.toString(),
     });
 
-    // Server-side redirect — works with latest Stripe
-    return NextResponse.redirect(checkoutSession.url!);
+    // Redirect the user to Stripe Checkout
+    return NextResponse.redirect(checkoutSession.url!, 303);
   } catch (err: any) {
-    console.error("Full Stripe error:", err.message);
-    return NextResponse.json({ error: `Stripe error: ${err.message}` }, { status: 500 });
+    console.error("Stripe checkout error:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
