@@ -1,451 +1,719 @@
+// app/dashboard/new-order/NewOrderClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import toast, { Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useRef } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 export default function NewOrderClient() {
   const { data: session } = useSession();
   const shopId = (session?.user as any)?.shopId;
-  const [recipientName, setRecipientName] = useState("");
+  const router = useRouter();
+
+  // Recipient
+  const [recipientFirstName, setRecipientFirstName] = useState("");
+  const [recipientLastName, setRecipientLastName] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [recipientApt, setRecipientApt] = useState("");
-  const [cardMessage, setCardMessage] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientZip, setRecipientZip] = useState("");
   const [recipientCity, setRecipientCity] = useState("");
   const [recipientState, setRecipientState] = useState("");
+
+  // Customer
+  const [customerFirstName, setCustomerFirstName] = useState("");
+  const [customerLastName, setCustomerLastName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+
+  const [cardMessage, setCardMessage] = useState("");
+
+  // Arrangement
+  const [productPhoto, setProductPhoto] = useState<string>("");
+  const [productName, setProductName] = useState("");
+  const [productDescription, setProductDescription] =
+    useState("Designer’s Choice");
+
+  // Delivery
+  const [specialInstructions, setSpecialInstructions] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState<Date | null>(null);
+  const [deliveryTimeOption, setDeliveryTimeOption] = useState<
+    "anytime" | "specific"
+  >("anytime");
+  const [deliveryTimeFrom, setDeliveryTimeFrom] = useState<string>("");
+  const [deliveryTimeTo, setDeliveryTimeTo] = useState<string>("");
+
+  // Pricing
   const [arrangementValue, setArrangementValue] = useState(100);
   const [deliveryFee, setDeliveryFee] = useState(20);
   const [originatingFee, setOriginatingFee] = useState(25);
-  const [shops, setShops] = useState<any[]>([]);
-  const [selectedShop, setSelectedShop] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [cardMessageLarge, setCardMessageLarge] = useState(false);
-  const [findShopSuccess, setFindShopSuccess] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
 
+  // Shops
+  const [shops, setShops] = useState<any[]>([]);
+  const [selectedShop, setSelectedShop] = useState<any>(null);
+  const [searching, setSearching] = useState(false);
+  const [findShopSuccess, setFindShopSuccess] = useState(false);
+
+  const totalCustomerPays = arrangementValue + deliveryFee + originatingFee;
+  const fulfillingShopGets = arrangementValue + deliveryFee; // 80/20 model
+
+  // Auto-fill city/state from ZIP
   useEffect(() => {
     if (recipientZip.length === 5) {
       fetch(`https://ziptasticapi.com/${recipientZip}`)
         .then((r) => r.json())
         .then((data) => {
-          if (data.city) setRecipientCity(`${data.city}`);
-          if (data.state) setRecipientState(`${data.state}`);
+          if (data.city && data.state) {
+            setRecipientCity(data.city);
+            setRecipientState(data.state);
+          }
         })
         .catch(() => {
-          setRecipientCity(""), setRecipientState("");
+          setRecipientCity("");
+          setRecipientState("");
         });
     }
   }, [recipientZip]);
 
+  // Search shops by ZIP
   const searchShops = async () => {
-    if (recipientZip.length !== 5 || !recipientZip)
-      return toast.error("Enter recipient ZIP");
+    if (recipientZip.length !== 5) {
+      toast.error("Enter a valid 5-digit ZIP code");
+      return;
+    }
 
     setSearching(true);
-
     try {
-      if (!recipientZip) return toast.error("Enter recipient ZIP");
-      setSearching(true);
       const res = await fetch(`/api/shops/near?zip=${recipientZip}`);
       const data = await res.json();
       setShops(data.shops || []);
-      setSearching(false);
-      setFindShopSuccess(true);
-      if (data.shops?.length === 0)
-        toast.error("No BloomDirect shops yet in that area – invite them!");
+      setFindShopSuccess(data.shops?.length > 0);
+      if (!data.shops?.length) {
+        toast.error("No BloomDirect shops in that area yet — invite them!");
+      }
     } catch (err) {
-      console.error(err);
-      setFindShopSuccess(false);
-      alert("Error searching shops");
+      toast.error("Error finding shops");
     } finally {
       setSearching(false);
     }
   };
 
-  const verifyAndSuggestAddress = async (address: string) => {
-    if (!address || address.length < 8) {
-      setAddressSuggestions([]);
-      return;
+  // Send Order
+  const sendOrder = async () => {
+    if (!selectedShop) return toast.error("Select a fulfilling shop");
+    if (!deliveryDate) return toast.error("Select delivery date");
+    if (!recipientPhone) return toast.error("Recipient phone is required");
+
+    // Validate time window if specific
+    if (deliveryTimeOption === "specific") {
+      if (!deliveryTimeFrom || !deliveryTimeTo) {
+        return toast.error("Please select both time fields");
+      }
+      if (deliveryTimeFrom >= deliveryTimeTo) {
+        return toast.error("End time must be after start time");
+      }
     }
 
-    try {
-      const res = await fetch("/api/address/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          street: address,
+    const res = await fetch("/api/orders/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fulfillingShopId: selectedShop._id,
+        recipient: {
+          firstName: recipientFirstName,
+          lastName: recipientLastName,
+          fullName: `${recipientFirstName} ${recipientLastName}`,
+          address: recipientAddress + (recipientApt ? " " + recipientApt : ""),
           city: recipientCity,
           state: recipientState,
           zip: recipientZip,
-        }),
-      });
+          phone: recipientPhone,
+          email: recipientEmail || null,
+          message: cardMessage,
+        },
+        customer: {
+          firstName: customerFirstName,
+          lastName: customerLastName,
+          email: customerEmail,
+          phone: customerPhone,
+        },
+        deliveryDate: deliveryDate.toISOString(),
+        deliveryTimeOption,
+        deliveryTimeFrom:
+          deliveryTimeOption === "specific" ? deliveryTimeFrom : null,
+        deliveryTimeTo:
+          deliveryTimeOption === "specific" ? deliveryTimeTo : null,
+        productPhoto,
+        productName,
+        productDescription,
+        specialInstructions: specialInstructions || "",
+        pricing: {
+          arrangement: arrangementValue,
+          delivery: deliveryFee,
+          fee: originatingFee,
+          total: totalCustomerPays,
+        },
+      }),
+    });
 
-      const data = await res.json();
-      if (data.suggestions && data.suggestions.length > 0) {
-        setAddressSuggestions(data.suggestions);
-      } else {
-        setAddressSuggestions([]);
-      }
-    } catch (error) {
-      console.log("Address verify failed (normal if no match)");
-      setAddressSuggestions([]);
+    if (res.ok) {
+      toast.success(`Order sent! You kept $${originatingFee} pure profit!`);
+      router.push("/dashboard");
+    } else {
+      const err = await res.json();
+      toast.error(err.error || "Failed to send order");
     }
   };
-
-  const addressTimeout = useRef<NodeJS.Timeout | null>(null);
-  const totalCustomerPays = arrangementValue + deliveryFee + originatingFee;
-  const fulfillingShopGets = arrangementValue + deliveryFee;
-
-  const router = useRouter();
 
   return (
     <>
       <Toaster position="top-center" />
       <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-center mb-4">
-            Send Order – Keep $20–$27 Instantly
+        <div className="max-w-5xl mx-auto">
+          {/* Header */}
+          <h1 className="text-5xl font-black text-center text-purple-600 mb-4">
+            Send Order – Keep $20–$50 Instantly
           </h1>
-          <p className="text-center text-gray-600 mb-10">
-            Customer calls you → you forward in 45 seconds → you keep pure
-            profit
+          <p className="text-center text-xl text-gray-600 mb-10">
+            Customer calls you → forward in 60 seconds → keep pure profit
           </p>
 
-          {/* Return to Dashboard */}
-          <div>
-            <Link href={"/dashboard"}>
-              <button className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-3xl mb-4 text-xl shadow-xl hover:shadow-2xl transition-all">
-                ← Cancel & Return
-              </button>
-            </Link>
-          </div>
+          <Link href="/dashboard">
+            <button className="mb-8 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-3xl text-xl shadow-xl">
+              ← Cancel & Return
+            </button>
+          </Link>
 
-          {/* Recipient Location */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <div className="flex gap-5 items-center">
-              <label className="block text-lg font-semibold mb-4">
-                Recipient ZIP Code
-              </label>
-              <p
-                className={
-                  (findShopSuccess ? "visible" : "invisible") + " text-sm mb-4"
-                }
-              >
-                <span className="text-green-500 font-semibold">
-                  Search Successful!
-                </span>{" "}
-                Scroll to bottom of page to choose a filling shop!
-              </p>
-            </div>
-            <div className="flex gap-4">
+          {/* ZIP Search */}
+          <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8">
+            <label className="block text-2xl font-bold mb-6">
+              Recipient ZIP Code
+            </label>
+            <div className="flex gap-6 items-center">
               <input
                 type="text"
                 maxLength={5}
                 value={recipientZip}
                 onChange={(e) =>
-                  setRecipientZip(e.target.value.replace(/\D/g, ""))
+                  setRecipientZip(e.target.value.replace(/\D/g, "").slice(0, 5))
                 }
                 placeholder="90210"
-                className="w-32 px-4 py-3 border rounded-lg text-2xl"
+                className="w-48 px-8 py-6 text-4xl font-bold text-center border-4 border-purple-300 rounded-2xl focus:border-purple-600 outline-none"
               />
               <button
                 onClick={searchShops}
                 disabled={searching}
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-bold"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-12 py-6 rounded-2xl font-black text-2xl shadow-xl"
               >
-                {searching ? "Searching…" : "Find BloomDirect Shops"}
+                {searching ? "Searching…" : "Find Shops"}
               </button>
             </div>
-            {(recipientCity || recipientState) && (
-              <div className="mt-4 p-6 bg-emerald-50 border border-emerald-200 rounded-2xl">
-                <p className="text-2xl font-bold text-emerald-700">
-                  {recipientCity}
-                  {recipientState && `, ${recipientState}`}
-                </p>
-                <p className="text-emerald-600 mt-1">
-                  Delivery Location Confirmed
-                </p>
-              </div>
+            {findShopSuccess && (
+              <p className="mt-6 text-2xl font-bold text-emerald-600 text-center">
+                Shops found! Scroll down to choose.
+              </p>
             )}
           </div>
 
           {/* Recipient Details */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6">Recipient Details</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="mb-2">
-                <label className="block text-lg font-semibold text-gray-700 mb-2">
-                  Recipient Name
-                </label>
-                <input
-                  placeholder="Recipient Name *"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                  className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all"
-                  required
-                />
-              </div>
+          <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8 space-y-8">
+            <h2 className="text-3xl font-black text-purple-600">
+              Recipient & Delivery
+            </h2>
 
-              <div className="mb-2">
-                <label className="block text-lg font-semibold text-gray-700 mb-2">
-                  Delivery Street Address
-                </label>
+            {/* Recipient (who receives the flowers) */}
+            <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8">
+              <h2 className="text-3xl font-black text-purple-600 mb-8">
+                Recipient Details (Delivery)
+              </h2>
+              <div className="grid md:grid-cols-2 gap-8">
                 <input
-                  type="text"
+                  placeholder="Recipient First Name *"
+                  required
+                  value={recipientFirstName}
+                  onChange={(e) => setRecipientFirstName(e.target.value)}
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Recipient Last Name *"
+                  required
+                  value={recipientLastName}
+                  onChange={(e) => setRecipientLastName(e.target.value)}
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Phone Number *"
+                  required
+                  value={recipientPhone}
+                  onChange={(e) =>
+                    setRecipientPhone(
+                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                    )
+                  }
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Email (optional)"
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Street Address *"
+                  required
                   value={recipientAddress}
                   onChange={(e) => setRecipientAddress(e.target.value)}
-                  placeholder="123 Main Street"
-                  className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all"
-                  required
+                  className="md:col-span-2 px-8 py-6 text-xl border-4 rounded-2xl"
                 />
-              </div>
-
-              <div className="mb-2">
-                <label className="block text-lg font-semibold text-gray-700 mb-2">
-                  Delivery ZIP Code
-                </label>
                 <input
-                  type="text"
+                  placeholder="Apt, Suite, Floor, Company (optional)"
+                  value={recipientApt}
+                  onChange={(e) => setRecipientApt(e.target.value)}
+                  className="md:col-span-2 px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="ZIP Code *"
                   value={recipientZip}
                   onChange={(e) =>
                     setRecipientZip(
                       e.target.value.replace(/\D/g, "").slice(0, 5)
                     )
                   }
-                  className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all"
-                  placeholder="14001"
-                  maxLength={5}
-                  required
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-6 mb-2">
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-2">
-                    Delivery City
-                  </label>
-                  <input
-                    type="text"
-                    value={recipientCity}
-                    onChange={(e) => setRecipientCity(e.target.value)}
-                    className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all"
-                    placeholder="Dallas"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-2">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    value={recipientState}
-                    onChange={(e) =>
-                      setRecipientState(
-                        e.target.value.toUpperCase().slice(0, 2)
-                      )
-                    }
-                    className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all uppercase"
-                    placeholder="TX"
-                    maxLength={2}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="mb-2">
-                <label className="block text-lg font-semibold text-gray-700 mb-2">
-                  Delivery Apt/Suite (optional)
-                </label>
                 <input
-                  placeholder="Apt/Suite (optional)"
-                  value={recipientApt}
-                  onChange={(e) => setRecipientApt(e.target.value)}
-                  className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all"
+                  placeholder="City"
+                  value={recipientCity}
+                  readOnly
+                  className="px-8 py-6 text-xl border-4 rounded-2xl bg-gray-100"
                 />
-              </div>
-              <div className="mb-2">
-                <div className="flex gap-2 justify-between mr-2 items-center">
-                  <label className="block text-lg font-semibold text-gray-700 mb-2">
-                    Card Message
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setCardMessageLarge((prev) => !prev)}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all hover:shadow-lg ${
-                      cardMessageLarge
-                        ? "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                        : "bg-emerald-100 hover:bg-emerald-200 text-emerald-700"
-                    }`}
-                  >
-                    {cardMessageLarge ? "Normal Text" : "Large Text"}
-                  </button>
-                </div>
-                <textarea
-                  placeholder="With deepest sympathy... / Happy Birthday! / Congratulations on your new arrival!"
-                  value={cardMessage}
-                  onChange={(e) => setCardMessage(e.target.value)}
-                  rows={3}
-                  // className="w-full px-4 py-3 border rounded-lg md:col-span-2"
-                  className={`w-full px-6 py-5 border-2 border-gray-300 rounded-2xl focus:border-emerald-500 focus:outline-none transition-all ${
-                    cardMessageLarge
-                      ? "text-2xl leading-relaxed" // Large & readable
-                      : "text-lg leading-normal" // Clean & default
-                  }`}
+                <input
+                  placeholder="State"
+                  value={recipientState}
+                  readOnly
+                  className="px-8 py-6 text-xl border-4 rounded-2xl bg-gray-100 uppercase font-bold"
                 />
               </div>
             </div>
-            {(recipientCity || recipientState) && (
-              <div className="mt-8 p-8 bg-emerald-50 border-2 border-emerald-300 rounded-3xl text-center shadow-lg">
-                <p className="text-4xl font-black text-emerald-700">
-                  {recipientCity}, {recipientState}
-                </p>
-                <p className="text-emerald-600 text-xl mt-3">
-                  Location auto-filled from ZIP
-                </p>
+
+            {/* Customer (who is paying) */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl shadow-2xl p-10 mb-8 border-4 border-blue-200">
+              <h2 className="text-3xl font-black text-blue-700 mb-8">
+                Customer Details (Person Paying)
+              </h2>
+              <p className="text-lg text-gray-700 mb-6">
+                Usually different from recipient — e.g., daughter in Texas
+                sending to mom in New York
+              </p>
+              <div className="grid md:grid-cols-2 gap-8">
+                <input
+                  placeholder="Customer First Name *"
+                  required
+                  value={customerFirstName}
+                  onChange={(e) => setCustomerFirstName(e.target.value)}
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Customer Last Name *"
+                  required
+                  value={customerLastName}
+                  onChange={(e) => setCustomerLastName(e.target.value)}
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Customer Email *"
+                  required
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
+                <input
+                  placeholder="Customer Phone *"
+                  required
+                  value={customerPhone}
+                  onChange={(e) =>
+                    setCustomerPhone(
+                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                    )
+                  }
+                  className="px-8 py-6 text-xl border-4 rounded-2xl"
+                />
               </div>
-            )}
+            </div>
+
+            {/* <div className="grid md:grid-cols-2 gap-8">
+              <input
+                placeholder="Recipient Company"
+                value={recipientCompany}
+                onChange={(e) => setRecipientCompany(e.target.value)}
+                className={(companyVisible ? "block" : "hidden") + " px-8 py-6 text-xl border-4 rounded-2xl"}
+              />
+
+              <input
+                placeholder="Recipient First Name *"
+                required
+                value={recipientFirstName}
+                onChange={(e) => setRecipientFirstName(e.target.value)}
+                className="px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="Recipient Last Name *"
+                required
+                value={recipientLastName}
+                onChange={(e) => setRecipientLastName(e.target.value)}
+                className="px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="Phone Number *"
+                required
+                value={recipientPhone}
+                onChange={(e) =>
+                  setRecipientPhone(
+                    e.target.value.replace(/\D/g, "").slice(0, 10)
+                  )
+                }
+                className="px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="Email Address *"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail}
+                className="px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="Street Address *"
+                required
+                value={recipientAddress}
+                onChange={(e) => setRecipientAddress(e.target.value)}
+                className="md:col-span-2 px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="Apt/Suite (optional)"
+                value={recipientApt}
+                onChange={(e) => setRecipientApt(e.target.value)}
+                className="md:col-span-2 px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="ZIP Code *"
+                value={recipientZip}
+                onChange={(e) =>
+                  setRecipientZip(e.target.value.replace(/\D/g, "").slice(0, 5))
+                }
+                className="px-8 py-6 text-xl border-4 rounded-2xl"
+              />
+              <input
+                placeholder="City"
+                value={recipientCity}
+                readOnly
+                className="px-8 py-6 text-xl border-4 rounded-2xl bg-gray-100"
+              />
+              <input
+                placeholder="State"
+                value={recipientState}
+                readOnly
+                className="px-8 py-6 text-xl border-4 rounded-2xl bg-gray-100 uppercase font-bold"
+              />
+            </div> */}
+
+            {/* Delivery Date & Time — THE MOST IMPORTANT PART */}
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-10 border-4 border-emerald-300">
+              <h3 className="text-3xl font-black text-emerald-800 mb-8">
+                When Should It Arrive?
+              </h3>
+
+              {/* Delivery Date */}
+              <div className="mb-8">
+                <label className="block text-xl font-bold mb-4">
+                  Delivery Date *
+                </label>
+                <DatePicker
+                  selected={deliveryDate}
+                  onChange={(date) => setDeliveryDate(date)}
+                  minDate={new Date()}
+                  className="w-full px-8 py-6 text-2xl font-bold text-center border-4 border-emerald-400 rounded-2xl focus:border-emerald-600 outline-none"
+                  placeholderText="Select delivery date"
+                  required
+                />
+              </div>
+
+              {/* Delivery Time Options */}
+              <div className="space-y-6">
+                <label className="flex items-center gap-6 p-6 bg-white rounded-2xl border-4 border-emerald-200 cursor-pointer hover:border-emerald-500 transition">
+                  <input
+                    type="radio"
+                    name="deliveryTime"
+                    checked={deliveryTimeOption === "anytime"}
+                    onChange={() => setDeliveryTimeOption("anytime")}
+                    className="w-8 h-8 text-emerald-600"
+                  />
+                  <div>
+                    <div className="text-2xl font-black text-emerald-700">
+                      Any Time That Day
+                    </div>
+                    <div className="text-lg text-gray-600">
+                      Most popular — florist delivers when convenient
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-6 p-6 bg-white rounded-2xl border-4 border-emerald-200 cursor-pointer hover:border-emerald-500 transition">
+                  <input
+                    type="radio"
+                    name="deliveryTime"
+                    checked={deliveryTimeOption === "specific"}
+                    onChange={() => setDeliveryTimeOption("specific")}
+                    className="w-8 h-8 text-emerald-600"
+                  />
+                  <div className="flex-1">
+                    <div className="text-2xl font-black text-emerald-700">
+                      Specific Time Window
+                    </div>
+                    <div className="text-lg text-gray-600">
+                      Funeral, hospital, or surprise — must be exact
+                    </div>
+                  </div>
+                </label>
+
+                {/* Specific Time Picker — only shows when selected */}
+                {deliveryTimeOption === "specific" && (
+                  <div className="mt-6 grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-lg font-bold text-emerald-700 mb-3">
+                        Deliver After
+                      </label>
+                      <input
+                        type="time"
+                        value={deliveryTimeFrom}
+                        onChange={(e) => setDeliveryTimeFrom(e.target.value)}
+                        className="w-full px-8 py-6 text-2xl text-center border-4 border-emerald-400 rounded-2xl focus:border-emerald-600"
+                        required={deliveryTimeOption === "specific"}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-lg font-bold text-emerald-700 mb-3">
+                        Deliver Before
+                      </label>
+                      <input
+                        type="time"
+                        value={deliveryTimeTo}
+                        onChange={(e) => setDeliveryTimeTo(e.target.value)}
+                        className="w-full px-8 py-6 text-2xl text-center border-4 border-emerald-400 rounded-2xl focus:border-emerald-600"
+                        required={deliveryTimeOption === "specific"}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <textarea
+              placeholder="Card Message (With deepest sympathy... / Happy Birthday!)"
+              value={cardMessage}
+              onChange={(e) => setCardMessage(e.target.value)}
+              rows={4}
+              className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
+            />
+
+            {/* Product Photo + Details */}
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-10 border-4 border-purple-200">
+              <h3 className="text-3xl font-black text-purple-700 mb-8">
+                What Are You Sending?
+              </h3>
+
+              {/* Photo Upload */}
+              <div className="mb-8">
+                <label className="block text-xl font-bold mb-4">
+                  Product Photo (optional but recommended)
+                </label>
+                <div className="border-4 border-dashed border-purple-300 rounded-3xl h-96 flex items-center justify-center bg-white cursor-pointer hover:border-purple-500 transition">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setProductPhoto(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="photo-upload"
+                  />
+                  <label
+                    htmlFor="photo-upload"
+                    className="cursor-pointer text-center"
+                  >
+                    {productPhoto ? (
+                      <img
+                        src={productPhoto}
+                        alt="Product"
+                        className="max-h-96 rounded-2xl"
+                      />
+                    ) : (
+                      <div className="text-purple-600">
+                        <svg
+                          className="w-24 h-24 mx-auto mb-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <p className="text-2xl font-bold">
+                          Click to upload photo
+                        </p>
+                        <p className="text-lg">
+                          Shows fulfilling shop exactly what to make
+                        </p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Product Name & Description */}
+              <div className="grid md:grid-cols-2 gap-8">
+                <div>
+                  <label className="block text-xl font-bold mb-3">
+                    Product Name (shown to recipient)
+                  </label>
+                  <input
+                    placeholder="e.g., Dozen Red Roses in Glass Vase"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    className="w-full px-8 py-6 text-xl border-4 rounded-2xl focus:border-purple-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xl font-bold mb-3">
+                    Short Description (helps fulfilling shop)
+                  </label>
+                  <textarea
+                    placeholder="e.g., Long-stem Ecuadorian roses, baby’s breath, greenery"
+                    value={productDescription}
+                    onChange={(e) => setProductDescription(e.target.value)}
+                    className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <textarea
+              placeholder="Special Instructions (optional) – No lilies, hospital room 312, call first, etc."
+              value={specialInstructions}
+              onChange={(e) => setSpecialInstructions(e.target.value)}
+              rows={3}
+              className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
+            />
           </div>
 
-          {/* Pricing */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6">
-              Pricing (100 % + $20–$27 model)
-            </h2>
-            <div className="grid md:grid-cols-3 gap-6">
+          {/* Set Pricing */}
+          {/* Pricing Section */}
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-10 mb-12 text-center">
+            <h2 className="text-4xl font-black mb-8">Customer Pays</h2>
+
+            <div className="grid md:grid-cols-3 gap-8 max-w-3xl mx-auto mb-8">
               <div>
-                <label className="block font-semibold">Arrangement + tax</label>
+                <label className="block text-xl opacity-90">
+                  Arrangement + tax
+                </label>
                 <input
                   type="number"
                   value={arrangementValue}
                   onChange={(e) => setArrangementValue(Number(e.target.value))}
-                  className="w-full px-4 py-3 border rounded-lg text-2xl"
+                  className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl placeholder-white/60"
+                  placeholder="100"
                 />
               </div>
               <div>
-                <label className="block font-semibold">Delivery fee</label>
+                <label className="block text-xl opacity-90">Delivery fee</label>
                 <input
                   type="number"
                   value={deliveryFee}
                   onChange={(e) => setDeliveryFee(Number(e.target.value))}
-                  className="w-full px-4 py-3 border rounded-lg text-2xl"
+                  className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl"
+                  placeholder="20"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-green-600">
-                  Your fee (profit)
+                <label className="block text-xl opacity-90">
+                  Your profit (fee)
                 </label>
                 <input
                   type="number"
                   value={originatingFee}
                   onChange={(e) => setOriginatingFee(Number(e.target.value))}
-                  className="w-full px-4 py-3 border rounded-lg text-2xl font-bold text-green-600"
+                  className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
+                  placeholder="25"
                 />
               </div>
             </div>
 
-            <div className="mt-8 p-6 bg-gray-100 rounded-lg text-center">
-              <div className="text-4xl font-bold">
-                Customer pays: ${totalCustomerPays}
-              </div>
-              <div className="text-2xl mt-2">
-                Fulfilling shop receives: <strong>${fulfillingShopGets}</strong>
-              </div>
-              <div className="text-2xl text-green-600 font-bold mt-4">
-                You keep: ${originatingFee} pure profit
-              </div>
+            <div className="text-8xl font-black mb-4">${totalCustomerPays}</div>
+            <div className="text-3xl opacity-90">
+              You keep{" "}
+              <span className="text-yellow-300 font-black">
+                ${originatingFee}
+              </span>{" "}
+              • Fulfilling shop gets $
+              {(arrangementValue + deliveryFee).toFixed(2)}
             </div>
           </div>
 
           {/* Shop Picker */}
           {shops.length > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold mb-4">Choose filling shop</h2>
-              <div className="space-y-4">
+            <div className="bg-white rounded-3xl shadow-2xl p-10">
+              <h2 className="text-3xl font-black text-purple-600 mb-8">
+                Choose Fulfilling Shop
+              </h2>
+              <div className="space-y-6">
                 {shops.map((shop) => (
                   <label
                     key={shop._id}
-                    className={`flex items-center justify-between p-6 border rounded-lg cursor-pointer hover:bg-green-50 ${
-                      selectedShop === shop._id
-                        ? "border-green-600 bg-green-50"
-                        : ""
+                    className={`flex items-center justify-between p-8 border-4 rounded-3xl cursor-pointer transition-all ${
+                      selectedShop?._id === shop._id
+                        ? "border-emerald-600 bg-emerald-50 shadow-2xl scale-105"
+                        : "border-gray-300 hover:border-purple-400"
                     }`}
                   >
                     <div>
-                      <div className="font-bold text-xl">{shop.shopName}</div>
-                      <div>
+                      <div className="text-2xl font-black">{shop.shopName}</div>
+                      <div className="text-lg text-gray-600">
                         {shop.address} • {shop.city}, {shop.state}
                       </div>
                     </div>
                     <input
                       type="radio"
                       name="shop"
-                      value={shop._id}
-                      onChange={() => setSelectedShop(shop._id)}
-                      className="w-6 h-6"
+                      checked={selectedShop?._id === shop._id}
+                      onChange={() => setSelectedShop(shop)}
+                      className="w-8 h-8 text-emerald-600"
                     />
                   </label>
                 ))}
               </div>
 
               <button
-                onClick={async () => {
-                  if (!selectedShop || !shopId) {
-                    toast.error("Missing shop");
-                    return;
-                  }
-
-                  if (!recipientName || !recipientAddress) {
-                    toast.error("Fill recipient name and address");
-                    return;
-                  }
-
-                  const res = await fetch("/api/orders/create", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      originatingShopId: shopId,
-                      fulfillingShopId: selectedShop,
-                      recipient: {
-                        name: recipientName,
-                        address: `${recipientAddress}${
-                          recipientApt ? " " + recipientApt : ""
-                        }`,
-                        city: recipientCity,
-                        state: recipientState,
-                        zip: recipientZip,
-                        message: cardMessage,
-                      },
-                      pricing: {
-                        arrangement: arrangementValue,
-                        delivery: deliveryFee,
-                        fee: originatingFee,
-                        total: totalCustomerPays,
-                      },
-                    }),
-                  });
-
-                  if (res.ok) {
-                    toast.success(`Order sent! 💐 You kept $${originatingFee}`);
-                    // Optional: reset form
-                    setRecipientName("");
-                    setRecipientAddress("");
-                    setRecipientCity("");
-                    setRecipientState("");
-                    setRecipientApt("");
-                    setCardMessage("");
-                    router.push("/dashboard");
-                  } else {
-                    const err = await res.json();
-                    toast.error(err.error || "Failed to send order");
-                  }
-                }}
-                disabled={!selectedShop || !recipientZip || searching}
-                className="mt-8 w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold text-2xl py-6 rounded-xl"
+                onClick={sendOrder}
+                disabled={!selectedShop || !deliveryDate}
+                className="mt-10 w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-black text-4xl py-10 rounded-3xl shadow-2xl transition-all"
               >
-                Send Order & Keep ${originatingFee} →→→
+                Send Order & Keep ${originatingFee} →
               </button>
             </div>
           )}

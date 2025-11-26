@@ -1,14 +1,15 @@
-// src/app/api/orders/status/route.ts
+// app/api/orders/status/route.ts
 import { NextResponse } from "next/server";
-import { connectToDB } from "@/lib/mongoose";
 import Order from "@/models/Order";
+import { connectToDB } from "@/lib/mongoose";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { resend } from "@/lib/resend";
+import Shop from "@/models/Shop";
 
 export async function POST(req: Request) {
   try {
     await connectToDB();
-
     const session = await getServerSession(authOptions);
     if (!session?.user?.shopId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,15 +17,11 @@ export async function POST(req: Request) {
 
     const { orderId, status } = await req.json();
 
-    if (!orderId || !["accepted", "declined"].includes(status)) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
-
     const order = await Order.findById(orderId);
-    if (!order) {
+    if (!order)
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
 
+    // Security: only the fulfilling shop can accept/decline
     if (order.fulfillingShop.toString() !== session.user.shopId) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
@@ -32,12 +29,41 @@ export async function POST(req: Request) {
     order.status = status;
     await order.save();
 
+    // Send email to originating shop
+    const originShop = await Shop.findById(order.originatingShop);
+    if (originShop?.email) {
+      await resend.emails.send({
+        from: "Joseph Croft - Test <jcroft0827@gmail.com>",
+        to: originShop.email,
+        subject: `Order ${order.orderNumber} has been ${status.toUpperCase()}`,
+        html: `
+      <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: ${status === "accepted" ? "#16a34a" : "#dc2626"};">
+          Order ${status === "accepted" ? "Accepted" : "Declined"}
+        </h1>
+        <p><strong>Order #:</strong> ${order.orderNumber}</p>
+        <p><strong>Fulfilling Shop:</strong> ${order.fulfillingShopName}</p>
+        <p><strong>Status:</strong> <span style="font-size: 1.5em; font-weight: bold; color: ${
+          status === "accepted" ? "#16a34a" : "#dc2626"
+        };">
+          ${status.toUpperCase()}
+        </span></p>
+        ${
+          status === "accepted"
+            ? "<p>Great news — they’re making the arrangement now!</p>"
+            : "<p>They declined. You may want to find another shop.</p>"
+        }
+        <p><a href="https://www.getbloomdirect.com/dashboard" style="background:#9333ea; color:white; padding:14px 28px; text-decoration:none; border-radius:12px; font-weight:bold;">
+          View in Dashboard
+        </a></p>
+      </div>
+    `,
+      });
+    }
+
     return NextResponse.json({ success: true, order });
   } catch (error: any) {
     console.error("Status update error:", error);
-    return NextResponse.json(
-      { error: "Failed to update", details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

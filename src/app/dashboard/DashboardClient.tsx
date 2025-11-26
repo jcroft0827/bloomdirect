@@ -6,22 +6,22 @@ import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
 
 export default function DashboardClient() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const [stats, setStats] = useState({
     profit: 0,
     ordersSent: 0,
     ordersReceived: 0,
     loading: true,
   });
-  const [pro, setPro] = useState(false)
+  const [pro, setPro] = useState(false);
 
-  useEffect(() => {  
+  useEffect(() => {
     if (session?.user?.isPro) {
       setPro(true);
     } else {
       setPro(false);
-    };
-  })
+    }
+  });
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -42,6 +42,21 @@ export default function DashboardClient() {
     };
     fetchStats();
   }, []);
+
+  // Refreshes the session when you come back from Stripe
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const query = new URLSearchParams(window.location.search);
+
+      // If user just came back from successful Stripe payment
+      if (query.get("success") === "true") {
+        update(); // This refreshes the session → isPro becomes true instantly
+
+        // Clean up the URL so ?success=true disappears (looks professional)
+        window.history.replaceState({}, "", "/dashboard");
+      }
+    }
+  }, [update]); // Only runs when 'update' function is ready
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
@@ -182,8 +197,11 @@ export default function DashboardClient() {
           </Link>
         </div>
         {/* Pro Tip */}
-        <div 
-          className={(pro ? "hidden" : "block") + " mt-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-3xl p-8 border border-amber-200"}
+        <div
+          className={
+            (pro ? "hidden" : "block") +
+            " mt-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-3xl p-8 border border-amber-200"
+          }
         >
           <p className="text-2xl font-bold text-amber-900 mb-2">
             Pro shops average $1,200/month in extra profit

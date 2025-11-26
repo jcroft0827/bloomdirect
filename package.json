@@ -18,9 +18,10 @@
     "next": "16.0.3",
     "next-auth": "^4.24.13",
     "react": "19.2.0",
+    "react-datepicker": "^8.9.0",
     "react-dom": "19.2.0",
     "react-hot-toast": "^2.6.0",
-    "resend": "^6.4.2",
+    "resend": "^6.5.2",
     "stripe": "^20.0.0",
     "tailwind": "^4.0.0"
   },
