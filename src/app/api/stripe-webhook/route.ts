@@ -1,73 +1,47 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import Stripe from "stripe";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 
-export const config = {
-  api: {
-    bodyParser: false, // Stripe requires raw body
-  },
-};
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // @ts-ignore
   apiVersion: "2025-11-17.clover",
 });
 
-export async function POST(req: Request) {
-  const rawBody = await req.text();
-  const signature = req.headers.get("stripe-signature")!;
-
-  let event;
+export async function POST(request: Request) {
+  const body = await request.text();
+  const headerList = headers();
+  const signature = (await headerList).get("stripe-signature");
 
   try {
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
+    const event = stripe.webhooks.constructEvent(
+      body,
+      signature!,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch (err: any) {
-    console.error("Webhook signature error:", err.message);
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
-  }
 
-  // Connect DB once per event
-  await connectToDB();
-
-  switch (event.type) {
-    case "checkout.session.completed": {
+    if (event.type === "checkout.session.completed") {
       const session = event.data.object;
 
-      const shopId = session.client_reference_id; // we fixed this above
+      const shopId = session.client_reference_id;
 
-      if (!shopId) {
-        console.error("Missing shopId in checkout.session.completed");
-        break;
+      if (shopId) {
+        await connectToDB();
+        await Shop.findByIdAndUpdate(shopId, {
+          isPro: true,
+          proSince: new Date(),
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: session.subscription,
+        });
       }
-
-      await Shop.findByIdAndUpdate(shopId, {
-        isPro: true,
-        proSince: new Date(),
-      });
-
-      console.log("🔥 Shop upgraded:", shopId);
-      break;
     }
 
-    case "customer.subscription.deleted": {
-      const sub = event.data.object;
-      const shopId = sub.metadata?.shopId;
-
-      if (!shopId) break;
-
-      await Shop.findByIdAndUpdate(shopId, {
-        isPro: false,
-      });
-
-      console.log("⛔ Subscription canceled for:", shopId);
-      break;
-    }
+    return NextResponse.json({ received: true });
+  } catch (err: any) {
+    console.error("Webhook error:", err.message);
+    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
-
-  return NextResponse.json({ received: true });
 }

@@ -4,7 +4,7 @@ import Order from "@/models/Order";
 import { connectToDB } from "@/lib/mongoose";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { resend } from "@/lib/resend";
+import { getResend } from "@/lib/resend";
 import Shop from "@/models/Shop";
 
 export async function POST(req: Request) {
@@ -28,10 +28,12 @@ export async function POST(req: Request) {
 
     order.status = status;
     await order.save();
-
+    
+    const resend = getResend();
     // Send email to originating shop
     const originShop = await Shop.findById(order.originatingShop);
     if (originShop?.email) {
+
       await resend.emails.send({
         from: "Joseph Croft - Test <jcroft0827@gmail.com>",
         to: originShop.email,
