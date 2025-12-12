@@ -6,9 +6,10 @@ import { useSession } from "next-auth/react";
 import toast, { Toaster } from "react-hot-toast";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function IncomingOrders() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +25,13 @@ export default function IncomingOrders() {
       setLoading(false);
     }
   };
+
+  const router = useRouter();
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace('/login');
+    }
+  }, [status, router]);
 
   useEffect(() => {
     fetchOrders();

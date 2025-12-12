@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_URL}/dashboard?canceled=true`,
       customer_email: userSession.user.email,
       // This is what your webhook uses to know which shop paid
-      client_reference_id: userSession.user.shopId?.toString(),
+      client_reference_id: userSession.user.id,
     });
 
     // Redirect the user to Stripe Checkout

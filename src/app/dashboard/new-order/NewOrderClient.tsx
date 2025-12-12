@@ -10,9 +10,14 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 export default function NewOrderClient() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const shopId = (session?.user as any)?.shopId;
   const router = useRouter();
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace('/login');
+    }
+  }, [status, router]);
 
   // Recipient
   const [recipientFirstName, setRecipientFirstName] = useState("");

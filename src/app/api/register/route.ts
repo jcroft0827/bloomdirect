@@ -1,9 +1,9 @@
-import { connectToDB } from "@/lib/mongoose";   // ← was "connectCollege" (my bad!)
+import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  await connectToDB();     // ← now matches the actual function name
+  await connectToDB();
   const body = await req.json();
 
   const existing = await Shop.findOne({ email: body.email });

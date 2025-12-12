@@ -1,58 +1,73 @@
-// src/app/api/stripe-webhook/route.ts
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { connectToDB } from "@/lib/mongoose";
-import Shop from "@/models/Shop"; // ← your shop/user model
+import Shop from "@/models/Shop";
+
+export const config = {
+  api: {
+    bodyParser: false, // Stripe requires raw body
+  },
+};
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // @ts-ignore — preview version
+  // @ts-ignore
   apiVersion: "2025-11-17.clover",
 });
 
 export async function POST(req: Request) {
-  const body = await req.text();
+  const rawBody = await req.text();
   const signature = req.headers.get("stripe-signature")!;
 
-  let event: Stripe.Event;
+  let event;
 
   try {
     event = stripe.webhooks.constructEvent(
-      body,
+      rawBody,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err: any) {
-    console.log("Webhook signature verification failed:", err.message);
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+    console.error("Webhook signature error:", err.message);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // Handle the event
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
+  // Connect DB once per event
+  await connectToDB();
 
-    const shopId = session.client_reference_id;
-    if (!shopId) {
-      console.log("No client_reference_id — skipping");
-      return new Response("No shopId", { status: 200 });
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object;
+
+      const shopId = session.client_reference_id; // we fixed this above
+
+      if (!shopId) {
+        console.error("Missing shopId in checkout.session.completed");
+        break;
+      }
+
+      await Shop.findByIdAndUpdate(shopId, {
+        isPro: true,
+        proSince: new Date(),
+      });
+
+      console.log("🔥 Shop upgraded:", shopId);
+      break;
     }
 
-    await connectToDB();
-    await Shop.findByIdAndUpdate(shopId, {
-      isPro: true,
-      proSince: new Date(),
-      stripeCustomerId: session.customer as string,
-      stripeSubscriptionId: session.subscription as string,
-    });
+    case "customer.subscription.deleted": {
+      const sub = event.data.object;
+      const shopId = sub.metadata?.shopId;
 
-    console.log(`Shop ${shopId} upgraded to Pro!`);
+      if (!shopId) break;
+
+      await Shop.findByIdAndUpdate(shopId, {
+        isPro: false,
+      });
+
+      console.log("⛔ Subscription canceled for:", shopId);
+      break;
+    }
   }
 
-  return new Response("Success", { status: 200 });
+  return NextResponse.json({ received: true });
 }
-
-// Required for Stripe webhooks (raw body)
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
