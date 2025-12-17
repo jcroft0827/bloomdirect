@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
+import { useRef } from "react";
+import { signOut } from "next-auth/react";
+import { set } from "mongoose";
 
 export default function SettingsClient({ initialShop }: { initialShop: any }) {
   const [shop, setShop] = useState({
@@ -14,7 +17,17 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
     weddingConsultations: initialShop.weddingConsultations ?? false,
   });
   const [passwordUpdate, setPasswordUpdate] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+
   const router = useRouter();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bouquetInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
     const res = await fetch("/api/shops/update", {
@@ -33,6 +46,12 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
       toast.error(error.error || "Failed to save");
     }
   };
+
+  useEffect(() => {
+    if ("scrollRestoration" in history) {
+      history.scrollRestoration = "manual";
+    }
+  }, []);
 
   return (
     <>
@@ -256,9 +275,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   Shop Logo / Photo
                 </label>
                 <div
-                  onClick={() =>
-                    document.getElementById("logo-upload")?.click()
-                  }
+                  onClick={() => logoInputRef.current?.click()}
                   className="border-4 border-dashed border-purple-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-purple-500 transition"
                 >
                   {shop.logo ? (
@@ -292,7 +309,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   )}
                 </div>
                 <input
-                  id="logo-upload"
+                  ref={logoInputRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
@@ -313,9 +330,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   Featured Bouquet Photo
                 </label>
                 <div
-                  onClick={() =>
-                    document.getElementById("bouquet-upload")?.click()
-                  }
+                  onClick={() => bouquetInputRef.current?.click()}
                   className="border-4 border-dashed border-purple-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-purple-500 transition"
                 >
                   {shop.featuredBouquet ? (
@@ -349,7 +364,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   )}
                 </div>
                 <input
-                  id="bouquet-upload"
+                  ref={bouquetInputRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
@@ -410,60 +425,174 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
             </div>
           </div>
 
-          {/* Update Password */}
-          <div>
-            <button
-              onClick={() => {setPasswordUpdate(true)}}
-              className={(passwordUpdate ? "hidden" : "block") + " bg-red-600 hover:bg-red-700 text-white font-black text-xl px-12 py-6 rounded-2xl mx-auto mb-12"}
-            >
-              Password Settings
-            </button>
-            <div
-              className={(passwordUpdate ? "flex" : "hidden") + " flex-col mx-auto max-w-72 mb-12 gap-5"}
-            >
-              <div className="flex flex-col">
-              <label>Enter Password</label>
-              <div>
-              <input 
-                placeholder="Password..."
-              />
-              <button>go</button>
-              </div>
-              </div>
-              <button
-                onClick={() => {setPasswordUpdate(false)}}
-                className="bg-red-600 hover:bg-red-700 text-white font-black text-lg px-10 py-2 rounded-2xl mx-auto"
-              >
-                cancel
-              </button>
-            </div>
-          </div>
-          <div className="bg-red-50 rounded-3xl p-10 mt-12 border-4 border-red-200 mb-12 hidden">
-            <h2 className="text-3xl font-black text-red-700 mb-6">
-              Change Password
-            </h2>
-            <div className="space-y-6">
-              <input
-                type="password"
-                placeholder="Current password"
-                className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
-              />
-              <input
-                type="password"
-                placeholder="New password"
-                className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
-              />
-              <input
-                type="password"
-                placeholder="Confirm new password"
-                className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
-              />
-              <button className="bg-red-600 hover:bg-red-700 text-white font-black text-xl px-12 py-6 rounded-2xl">
-                Update Password
-              </button>
-            </div>
-          </div>
+          {/* Update Login Information */}
+          <div className="flex flex-col mb-12 items-center justify-center gap-8 bg-gradient-to-br from-blue-200 to-red-200 rounded-3xl shadow-2xl p-10 md:flex-row md:gap-12">
+            {/* Update Password */}
+            <div className="text-center">
+              {!showPasswordForm ? (
+                <button
+                  onClick={() => {
+                    setShowEmailForm(false);
+                    setShowPasswordForm(true);
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white font-black text-xl px-12 py-6 rounded-2xl"
+                >
+                  Change Password
+                </button>
+              ) : (
+                <div className="max-w-md mx-auto bg-red-50 border-4 border-red-200 rounded-3xl p-8 space-y-6">
+                  <h2 className="text-2xl font-black text-red-700">
+                    Change Password
+                  </h2>
 
+                  <input
+                    type="password"
+                    placeholder="Current password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full px-6 py-4 text-lg border-4 rounded-xl"
+                  />
+
+                  <input
+                    type="password"
+                    placeholder="New password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-6 py-4 text-lg border-4 rounded-xl"
+                  />
+
+                  <input
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-6 py-4 text-lg border-4 rounded-xl"
+                  />
+
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={async () => {
+                        if (newPassword !== confirmPassword) {
+                          toast.error("Passwords do not match");
+                          return;
+                        }
+
+                        const res = await fetch("/api/auth/change-password", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            currentPassword,
+                            newPassword,
+                          }),
+                        });
+
+                        if (res.ok) {
+                          toast.success("Password updated.");
+                          setShowPasswordForm(false);
+                        } else {
+                          const err = await res.json();
+                          toast.error(err.error);
+                        }
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl"
+                    >
+                      Update
+                    </button>
+
+                    <button
+                      onClick={() => setShowPasswordForm(false)}
+                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold px-6 py-3 rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Update Email */}
+            <div className="text-center">
+              {!showEmailForm ? (
+                <button
+                  onClick={() => {
+                    setShowPasswordForm(false);
+                    setShowEmailForm(true);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xl px-12 py-6 rounded-2xl"
+                >
+                  Change Email Address
+                </button>
+              ) : (
+                <div className="max-w-md mx-auto bg-blue-50 border-4 border-blue-200 rounded-3xl p-8 space-y-6">
+                  <h2 className="text-2xl font-black text-blue-700">
+                    Change Email
+                    <br /> <span className="text-sm">(Requires Re-login)</span>
+                  </h2>
+
+                  <label className="flex flex-col text-start text-lg font-bold mb-2">
+                    Current Email
+                    <input
+                      type="email"
+                      value={initialShop.email}
+                      disabled
+                      className="w-full px-6 py-4 text-lg border-4 rounded-xl bg-gray-100 text-gray-700"
+                    />
+                  </label>
+
+                  <input
+                    type="email"
+                    placeholder="New email address"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="w-full px-6 py-4 text-lg border-4 rounded-xl"
+                  />
+
+                  <input
+                    type="password"
+                    placeholder="Confirm with password"
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    className="w-full px-6 py-4 text-lg border-4 rounded-xl"
+                  />
+
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={async () => {
+                        const res = await fetch("/api/auth/change-email", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            newEmail,
+                            password: emailPassword,
+                          }),
+                        });
+
+                        if (res.ok) {
+                          toast.success("Email updated. Please log in again.");
+                          setTimeout(() => {
+                            signOut({ callbackUrl: "/login" });
+                          }, 1000);
+                        } else {
+                          const err = await res.json();
+                          toast.error(err.error);
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl"
+                    >
+                      Update
+                    </button>
+
+                    <button
+                      onClick={() => setShowEmailForm(false)}
+                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold px-6 py-3 rounded-xl"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           {/* Save Button */}
           <div className="text-center">
             <button

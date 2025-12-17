@@ -9,10 +9,10 @@ export async function GET() {
   try {
     await connectToDB();
     const session = await getServerSession(authOptions);
-    if (!session?.user?.shopId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const orders = await Order.find({
-      fulfillingShop: session.user.shopId,
+      fulfillingShop: session.user.id,
       status: { $in: ["pending", "accepted"] },
     })
       .sort({ createdAt: -1 })

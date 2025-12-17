@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   try {
     await connectToDB();
     const session = await getServerSession(authOptions);
-    if (!session?.user?.shopId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     // Security: only the fulfilling shop can accept/decline
-    if (order.fulfillingShop.toString() !== session.user.shopId) {
+    if (order.fulfillingShop.toString() !== session.user.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
