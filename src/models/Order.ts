@@ -1,17 +1,26 @@
-// src/models/Order.ts
 import mongoose from "mongoose";
+import { OrderStatus } from "@/lib/order-status";
 
 const orderSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, unique: true },
-  originatingShop: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
+
+  originatingShop: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Shop",
+    required: true,
+  },
   originatingShopName: String,
-  fulfillingShop: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
+
+  fulfillingShop: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Shop",
+    required: true,
+  },
   fulfillingShopName: String,
 
   recipient: {
     firstName: String,
     lastName: String,
-    fullName: String,
     address: String,
     city: String,
     state: String,
@@ -28,32 +37,37 @@ const orderSchema = new mongoose.Schema({
     phone: String,
   },
 
-  deliveryDate: { type: Date, required: true },
-  deliveryTimeOption: { type: String, enum: ["anytime", "specific"], default: "anytime" },
-  deliveryTimeFrom: String,
-  deliveryTimeTo: String,
+  deliveryDate: Date,
 
   productName: String,
   productDescription: String,
   productPhoto: String,
   specialInstructions: String,
 
-  totalCustomerPaid: { type: Number, required: true },
+  totalCustomerPaid: Number,
   bloomDirectFee: Number,
   fulfillingShopGets: Number,
 
-  // Legacy — keep for old orders
-  arrangementValue: Number,
-  deliveryFee: Number,
-  originatingFee: Number,
+  paymentMethod: {
+    type: String,
+    enum: ["venmo", "cashapp", "zelle", "other"],
+  },
+  paymentMarkedPaidAt: Date,
 
   status: {
     type: String,
-    enum: ["pending", "accepted", "declined", "delivered"],
-    default: "pending",
+    enum: Object.values(OrderStatus),
+    default: OrderStatus.PENDING_ACCEPTANCE,
   },
+
+  // Timestamps (future-proof, optional use)
+  acceptedAt: Date,
+  declinedAt: Date,
+  paidAt: Date,
+  completedAt: Date,
 
   createdAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.models.Order || mongoose.model("Order", orderSchema);
+export default mongoose.models.Order ||
+  mongoose.model("Order", orderSchema);

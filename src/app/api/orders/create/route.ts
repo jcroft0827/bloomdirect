@@ -122,8 +122,7 @@ export async function POST(req: Request) {
       deliveryTimeOption,
       deliveryTimeFrom:
         deliveryTimeOption === "specific" ? deliveryTimeFrom : null,
-      deliveryTimeTo:
-        deliveryTimeOption === "specific" ? deliveryTimeTo : null,
+      deliveryTimeTo: deliveryTimeOption === "specific" ? deliveryTimeTo : null,
 
       totalCustomerPaid,
       bloomDirectFee,
@@ -142,7 +141,7 @@ export async function POST(req: Request) {
       from: "BloomDirect Orders <new-orders@getbloomdirect.com>",
       to: fulfillShop.email,
       subject: `New Order • ${order.orderNumber} • ${originShop.shopName}`,
-html: `
+      html: `
  <!DOCTYPE html>
  <html>
  <head>
@@ -173,8 +172,8 @@ html: `
        <p style="margin:8px 0 0; font-size:20px; font-weight:600; color:#2d1b3d;">
          ${originShop.shopName}<br>
          <span style="font-weight:400; color:#666;">${originShop.city}, ${
-       originShop.state
-     }</span>
+        originShop.state
+      }</span>
        </p>
      </div>
 
@@ -191,8 +190,8 @@ html: `
          <p style="margin:8px 0 0; padding:8px 16px; background:${
            order.deliveryTimeOption === "specific" ? "#fee2e2" : "#ecfdf5"
          }; color:${
-       order.deliveryTimeOption === "specific" ? "#991b1b" : "#166534"
-     }; border-radius:50px; display:inline-block; font-weight:600;">
+        order.deliveryTimeOption === "specific" ? "#991b1b" : "#166534"
+      }; border-radius:50px; display:inline-block; font-weight:600;">
            ${
              order.deliveryTimeOption === "specific"
                ? `${order.deliveryTimeFrom} – ${order.deliveryTimeTo}`
@@ -211,8 +210,8 @@ html: `
        <p style="margin:8px 0; color:#444; line-height:1.6;">
          ${order.recipient.address}<br>
          ${order.recipient.city}, ${order.recipient.state} ${
-       order.recipient.zip
-     }<br>
+        order.recipient.zip
+      }<br>
          Phone: ${order.recipient.phone || "Not provided"}
        </p>
      </div>
@@ -268,35 +267,15 @@ html: `
 
      <!-- Earnings -->
      <div style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); padding:32px; border-radius:16px; text-align:center; margin:40px 0;">
-       <p style="margin:0; color:#166534; font-size:18px; font-weight:600;">You earn today</p>
-       <p style="margin:16px 0 0; color:#166534; font-size:48px; font-weight:800; font-family:'Playfair Display', serif;">
-         $${order.fulfillingShopGets.toFixed(2)}
-       </p>
-       <p style="margin:8px 0 0; color:#166534; font-size:16px;">80% of order • paid instantly</p>
-     </div>
-
-     <!-- Payment Options -->
-     <div style="margin:40px 0;">
-       <p style="margin:0 0 16px; font-weight:600; color:#2d1b3d;">Get paid instantly via:</p>
-       <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
-         <a href="https://venmo.com/?txn=pay&recipients=${encodeURIComponent(
-           fulfillShop.phone
-         )}&amount=${order.fulfillingShopGets.toFixed(2)}&note=BloomDirect%20${
-       order.orderNumber
-     }"
-            style="background:#008CFF; color:white; padding:14px 28px; border-radius:12px; text-decoration:none; font-weight:600;">
-           Venmo
-         </a>
-         <a href="https://cash.app/$cashtag?amount=${order.fulfillingShopGets.toFixed(
-           2
-         )}"
-            style="background:#00C244; color:white; padding:14px 28px; border-radius:12px; text-decoration:none; font-weight:600;">
-           Cash App
-         </a>
-       </div>
-       <p style="margin:20px 0 0; text-align:center; color:#666;">
-         Or Zelle to: <strong>${fulfillShop.phone}</strong>
-       </p>
+        <p style="margin:0; color:#166534; font-size:18px; font-weight:600;">
+          Earnings for this order
+        </p>
+        <p style="margin:16px 0 0; color:#166534; font-size:48px; font-weight:800;">
+          $${order.fulfillingShopGets.toFixed(2)}
+        </p>
+        <p style="margin:8px 0 0; color:#166534; font-size:16px;">
+          Payment is requested after you accept this order
+        </p>
      </div>
 
      <!-- CTA Button -->
@@ -327,4 +306,4 @@ html: `
       { status: 500 }
     );
   }
-};
+}

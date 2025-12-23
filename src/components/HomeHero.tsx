@@ -31,7 +31,7 @@ export default function HomeHero() {
           </Link>
           <Link
             href='#how-it-works'
-            className="rounded-2xl border-2 border-purple-600 px-8 py-4 text-lg font-bold text-purple-600 hover:bg-purple-50"
+            className="rounded-2xl border-2 border-emerald-600 px-8 py-4 text-lg font-bold text-emerald-600 hover:bg-purple-50"
           >
             How It Works
           </Link>
@@ -49,7 +49,7 @@ export default function HomeHero() {
         <motion.div
             animate={{ opacity: [0.4, 0.8, 0.4] }}
             transition={{ duration: 4, repeat: Infinity }}
-            className="absolute inset-0 rounded-full border-2 border-dashed border-green-400"
+            className="absolute inset-0 rounded-full border-2 border-dashed border-emerald-400"
         >
             
             {/* Shop Nodes */}

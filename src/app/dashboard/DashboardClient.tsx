@@ -209,7 +209,7 @@ export default function DashboardClient() {
             href="/dashboard/incoming"
             className="group bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-3xl p-12 text-center shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 transition-all duration-300"
           >
-            <div className="text-6xl mb-4">Incoming Orders</div>
+            <div className="text-6xl mb-4">Orders</div>
             <p className="text-xl opacity-90">
               Accept orders & earn 100% of delivery + arrangement
             </p>

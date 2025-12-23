@@ -52,6 +52,7 @@ const shopSchema = new mongoose.Schema(
     lastLogin: Date,
     lastActive: Date,
     onboardingComplete: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false },
 
     // Search / geo (optional)
     geoLocation: {

@@ -32,29 +32,69 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-lg w-full bg-white rounded-lg shadow p-8">
-        <h1 className="text-3xl font-bold text-center mb-8">Join BloomDirect</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">
+          Join BloomDirect
+        </h1>
+        <p className="text-center text-gray-600 mb-6">
+          Free forever. No commissions. Built for independent florists.
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input placeholder="Shop Name" required className="w-full px-4 py-3 border rounded-lg"
-            onChange={(e) => setForm({ ...form, shopName: e.target.value })} />
-          <input type="email" placeholder="Email" required className="w-full px-4 py-3 border rounded-lg"
-            onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <input type="password" placeholder="Password" required className="w-full px-4 py-3 border rounded-lg"
-            onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          <input placeholder="Phone" className="w-full px-4 py-3 border rounded-lg"
-            onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <input placeholder="Address" className="w-full px-4 py-3 border rounded-lg"
-            onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          <input
+            placeholder="Shop Name"
+            required
+            className="w-full px-4 py-3 border rounded-lg"
+            onChange={(e) => setForm({ ...form, shopName: e.target.value })}
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            required
+            className="w-full px-4 py-3 border rounded-lg"
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            required
+            className="w-full px-4 py-3 border rounded-lg"
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+          />
+          <input
+            placeholder="Phone"
+            className="w-full px-4 py-3 border rounded-lg"
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          />
+          <input
+            placeholder="Address"
+            className="w-full px-4 py-3 border rounded-lg"
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+          />
           <div className="grid grid-cols-3 gap-4">
-            <input placeholder="City" className="px-4 py-3 border rounded-lg"
-              onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            <input placeholder="State" className="px-4 py-3 border rounded-lg"
-              onChange={(e) => setForm({ ...form, state: e.target.value })} />
-            <input placeholder="ZIP" className="px-4 py-3 border rounded-lg"
-              onChange={(e) => setForm({ ...form, zip: e.target.value })} />
+            <input
+              placeholder="City"
+              className="px-4 py-3 border rounded-lg"
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+            />
+            <input
+              placeholder="State"
+              className="px-4 py-3 border rounded-lg"
+              onChange={(e) => setForm({ ...form, state: e.target.value })}
+            />
+            <input
+              placeholder="ZIP"
+              className="px-4 py-3 border rounded-lg"
+              onChange={(e) => setForm({ ...form, zip: e.target.value })}
+            />
           </div>
-          <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-lg font-bold hover:bg-green-700">
+          <button
+            type="submit"
+            className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition"
+          >
             Create My Shop
           </button>
+          <p className="text-center text-xs text-gray-500 mt-4">
+            No contracts. Cancel anytime. Your data stays yours.
+          </p>
         </form>
       </div>
     </div>

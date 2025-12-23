@@ -1,10 +1,10 @@
 import Providers from "@/components/Providers";
-import IncomingClient from "./IncomingClient";
+import OrdersDashboard from "./OrdersDashboard";
 
 export default function IncomingPage() {
   return (
     <Providers>
-      <IncomingClient />
+      <OrdersDashboard />
     </Providers>
   );
 }
