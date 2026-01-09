@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OrderStatus } from "@/lib/order-status";
+import OrderFlowHelper from "@/components/OrderFlowHelper";
 
 export default function OrdersDashboard() {
   const { data: session, status } = useSession();
@@ -149,6 +150,8 @@ export default function OrdersDashboard() {
             Manage all orders — sent and received
           </p>
 
+          <OrderFlowHelper />
+
           {orders.length === 0 ? (
             <div className="text-center py-32">
               <p className="text-3xl text-gray-600">No orders found</p>
@@ -178,6 +181,8 @@ export default function OrdersDashboard() {
                           </span>
                         </div>
                       )}
+                      <Link href={`/orders/${order._id}`}>View Order</Link>
+
                       <div className="text-center">
                         <p className="text-5xl font-black text-emerald-600">
                           You earn ${order.fulfillingShopGets?.toFixed(2)}
@@ -316,18 +321,18 @@ export default function OrdersDashboard() {
                           </div>
                         )}
 
-                        {/* Mark Delivered (Fulfilling Shop) */}
-                        {order.status === OrderStatus.PAID_AWAITING_FULFILLMENT &&
-                          session?.user?.id === order.fulfillingShop && (
-                            <button
-                              onClick={() =>
-                                handleStatus(order._id, OrderStatus.COMPLETED)
-                              }
-                              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black text-2xl py-4 rounded-3xl"
-                            >
-                              Mark as Delivered
-                            </button>
-                          )}
+                      {/* Mark Delivered (Fulfilling Shop) */}
+                      {order.status === OrderStatus.PAID_AWAITING_FULFILLMENT &&
+                        session?.user?.id === order.fulfillingShop && (
+                          <button
+                            onClick={() =>
+                              handleStatus(order._id, OrderStatus.COMPLETED)
+                            }
+                            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black text-2xl py-4 rounded-3xl"
+                          >
+                            Mark as Delivered
+                          </button>
+                        )}
                     </div>
                   </div>
                 </div>
