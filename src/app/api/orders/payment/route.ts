@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getResend } from "@/lib/resend";
 import Shop from "@/models/Shop";
+import { getOrderEmailSubject } from "@/lib/order-email-subject";
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +20,10 @@ export async function POST(req: Request) {
 
     const { orderId, paymentMethod } = await req.json();
     if (!["venmo", "cashapp", "zelle", "other"].includes(paymentMethod)) {
-      return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid payment method" },
+        { status: 400 }
+      );
     }
 
     const order = await Order.findById(orderId);
@@ -33,7 +37,10 @@ export async function POST(req: Request) {
 
     // Only allow marking paid if status is ACCEPTED_AWAITING_PAYMENT
     if (order.status !== OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
-      return NextResponse.json({ error: "Cannot mark this order as paid", status: 400 });
+      return NextResponse.json({
+        error: "Cannot mark this order as paid",
+        status: 400,
+      });
     }
 
     // Update order
@@ -41,6 +48,12 @@ export async function POST(req: Request) {
     order.paymentMethod = paymentMethod;
     order.paymentMarkedPaidAt = new Date();
     order.paidAt = new Date();
+    order.activityLog.push({
+      action: "PAID",
+      message: `Marked paid via ${paymentMethod}`,
+      actorShop: session.user.id,
+    });
+
     await order.save();
 
     // Send email notification to fulfilling shop
@@ -52,9 +65,13 @@ export async function POST(req: Request) {
       await resend.emails.send({
         from: "BloomDirect <new-orders@getbloomdirect.com>",
         to: fulfillShop.email,
-        subject: `Order ${order.orderNumber} Paid — Ready to Fulfill`,
+        subject:
+          getOrderEmailSubject(order.orderNumber, order.status) +
+          ` - Ready to Fulfill`,
         html: `
-          <p>Order #${order.orderNumber} has been marked as paid by ${originShop.shopName} via ${paymentMethod.toUpperCase()}.</p>
+          <p>Order #${order.orderNumber} has been marked as paid by ${
+          originShop.shopName
+        } via ${paymentMethod.toUpperCase()}.</p>
           <p>Start preparing the order and mark it as fulfilled once done.</p>
         `,
       });

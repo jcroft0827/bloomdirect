@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import Order from "@/models/Order";
 import Shop from "@/models/Shop";
 import { Resend } from "resend";
+import { getOrderEmailSubject } from "@/lib/order-email-subject";
 
 /**
  * Generates a readable BloomDirect order number
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: "BloomDirect Orders <new-orders@getbloomdirect.com>",
       to: fulfillShop.email,
-      subject: `New Order • ${order.orderNumber} • ${originShop.shopName}`,
+      subject: getOrderEmailSubject(order.orderNumber, order.status) + ` - ${originShop.shopName}`,
       html: `
  <!DOCTYPE html>
  <html>

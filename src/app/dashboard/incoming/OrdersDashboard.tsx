@@ -17,6 +17,14 @@ export default function OrdersDashboard() {
   const [roleFilter, setRoleFilter] = useState<
     "originating" | "fulfilling" | "all"
   >("all");
+
+  const [declineOrderId, setDeclineOrderId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState<string>("");
+  const [declineMessage, setDeclineMessage] = useState<string>("");
+  const [declineLoading, setDeclineLoading] = useState(false);
+
+  const [actionOrderId, setActionOrderId] = useState<string | null>(null);
+
   const router = useRouter();
 
   const fetchOrders = async () => {
@@ -48,11 +56,17 @@ export default function OrdersDashboard() {
   }, [statusFilter, roleFilter]);
 
   const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
+    if (actionOrderId === orderId) return; // Prevent duplicate actions
+
+    setActionOrderId(orderId);
+
     const res = await fetch("/api/orders/status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId, status: newStatus }),
     });
+
+    setActionOrderId(null);
 
     if (res.ok) {
       toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
@@ -98,6 +112,14 @@ export default function OrdersDashboard() {
     FULFILLED_PENDING_CONFIRMATION: "Delivered — Awaiting Confirmation",
     COMPLETED: "Completed",
     DECLINED: "Declined",
+  };
+
+  const statusBadgeStyles: Record<string, string> = {
+    PENDING_ACCEPTANCE: "bg-yellow-100 text-yellow-800",
+    ACCEPTED_AWAITING_PAYMENT: "bg-blue-100 text-blue-800",
+    PAID_AWAITING_FULFILLMENT: "bg-purple-100 text-purple-800",
+    COMPLETED: "bg-emerald-100 text-emerald-800",
+    DECLINED: "bg-red-100 text-red-700",
   };
 
   return (
@@ -161,7 +183,13 @@ export default function OrdersDashboard() {
               {orders.map((order) => (
                 <div
                   key={order._id}
-                  className="bg-white rounded-3xl shadow-2xl overflow-hidden border-l-8 border-yellow-500"
+                  className={`bg-white rounded-3xl shadow-2xl overflow-hidden border-l-8 ${
+                    order.status === OrderStatus.DECLINED
+                      ? "border-red-500"
+                      : order.status === OrderStatus.COMPLETED
+                      ? "border-emerald-500"
+                      : "border-yellow-500"
+                  }`}
                 >
                   <div className="grid lg:grid-cols-3 gap-8 p-8">
                     {/* LEFT: Product & Earnings */}
@@ -262,16 +290,60 @@ export default function OrdersDashboard() {
                       <p className="text-xl text-gray-500 uppercase tracking-wide mb-2">
                         Order Status
                       </p>
-                      <p className="text-4xl font-black text-gray-700 mb-4">
+
+                      <span
+                        className={`px-4 py-2 rounded-full text-sm font-black ${
+                          statusBadgeStyles[order.status] ??
+                          "bg-gray-100 text-gray-700"
+                        }`}
+                      >
                         {statusLabels[order.status] ||
                           order.status.replaceAll("_", " ")}
-                      </p>
+                      </span>
+
+                      {order.status === OrderStatus.DECLINED &&
+                        session?.user?.id === order.originatingShop && (
+                          <div className="mt-3 text-sm bg-red-50 border border-red-200 rounded-xl p-3">
+                            <p className="font-bold text-red-700">Declined</p>
+
+                            {order.declineReason && (
+                              <p>
+                                <span className="font-semibold">Reason:</span>{" "}
+                                {order.declineReason.replaceAll("_", " ")}
+                              </p>
+                            )}
+
+                            {order.declineMessage && (
+                              <p className="italic mt-1">
+                                “{order.declineMessage}”
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                      {order.status === OrderStatus.DECLINED &&
+                        session?.user?.id === order.originatingShop && (
+                          <button
+                            onClick={() => {
+                              const confirmed = confirm(
+                                "Reassign this order to another shop?"
+                              );
+                              if (confirmed) {
+                                router.push(`/orders/${order._id}`);
+                              }
+                            }}
+                            className="mt-3 text-sm font-bold text-purple-600 hover:underline"
+                          >
+                            Reassign this order →
+                          </button>
+                        )}
 
                       {/* Accept / Decline → Only fulfilling shop */}
                       {order.status === OrderStatus.PENDING_ACCEPTANCE &&
                         session?.user?.id === order.fulfillingShop && (
                           <div className="flex flex-col gap-4 w-full">
                             <button
+                              disabled={actionOrderId === order._id}
                               onClick={() =>
                                 handleStatus(
                                   order._id,
@@ -282,10 +354,14 @@ export default function OrdersDashboard() {
                             >
                               Accept
                             </button>
+
                             <button
-                              onClick={() =>
-                                handleStatus(order._id, OrderStatus.DECLINED)
-                              }
+                              disabled={actionOrderId === order._id}
+                              onClick={() => {
+                                setDeclineOrderId(order._id);
+                                setDeclineReason("");
+                                setDeclineMessage("");
+                              }}
                               className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-2xl py-4 rounded-3xl"
                             >
                               Decline
@@ -301,6 +377,7 @@ export default function OrdersDashboard() {
                               ["venmo", "cashapp", "zelle", "other"] as const
                             ).map((method) => (
                               <button
+                                disabled={actionOrderId === order._id}
                                 key={method}
                                 onClick={() =>
                                   handleMarkPaid(order._id, method)
@@ -325,6 +402,7 @@ export default function OrdersDashboard() {
                       {order.status === OrderStatus.PAID_AWAITING_FULFILLMENT &&
                         session?.user?.id === order.fulfillingShop && (
                           <button
+                            disabled={actionOrderId === order._id}
                             onClick={() =>
                               handleStatus(order._id, OrderStatus.COMPLETED)
                             }
@@ -341,6 +419,94 @@ export default function OrdersDashboard() {
           )}
         </div>
       </div>
+
+      {/* Decline Order Modal */}
+      {declineOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-3xl p-8 max-w-lg space-y-6 shadow-2xl">
+            <h2 className="text-3xl font-black text-red-600">
+              Decline Order
+            </h2>
+
+            <div>
+              <label className="block font-bold mb-2">Reason</label>
+              <select
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                className="w-full border rounded-xl p-3"
+              >
+                <option value="">Select a reason</option>
+                <option value="OUT_OF_STOCK">Out of Stock</option>
+                <option value="TOO_BUSY">Too Busy</option>
+                <option value="DELIVERY_TOO_FAR">Delivery Too Far</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
+            {declineReason === "OTHER" && (
+              <div>
+                <label className="block font-bold mb-2">
+                  Additional details
+                </label>
+
+                <textarea 
+                  value={declineMessage}
+                  onChange={(e) => setDeclineMessage(e.target.value)}
+                  className="w-full border rounded-xl p-3"
+                  rows={4}
+                  placeholder="Please explain..."
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setDeclineOrderId(null)}
+                className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-black rounded-xl"
+              >
+                Cancel
+              </button>
+
+              <button
+                disabled={
+                  !declineReason ||
+                  (declineReason === "OTHER" && !declineMessage.trim()) ||
+                  declineLoading
+                }
+                onClick={async () => {
+                  setDeclineLoading(true);
+
+                  const res = await fetch("/api/orders/status", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      orderId: declineOrderId,
+                      status: OrderStatus.DECLINED,
+                      declineReason,
+                      declineMessage: declineMessage.trim(),
+                    }),
+                  });
+
+                  setDeclineLoading(false);
+
+                  if (res.ok) {
+                    toast.success("Order declined");
+                    setDeclineOrderId(null);
+                    fetchOrders();
+                  } else {
+                    const err = await res.json();
+                    toast.error(err.error || "Failed to decline order");
+                  }
+                }}
+
+                className="px-6 py-3 rounded-xl bg-red-600 text-white font-black disabled:opacity-50"
+              >
+                Confirm Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
