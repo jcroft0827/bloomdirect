@@ -1,24 +1,24 @@
-// /app/invite/[token]/route.ts
-import { redirect } from "next/navigation";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import Invite from "@/models/Invite";
 
 export async function GET(
-  req: Request,
-  context: { params: { token: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
 ) {
-  const { token } = context.params;
+  const { token } = await params;
 
   await connectToDB();
 
   const invite = await Invite.findOne({ token });
 
-  if (invite) {
-    await Invite.updateOne(
-      { _id: invite._id },
-      { $inc: { uses: 1 } }
+  if (!invite) {
+    return NextResponse.redirect(
+      new URL("/register?error=invalid-invite", request.url)
     );
   }
 
-  redirect(`/register?invite=${token}`);
+  return NextResponse.redirect(
+    new URL(`/register?invite=${token}`, request.url)
+  );
 }

@@ -49,8 +49,7 @@ Hi there,
 
 
 <p style="font-size: 16px; color: #374151;">
-<strong>${vars.inviterName}</strong> from
-<strong>${vars.shopName}</strong> invited you to join
+<strong>${vars.inviterName}</strong> invited you to join
 <strong>BloomDirect</strong>.
 </p>
 
