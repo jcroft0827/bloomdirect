@@ -7,6 +7,7 @@ import Order from "@/models/Order";
 import Shop from "@/models/Shop";
 import { Resend } from "resend";
 import { getOrderEmailSubject } from "@/lib/order-email-subject";
+import { ApiError } from "@/lib/api-error";
 
 /**
  * Generates a readable BloomDirect order number
@@ -301,10 +302,19 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, order });
   } catch (error: any) {
-    console.error("ORDER CREATE ERROR:", error);
+  console.error("ORDER CREATE ERROR:", error);
+
+  if (error instanceof ApiError) {
     return NextResponse.json(
-      { error: "Failed to create order" },
-      { status: 500 }
+      { error: error.message, code: error.code },
+      { status: error.status }
     );
   }
+
+  return NextResponse.json(
+    { error: "Failed to create order. Please try again.", code: "SERVER_ERROR" },
+    { status: 500 }
+  );
+}
+
 }

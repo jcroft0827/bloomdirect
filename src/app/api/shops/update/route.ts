@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import { redirect } from "next/navigation";
+import { ApiError } from "@/lib/api-error";
 
 export async function POST(req: Request) {
   try {
@@ -32,7 +33,21 @@ export async function POST(req: Request) {
     redirect('/dashboard');
 
   } catch (error: any) {
-    console.error("Update shop error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+        console.error("UPDATE SHOP ERROR:", error);
+    
+        if (error instanceof ApiError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code },
+            { status: error.status },
+          );
+        }
+    
+        return NextResponse.json(
+          {
+            error: "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+            code: "SERVER_ERROR",
+          },
+          { status: 500 },
+        );
+      }
 }

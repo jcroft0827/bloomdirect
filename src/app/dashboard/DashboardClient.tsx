@@ -1,8 +1,18 @@
+// /app/dashboard/DashboardClient.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { RingLoader } from "react-spinners";
+import BloomSpinner from "@/components/BloomSpinner";
+import { useRouter } from "next/navigation";
+import { clear } from "console";
+import { getResend } from "@/lib/resend";
+import { Resend } from "resend";
+import { NextResponse } from "next/server";
 
 export default function DashboardClient() {
   const { data: session, status } = useSession();
@@ -17,7 +27,17 @@ export default function DashboardClient() {
   const [logo, setLogo] = useState<string | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [proSince, setProSince] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [newOrderLoading, setNewOrderLoading] = useState(false);
+
+  // Invite Florists
+  const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
+  const [personalMessageVisible, setPersonalMessageVisible] = useState(false);
+  const [personalMessage, setPersonalMessage] = useState("");
+  const [toEmail, setToEmail] = useState("");
+
+  const route = useRouter();
 
   // ------------------------------
   // Fetch dashboard data
@@ -28,6 +48,7 @@ export default function DashboardClient() {
     async function loadDashboard() {
       try {
         console.log("Fetching dashboard info...");
+        setIsLoading(true);
 
         const res = await fetch("/api/dashboard/overview");
         if (!res.ok) {
@@ -47,20 +68,16 @@ export default function DashboardClient() {
         setProSince(data.proSince ?? null);
       } catch (err) {
         console.error("Failed to load dashboard:", err);
+        toast.error(
+          "Failed to load dashboard data. Please refresh the page. If the problem persists, contact GetBloomDirect support.",
+        );
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     }
 
     loadDashboard();
   }, [status]);
-
-  // ------------------------------
-  // Loading / Unauthorized
-  // ------------------------------
-  if (status === "loading" || loading) {
-    return <div className="p-6 text-xl">Loading dashboard...</div>;
-  }
 
   if (status === "unauthenticated") {
     return (
@@ -76,8 +93,50 @@ export default function DashboardClient() {
   console.log("PRO STATUS:", isPro);
 
   // ------------------------------
+  // CLEAR INVITE FIELDS
+  // ------------------------------
+  const clearInviteFields = () => {
+    setToEmail("");
+    setPersonalMessage("");
+    setPersonalMessageVisible(false);
+    setInviteFriendsVisible(false);
+  };
+
+  // ------------------------------
+  // SEND INVITE HANDLER
+  // ------------------------------
+  const sendInvite = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent default form submission behavior
+    try {
+      await fetch("/api/invites/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: toEmail,
+          message: personalMessage,
+        }),
+      });
+      toast.success("Invite sent successfully!");
+      clearInviteFields();
+    } catch (error) {
+      console.error("INVITE ERROR:", error);
+      toast.error(
+        "Failed to send invite. Please try again. If the issue persists, contact GetBloomDirect support.",
+      );
+    }
+  }
+
+  // ------------------------------
   // RENDER
   // ------------------------------
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[70vh] items-center justify-center">
+        <BloomSpinner size={72} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
@@ -86,7 +145,7 @@ export default function DashboardClient() {
         <div className="flex items-center gap-5 w-full justify-between p-2">
           <div>
             {logo && (
-              <img 
+              <img
                 src={logo}
                 alt="Shop Logo"
                 className="w-20 h-20 rounded-full shadow-lg border-4 border-white"
@@ -94,29 +153,29 @@ export default function DashboardClient() {
             )}
           </div>
           <div className="flex items-center gap-5 p-2">
-            <Link href={'/settings'}>
-                             <svg
-                 xmlns="http://www.w3.org/2000/svg"
-                 fill="none"
-                 viewBox="0 0 24 24"
-                 strokeWidth="1.5"
-                 stroke="currentColor"
-                 className="w-8"
-               >
-                 <path
-                   strokeLinecap="round"
-                   strokeLinejoin="round"
-                   d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
-                 />
-                 <path
-                   strokeLinecap="round"
-                   strokeLinejoin="round"
-                   d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                 />
-               </svg>
+            <Link href={"/settings"}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="1.5"
+                stroke="currentColor"
+                className="w-8"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                />
+              </svg>
             </Link>
             <button
-              onClick={() => signOut({ callbackUrl: '/' })}
+              onClick={() => signOut({ callbackUrl: "/" })}
               className="bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-700 transition shadow-lg"
             >
               Log out
@@ -124,18 +183,19 @@ export default function DashboardClient() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-6 py-16">
-            <h1 className="text-4xl md:text-6xl font-bold mb-4">
-              Welcome back, {shopName || "Florist"}!
-            </h1>
-            <p className="text-xl opacity-90">
-              You're saving thousands by skipping wire services.
-            </p>
+          <h1 className="text-4xl md:text-6xl font-bold mb-4">
+            Welcome back, {shopName || "Florist"}!
+          </h1>
+          <p className="text-xl opacity-90">
+            You're saving thousands by skipping wire services.
+          </p>
         </div>
       </div>
+
       <div className="max-w-7xl mx-auto px-6 py-12 -mt-8">
-        {/* Stats Cards */}  
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-           {isPro ? (
+          {isPro ? (
             <>
               {/* REAL STATS — Pro users only */}
               <div className="bg-white rounded-3xl shadow-2xl p-10 border border-emerald-200 hover:scale-105 transition-all">
@@ -194,6 +254,7 @@ export default function DashboardClient() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Link
             href="/dashboard/new-order"
+            onClick={() => setOrdersLoading(true)}
             className="group bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-3xl p-12 text-center shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 transition-all duration-300"
           >
             <div className="text-6xl mb-4">Send New Order</div>
@@ -201,12 +262,13 @@ export default function DashboardClient() {
               Keep $20–$27 instantly → No wire fees
             </p>
             <div className="mt-6 text-3xl font-bold group-hover:translate-x-4 transition-transform inline-block">
-              →
+              {ordersLoading ? <BloomSpinner size={72} /> : "→"}
             </div>
           </Link>
 
           <Link
             href="/dashboard/incoming"
+            onClick={() => setNewOrderLoading(true)}
             className="group bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-3xl p-12 text-center shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 transition-all duration-300"
           >
             <div className="text-6xl mb-4">Orders</div>
@@ -214,7 +276,7 @@ export default function DashboardClient() {
               Accept orders & earn 100% of delivery + arrangement
             </p>
             <div className="mt-6 text-3xl font-bold group-hover:translate-x-4 transition-transform inline-block">
-              →
+              {newOrderLoading ? <BloomSpinner size={72} /> : "→"}
             </div>
           </Link>
         </div>
@@ -234,5 +296,87 @@ export default function DashboardClient() {
           </p>
         </div>
       </div>
+
+      {/* Beta Ad */}
+      <div className="absolute bottom-0 w-full text-2xl text-white font-semibold from-blue-400 to-slate-500 bg-gradient-to-r p-4 text-center shadow-lg hover:cursor-pointer hover:opacity-90 transition">
+        <button
+          onClick={() => setInviteFriendsVisible(true)}
+          className="w-full h-20"
+        >
+          Invite a florist to join BloomDirect's beta program and help us shape
+          the future of floral delivery!
+        </button>
+      </div>
+
+      {/* Invite Friends */}
+      <div
+        className={
+          (inviteFriendsVisible ? "block" : "hidden") +
+          " fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6"
+        }
+      >
+        <div className="from-blue-300 to-white bg-gradient-to-br w-1/3 h-1/2 rounded-3xl shadow-lg">
+          <div className="flex justify-between w-full pr-10 pt-5">
+            <button
+              type="button"
+              onClick={() => setPersonalMessageVisible(true)}
+              className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition shadow-lg ml-5"
+            >
+              Add Personal Message
+            </button>
+
+            <button
+              onClick={() => clearInviteFields()}
+              className="text-3xl font-bold text-gray-600 hover:text-gray-800"
+            >
+              X
+            </button>
+          </div>
+
+          <form className="w-full m-10"
+            onSubmit={(e) => sendInvite(e)}
+          >
+            <label className="block text-xl font-semibold mb-4">
+              To: <br />
+              <span className="text-red-600 text-3xl">*</span>
+              <input
+                type="email"
+                className="mt-2 ml-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-1/2"
+                placeholder="Enter florist's email"
+                value={toEmail}
+                onChange={(e) => setToEmail(e.target.value)}
+              />
+            </label>
+
+            <label className="block text-xl font-semibold mb-4">
+              From: <br />
+              <input
+                type="text"
+                className="mt-2 ml-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                disabled
+                value={shopName}
+              />
+            </label>
+
+            <textarea
+              className={
+                (personalMessageVisible ? "block" : "hidden") +
+                " h-32 w-2/3 p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-6"
+              }
+              placeholder="Personal Message (optional)"
+              value={personalMessage}
+              onChange={(e) => setPersonalMessage(e.target.value)}
+            />
+
+            <button
+              type="submit"
+              className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition shadow-lg"
+            >
+              Send Invite to Florist
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
-  )};
+  );
+}

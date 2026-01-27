@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { ApiError } from "@/lib/api-error";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   // @ts-ignore — preview version (your account uses 2025-11-17.clover)
@@ -45,8 +46,22 @@ export async function POST(req: Request) {
 
     // Redirect the user to Stripe Checkout
     return NextResponse.redirect(checkoutSession.url!, 303);
-  } catch (err: any) {
-    console.error("Stripe checkout error:", err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error: any) {
+    console.error("CHECKOUT ERROR:", error);
+
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "Something went wrong. Please try again.",
+        code: "SERVER_ERROR",
+      },
+      { status: 500 },
+    );
   }
 }

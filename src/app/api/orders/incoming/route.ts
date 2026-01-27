@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import { OrderStatus } from "@/lib/order-status";
+import { ApiError } from "@/lib/api-error";
 
 export async function GET() {
   try {
@@ -30,7 +31,21 @@ export async function GET() {
 
     return NextResponse.json({ orders });
   } catch (error: any) {
-    console.error("INCOMING ERROR:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+      console.error("INCOMING ERROR:", error);
+  
+      if (error instanceof ApiError) {
+        return NextResponse.json(
+          { error: error.message, code: error.code },
+          { status: error.status },
+        );
+      }
+  
+      return NextResponse.json(
+        {
+          error: "Error With Order Incoming. Please contact GetBloomDirect Support.",
+          code: "SERVER_ERROR",
+        },
+        { status: 500 },
+      );
+    }
 }

@@ -5,28 +5,38 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import BloomSpinner from "@/components/BloomSpinner";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoggingIn(true);
 
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false, // ← important: we handle redirect ourselves
-    });
-
-    if (res?.error) {
-      setError("Invalid email or password");
-    } else {
-      router.push("/dashboard");
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false, // ← important: we handle redirect ourselves
+      });
+  
+      if (res?.error) {
+        setError("Invalid email or password");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
   
@@ -80,9 +90,14 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-2xl py-6 rounded-3xl shadow-xl transition"
+            disabled={isLoggingIn}
+            className={`w-full bg-purple-600 hover:bg-purple-700 text-white font-black text-2xl py-6 rounded-3xl shadow-xl transition
+              ${isLoggingIn ? "opacity-70 cursor-not-allowed" : ""}`}
           >
-            Log In
+            <span className="flex items-center justify-center gap-3">
+              {isLoggingIn ? "Logging In..." : "Log In"}
+              {isLoggingIn && (<BloomSpinner size={28} />)}
+            </span>
           </button>
         </form>
       </div>

@@ -1,3 +1,5 @@
+// api/orders/reassign/route.ts
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -7,6 +9,9 @@ import Shop from "@/models/Shop";
 import { OrderStatus } from "@/lib/order-status";
 import { getResend } from "@/lib/resend";
 import { getOrderEmailSubject } from "@/lib/order-email-subject";
+import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
+import { assertOrderTransition } from "@/lib/order-transition-guard";
+import { ApiError } from "@/lib/api-error";
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +27,7 @@ export async function POST(req: Request) {
     if (!orderId || !newFulfillingShopId) {
       return NextResponse.json(
         { error: "Missing orderId or newFulfillingShopId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,7 +45,7 @@ export async function POST(req: Request) {
     if (order.status !== OrderStatus.DECLINED) {
       return NextResponse.json(
         { error: "Only declined orders can be reassigned" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -48,7 +53,7 @@ export async function POST(req: Request) {
     if (order.fulfillingShop.toString() === newFulfillingShopId) {
       return NextResponse.json(
         { error: "Order is already assigned to this shop" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -56,7 +61,7 @@ export async function POST(req: Request) {
     if (!newShop) {
       return NextResponse.json(
         { error: "Fulfilling shop not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -77,13 +82,24 @@ export async function POST(req: Request) {
 
     order.reassignCount = (order.reassignCount || 0) + 1;
 
-    order.activityLog.push({
-      action: "REASSIGNED",
-      message: `Order reassigned to ${newShop.shopName}`,
-      actorShop: session.user.id,
+    // ─────────────────────────────────────────────
+    // STATUS TRANSITION GUARD
+    // ─────────────────────────────────────────────
+    assertOrderTransition({
+      order,
+      nextStatus: OrderStatus.PENDING_ACCEPTANCE,
+      actorShopId: session.user.id,
     });
 
     await order.save();
+
+    // Activity Log
+    await addOrderActivity({
+      orderId: order._id,
+      action: OrderActivityActions.ORDER_REASSIGNED,
+      actorShopId: session.user.id,
+      message: `Order reassigned to ${newShop.shopName}`,
+    });
 
     /**
      * EMAIL NEW SHOP
@@ -105,7 +121,21 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, order });
   } catch (error: any) {
-    console.error("REASSIGN ERROR:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+        console.error("REASSIGN ERROR:", error);
+    
+        if (error instanceof ApiError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code },
+            { status: error.status },
+          );
+        }
+    
+        return NextResponse.json(
+          {
+            error: "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+            code: "SERVER_ERROR",
+          },
+          { status: 500 },
+        );
+      }
 }

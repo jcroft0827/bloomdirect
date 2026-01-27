@@ -35,9 +35,16 @@ export default function OrdersDashboard() {
 
       const res = await fetch(`/api/orders?${params.toString()}`);
       const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to load orders.");
+        return;
+      }
+
       setOrders(data.orders || []);
     } catch (err) {
       console.error("Failed to load orders", err);
+      toast.error("Unexpected error loading orders. Reload the page. If the problem persists, contact GetBloomDirect support.");
     } finally {
       setLoading(false);
     }
@@ -58,28 +65,35 @@ export default function OrdersDashboard() {
   const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
     if (actionOrderId === orderId) return; // Prevent duplicate actions
 
-    setActionOrderId(orderId);
 
-    const res = await fetch("/api/orders/status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId, status: newStatus }),
-    });
-
-    setActionOrderId(null);
-
-    if (res.ok) {
-      toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
-      fetchOrders();
-    } else {
-      const error = await res.json();
-      toast.error(error.error || "Failed to update order");
+    try {
+      setActionOrderId(orderId);
+  
+      const res = await fetch("/api/orders/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+  
+      setActionOrderId(null);
+  
+      if (res.ok) {
+        toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
+        fetchOrders();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to update order");
+      }
+    } catch (error) {
+      console.error("Failed to update order", error);
+      toast.error("Failed to update order. Please try again. If the problem persists, contact GetBloomDirect support.");
     }
+
   };
 
   const handleMarkPaid = async (
     orderId: string,
-    method: "venmo" | "cashapp" | "zelle" | "other"
+    method: "venmo" | "cashapp" | "zelle" | "other",
   ) => {
     try {
       const res = await fetch("/api/orders/payment", {
@@ -92,8 +106,8 @@ export default function OrdersDashboard() {
         fetchOrders();
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to mark order as paid");
+      console.error("Failed to mark order as paid", err);
+      toast.error("Failed to mark order as paid. Please try again. If the problem persists, contact GetBloomDirect support.");
     }
   };
 
@@ -151,7 +165,7 @@ export default function OrdersDashboard() {
                 value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(
-                    Array.from(e.target.selectedOptions).map((o) => o.value)
+                    Array.from(e.target.selectedOptions).map((o) => o.value),
                   )
                 }
                 className="rounded-xl p-2 border"
@@ -187,8 +201,8 @@ export default function OrdersDashboard() {
                     order.status === OrderStatus.DECLINED
                       ? "border-red-500"
                       : order.status === OrderStatus.COMPLETED
-                      ? "border-emerald-500"
-                      : "border-yellow-500"
+                        ? "border-emerald-500"
+                        : "border-yellow-500"
                   }`}
                 >
                   <div className="grid lg:grid-cols-3 gap-8 p-8">
@@ -240,7 +254,7 @@ export default function OrdersDashboard() {
                               weekday: "long",
                               month: "long",
                               day: "numeric",
-                            }
+                            },
                           )}
                         </p>
                       </div>
@@ -326,7 +340,7 @@ export default function OrdersDashboard() {
                           <button
                             onClick={() => {
                               const confirmed = confirm(
-                                "Reassign this order to another shop?"
+                                "Reassign this order to another shop?",
                               );
                               if (confirmed) {
                                 router.push(`/orders/${order._id}`);
@@ -347,7 +361,7 @@ export default function OrdersDashboard() {
                               onClick={() =>
                                 handleStatus(
                                   order._id,
-                                  OrderStatus.ACCEPTED_AWAITING_PAYMENT
+                                  OrderStatus.ACCEPTED_AWAITING_PAYMENT,
                                 )
                               }
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-2xl py-4 rounded-3xl"
@@ -386,10 +400,10 @@ export default function OrdersDashboard() {
                                   method === "venmo"
                                     ? "bg-blue-500 hover:bg-blue-600"
                                     : method === "cashapp"
-                                    ? "bg-green-500 hover:bg-green-600"
-                                    : method === "zelle"
-                                    ? "bg-purple-500 hover:bg-purple-600"
-                                    : "bg-gray-500 hover:bg-gray-600"
+                                      ? "bg-green-500 hover:bg-green-600"
+                                      : method === "zelle"
+                                        ? "bg-purple-500 hover:bg-purple-600"
+                                        : "bg-gray-500 hover:bg-gray-600"
                                 }`}
                               >
                                 {method.toUpperCase()}
@@ -424,9 +438,7 @@ export default function OrdersDashboard() {
       {declineOrderId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-3xl p-8 max-w-lg space-y-6 shadow-2xl">
-            <h2 className="text-3xl font-black text-red-600">
-              Decline Order
-            </h2>
+            <h2 className="text-3xl font-black text-red-600">Decline Order</h2>
 
             <div>
               <label className="block font-bold mb-2">Reason</label>
@@ -449,7 +461,7 @@ export default function OrdersDashboard() {
                   Additional details
                 </label>
 
-                <textarea 
+                <textarea
                   value={declineMessage}
                   onChange={(e) => setDeclineMessage(e.target.value)}
                   className="w-full border rounded-xl p-3"
@@ -498,7 +510,6 @@ export default function OrdersDashboard() {
                     toast.error(err.error || "Failed to decline order");
                   }
                 }}
-
                 className="px-6 py-3 rounded-xl bg-red-600 text-white font-black disabled:opacity-50"
               >
                 Confirm Decline

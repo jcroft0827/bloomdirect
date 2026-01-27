@@ -8,6 +8,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getResend } from "@/lib/resend";
 import Shop from "@/models/Shop";
+import {
+  addOrderActivity,
+  OrderActivityActions,
+} from "@/lib/order-activity";
+import { assertOrderTransition } from "@/lib/order-transition-guard";
+import { ApiError } from "@/lib/api-error";
+
 
 export async function POST(req: Request) {
   try {
@@ -86,12 +93,22 @@ export async function POST(req: Request) {
       order.declineMessage = declineMessage?.trim();
       order.declinedAt = new Date();
       order.declineCount = (order.declineCount || 0) + 1;
-      order.activityLog.push({
-        action: "DECLINED",
-        message: `Order declined${declineReason ? ` : ${declineReason}` : ""}`,
-        actorShop: session.user.id,
+      await addOrderActivity({
+        orderId: order._id,
+        action: OrderActivityActions.ORDER_DECLINED,
+        actorShopId: session.user.id,
+        message: declineMessage ? declineMessage : `Declined: ${declineReason.replaceAll("_", " ")}`,
       });
     }
+
+    // ─────────────────────────────────────────────
+    // STATUS TRANSITION GUARD
+    // ─────────────────────────────────────────────
+    assertOrderTransition({
+      order,
+      nextStatus: status,
+      actorShopId: session.user.id,
+      });
 
     // ─────────────────────────────────────────────
     // STATUS TRANSITIONS
@@ -101,10 +118,11 @@ export async function POST(req: Request) {
 
     if (status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
       order.acceptedAt = now;
-      order.activityLog.push({
-        action: "ACCEPTED_AWAITING_PAYMENT",
+      await addOrderActivity({
+        orderId: order._id,
+        action: OrderActivityActions.ORDER_ACCEPTED,
+        actorShopId: session.user.id,
         message: `Order accepted, awaiting payment`,
-        actorShop: session.user.id,
       });
 
       // Clear any previous decline data
@@ -114,10 +132,11 @@ export async function POST(req: Request) {
 
     if (status === OrderStatus.COMPLETED) {
       order.completedAt = now;
-      order.activityLog.push({
-        action: "COMPLETED",
-        message: `Order completed`,
-        actorShop: session.user.id,
+      await addOrderActivity({
+        orderId: order._id,
+        action: OrderActivityActions.ORDER_COMPLETED,
+        actorShopId: session.user.id,
+        message: `Order marked as completed`,
       });
     }
 
@@ -183,106 +202,21 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, order });
   } catch (error: any) {
-    console.error("STATUS ROUTE ERROR:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+        console.error("STATUS ROUTE ERROR:", error);
+    
+        if (error instanceof ApiError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code },
+            { status: error.status },
+          );
+        }
+    
+        return NextResponse.json(
+          {
+            error: "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+            code: "SERVER_ERROR",
+          },
+          { status: 500 },
+        );
+      }
 }
-
-// import { NextResponse } from "next/server";
-// import Order from "@/models/Order";
-// import { OrderStatus } from "@/lib/order-status";
-// import { connectToDB } from "@/lib/mongoose";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/lib/auth";
-// import { getResend } from "@/lib/resend";
-// import Shop from "@/models/Shop";
-
-// export async function POST(req: Request) {
-//   try {
-//     await connectToDB();
-//     const session = await getServerSession(authOptions);
-
-//     if (!session?.user?.id) {
-//       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-//     }
-
-//     const { orderId, status } = await req.json();
-
-//     if (!Object.values(OrderStatus).includes(status)) {
-//       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-//     }
-
-//     const order = await Order.findById(orderId);
-//     if (!order) {
-//       return NextResponse.json({ error: "Order not found" }, { status: 404 });
-//     }
-
-//     const userShopId = session.user.id;
-
-//     // PERMISSION RULES
-//     if (
-//       [
-//         OrderStatus.ACCEPTED_AWAITING_PAYMENT,
-//         OrderStatus.DECLINED,
-//         OrderStatus.COMPLETED,
-//       ].includes(status) &&
-//       order.fulfillingShop.toString() !== userShopId
-//     ) {
-//       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-//     }
-
-//     // Status transitions
-//     order.status = status;
-
-//     const now = new Date();
-//     if (status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) order.acceptedAt = now;
-//     if (status === OrderStatus.DECLINED) order.declinedAt = now;
-//     if (status === OrderStatus.COMPLETED) order.completedAt = now;
-
-//     await order.save();
-
-//     // Emails
-//     const resend = getResend();
-//     const originShop = await Shop.findById(order.originatingShop);
-//     const fulfillShop = await Shop.findById(order.fulfillingShop);
-
-//     if (originShop && fulfillShop) {
-//       const sendEmail = (to: string, subject: string, html: string) =>
-//         resend.emails.send({
-//           from: "BloomDirect <new-orders@getbloomdirect.com>",
-//           to,
-//           subject,
-//           html,
-//         });
-
-//       if (status === OrderStatus.ACCEPTED_AWAITING_PAYMENT && originShop.email) {
-//         await sendEmail(
-//           originShop.email,
-//           `Order ${order.orderNumber} Accepted`,
-//           `<p>${fulfillShop.shopName} has accepted your order.</p>`
-//         );
-//       }
-
-//       if (status === OrderStatus.DECLINED && originShop.email) {
-//         await sendEmail(
-//           originShop.email,
-//           `Order ${order.orderNumber} Declined`,
-//           `<p>${fulfillShop.shopName} declined your order.</p>`
-//         );
-//       }
-
-//       if (status === OrderStatus.COMPLETED && originShop.email) {
-//         await sendEmail(
-//           originShop.email,
-//           `Order ${order.orderNumber} Delivered`,
-//           `<p>Your order has been completed and delivered.</p>`
-//         );
-//       }
-//     }
-
-//     return NextResponse.json({ success: true, order });
-//   } catch (error: any) {
-//     console.error("STATUS ERROR:", error);
-//     return NextResponse.json({ error: error.message }, { status: 500 });
-//   }
-// }

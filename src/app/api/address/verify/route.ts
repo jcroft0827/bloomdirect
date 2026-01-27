@@ -1,4 +1,5 @@
 // src/app/api/address/verify/route.ts
+import { ApiError } from "@/lib/api-error";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
 
   try {
     const response = await fetch(
-      `https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML=${encodeURIComponent(xmlRequest)}`
+      `https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML=${encodeURIComponent(xmlRequest)}`,
     );
 
     const text = await response.text();
@@ -29,13 +30,15 @@ export async function POST(req: Request) {
 
     // If USPS returns an error (most common issue)
     if (text.includes("<Error>")) {
-      const desc = text.match(/<Description>(.*?)<\/Description>/)?.[1] || "Unknown error";
+      const desc =
+        text.match(/<Description>(.*?)<\/Description>/)?.[1] || "Unknown error";
       console.log("USPS Error:", desc);
       return NextResponse.json({ suggestions: [] });
     }
 
     // Extract corrected address
-    const address2 = text.match(/<Address2>(.*?)<\/Address2>/)?.[1]?.trim() || street;
+    const address2 =
+      text.match(/<Address2>(.*?)<\/Address2>/)?.[1]?.trim() || street;
     const cityOut = text.match(/<City>(.*?)<\/City>/)?.[1]?.trim() || city;
     const stateOut = text.match(/<State>(.*?)<\/State>/)?.[1]?.trim() || state;
     const zip5 = text.match(/<Zip5>(.*?)<\/Zip5>/)?.[1]?.trim() || zip;
@@ -47,18 +50,34 @@ export async function POST(req: Request) {
 
     if (original !== corrected) {
       return NextResponse.json({
-        suggestions: [{
-          street: address2,
-          city: cityOut,
-          state: stateOut,
-          zip: zip5,
-        }],
+        suggestions: [
+          {
+            street: address2,
+            city: cityOut,
+            state: stateOut,
+            zip: zip5,
+          },
+        ],
       });
     }
 
     return NextResponse.json({ suggestions: [] });
-  } catch (err: any) {
-    console.error("Fetch error:", err.message);
-    return NextResponse.json({ suggestions: [] });
+  } catch (error: any) {
+    console.error("ADDRESS VERIFY ERROR:", error);
+
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+        code: "SERVER_ERROR",
+      },
+      { status: 500 },
+    );
   }
 }

@@ -15,7 +15,7 @@ export default function NewOrderClient() {
   const router = useRouter();
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace('/login');
+      router.replace("/login");
     }
   }, [status, router]);
 
@@ -64,6 +64,10 @@ export default function NewOrderClient() {
   const [searching, setSearching] = useState(false);
   const [findShopSuccess, setFindShopSuccess] = useState(false);
 
+  // Beta
+  const [zipInfoVisible, setZipInfoVisible] = useState(false);
+  const [isBeta, setIsBeta] = useState(true);
+
   const totalCustomerPays = arrangementValue + deliveryFee + originatingFee;
   const fulfillingShopGets = arrangementValue + deliveryFee; // 80/20 model
 
@@ -102,7 +106,10 @@ export default function NewOrderClient() {
         toast.error("No BloomDirect shops in that area yet — invite them!");
       }
     } catch (err) {
-      toast.error("Error finding shops");
+      console.error("Error finding shops", err);
+      toast.error(
+        "Error finding shops. Please try again. If the problem persists, contact GetBloomDirect support.",
+      );
     } finally {
       setSearching(false);
     }
@@ -110,68 +117,84 @@ export default function NewOrderClient() {
 
   // Send Order
   const sendOrder = async () => {
-    if (!selectedShop) return toast.error("Select a fulfilling shop");
-    if (!deliveryDate) return toast.error("Select delivery date");
-    if (!recipientPhone) return toast.error("Recipient phone is required");
+    try {
+      // Validate required fields
+      if (!selectedShop) return toast.error("Select a fulfilling shop");
+      if (!deliveryDate) return toast.error("Select delivery date");
+      if (!recipientPhone) return toast.error("Recipient phone is required");
 
-    // Validate time window if specific
-    if (deliveryTimeOption === "specific") {
-      if (!deliveryTimeFrom || !deliveryTimeTo) {
-        return toast.error("Please select both time fields");
+      // Validate time window if specific
+      if (deliveryTimeOption === "specific") {
+        if (!deliveryTimeFrom || !deliveryTimeTo) {
+          return toast.error("Please select both time fields");
+        }
+        if (deliveryTimeFrom >= deliveryTimeTo) {
+          return toast.error("End time must be after start time");
+        }
       }
-      if (deliveryTimeFrom >= deliveryTimeTo) {
-        return toast.error("End time must be after start time");
+
+      const res = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fulfillingShopId: selectedShop._id,
+          recipient: {
+            firstName: recipientFirstName,
+            lastName: recipientLastName,
+            fullName: `${recipientFirstName} ${recipientLastName}`,
+            address:
+              recipientAddress + (recipientApt ? " " + recipientApt : ""),
+            city: recipientCity,
+            state: recipientState,
+            zip: recipientZip,
+            phone: recipientPhone,
+            email: recipientEmail || null,
+            message: cardMessage,
+          },
+          customer: {
+            firstName: customerFirstName,
+            lastName: customerLastName,
+            email: customerEmail,
+            phone: customerPhone,
+          },
+          deliveryDate: deliveryDate.toISOString(),
+          deliveryTimeOption,
+          deliveryTimeFrom:
+            deliveryTimeOption === "specific" ? deliveryTimeFrom : null,
+          deliveryTimeTo:
+            deliveryTimeOption === "specific" ? deliveryTimeTo : null,
+          productPhoto,
+          productName,
+          productDescription,
+          specialInstructions: specialInstructions || "",
+          pricing: {
+            arrangement: arrangementValue,
+            delivery: deliveryFee,
+            fee: originatingFee,
+            total: totalCustomerPays,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`Order sent! You kept $${originatingFee} pure profit!`);
+        router.push("/dashboard");
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to send order");
       }
+    } catch (error) {
+      console.error("Failed to send order", error);
+      toast.error(
+        "Failed to send order. Please try again. If the problem persists, contact GetBloomDirect support.",
+      );
     }
+  };
 
-    const res = await fetch("/api/orders/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fulfillingShopId: selectedShop._id,
-        recipient: {
-          firstName: recipientFirstName,
-          lastName: recipientLastName,
-          fullName: `${recipientFirstName} ${recipientLastName}`,
-          address: recipientAddress + (recipientApt ? " " + recipientApt : ""),
-          city: recipientCity,
-          state: recipientState,
-          zip: recipientZip,
-          phone: recipientPhone,
-          email: recipientEmail || null,
-          message: cardMessage,
-        },
-        customer: {
-          firstName: customerFirstName,
-          lastName: customerLastName,
-          email: customerEmail,
-          phone: customerPhone,
-        },
-        deliveryDate: deliveryDate.toISOString(),
-        deliveryTimeOption,
-        deliveryTimeFrom:
-          deliveryTimeOption === "specific" ? deliveryTimeFrom : null,
-        deliveryTimeTo:
-          deliveryTimeOption === "specific" ? deliveryTimeTo : null,
-        productPhoto,
-        productName,
-        productDescription,
-        specialInstructions: specialInstructions || "",
-        pricing: {
-          arrangement: arrangementValue,
-          delivery: deliveryFee,
-          fee: originatingFee,
-          total: totalCustomerPays,
-        },
-      }),
-    });
-
-    if (res.ok) {
-      toast.success(`Order sent! You kept $${originatingFee} pure profit!`);
-      router.push("/dashboard");
-    } else {
-      const err = await res.json();
-      toast.error(err.error || "Failed to send order");
+  // Enter Key Press to Search Shops
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      searchShops();
     }
   };
 
@@ -196,14 +219,50 @@ export default function NewOrderClient() {
 
           {/* ZIP Search */}
           <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8">
-            <label className="block text-2xl font-bold mb-6">
-              Recipient ZIP Code
-            </label>
+            <div className="flex justify-between relative">
+              <label className="block text-2xl font-bold mb-6">
+                Recipient ZIP Code
+              </label>
+
+              {/* THIS IS BETA INFORMATION, REMOVE FOR LIVE VERSION */}
+              <button
+                onClick={() => setZipInfoVisible(true)}
+                className={
+                  zipInfoVisible
+                    ? "hidden"
+                    : "text-xl font-bold text-white bg-blue-600 w-8 h-8 rounded-full shadow-2xl hover:text-2xl hover:w-10 hover:h-10 transition-all"
+                }
+              >
+                i
+              </button>
+              <div
+                className={
+                  (zipInfoVisible ? "flex flex-col" : "hidden") +
+                  " bg-blue-100 rounded-2xl shadow-2xl max-w-md absolute -right-7 -top-7"
+                }
+              >
+                <button
+                  onClick={() => setZipInfoVisible(false)}
+                  className="text-xl self-end font-bold text-blue-600 mb-2 pr-4 pt-2"
+                >
+                  X
+                </button>
+                <p className="px-4 pb-4 font-semibold text-purple-700">
+                  <b>In the beta,</b> we show all shops using GetBloomDirect
+                  when searching for shops by ZIP code. This will allow for a
+                  better testing experience. <br />
+                  <br />
+                  <b>In the live version,</b> we will only show shops in the
+                  chosen ZIP code & shops within 5 miles of the ZIP code.
+                </p>
+              </div>
+            </div>
             <div className="flex gap-6 items-center">
               <input
                 type="text"
                 maxLength={5}
                 value={recipientZip}
+                onKeyDown={handleKeyDown}
                 onChange={(e) =>
                   setRecipientZip(e.target.value.replace(/\D/g, "").slice(0, 5))
                 }
@@ -219,11 +278,88 @@ export default function NewOrderClient() {
               </button>
             </div>
             {findShopSuccess && (
-              <p className="mt-6 text-2xl font-bold text-emerald-600 text-center">
-                Shops found! Scroll down to choose.
-              </p>
+              <div>
+                <p className="mt-6 text-2xl font-bold text-emerald-600 text-center">
+                  Shops found! Please select below. <br />
+                </p>
+                {/* THIS IS BETA TEXT, REMOVE FOR LIVE VERSION */}
+                <p className="mt-2 text-lg font-semibold text-purple-600 text-center leading-tight">
+                  In the beta, all shops using GetBloomDirect will show. <br />
+                  This will not be the case in the live version.
+                </p>
+              </div>
             )}
           </div>
+
+          {/* Shop Picker - BETA*/}
+          {shops.length > 0 && isBeta && (
+            <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8">
+              <h2 className="text-3xl font-black text-purple-600 mb-8">
+                Choose Fulfilling Shop - Beta
+              </h2>
+              <div className="space-y-6">
+                {shops.map((shop) => (
+                  <label
+                    key={shop._id}
+                    className={`flex items-center justify-between p-8 border-4 rounded-3xl cursor-pointer transition-all ${
+                      selectedShop?._id === shop._id
+                        ? "border-emerald-600 bg-emerald-50 shadow-2xl scale-105"
+                        : "border-gray-300 hover:border-purple-400"
+                    }`}
+                  >
+                    <div>
+                      <div className="text-2xl font-black">{shop.shopName}</div>
+                      <div className="text-lg text-gray-600">
+                        {shop.address} • {shop.city}, {shop.state}
+                      </div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="shop"
+                      checked={selectedShop?._id === shop._id}
+                      onChange={() => setSelectedShop(shop)}
+                      className="w-8 h-8 text-emerald-600"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Shop Picker - LIVE */}
+          {shops.length > 0 && !isBeta && (
+            <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8">
+              <h2 className="text-3xl font-black text-purple-600 mb-8">
+                Choose Fulfilling Shop - Live
+              </h2>
+              <div className="space-y-6">
+                {shops.map((shop) => (
+                  <label
+                    key={shop._id}
+                    className={`flex items-center justify-between p-8 border-4 rounded-3xl cursor-pointer transition-all ${
+                      selectedShop?._id === shop._id
+                        ? "border-emerald-600 bg-emerald-50 shadow-2xl scale-105"
+                        : "border-gray-300 hover:border-purple-400"
+                    }`}
+                  >
+                    <div>
+                      <div className="text-2xl font-black">{shop.shopName}</div>
+                      <div className="text-lg text-gray-600">
+                        {shop.address} • {shop.city}, {shop.state}
+                      </div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="shop"
+                      checked={selectedShop?._id === shop._id}
+                      onChange={() => setSelectedShop(shop)}
+                      className="w-8 h-8 text-emerald-600"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Recipient Details */}
           <div className="bg-white rounded-3xl shadow-2xl p-10 mb-8 space-y-8">
@@ -257,7 +393,7 @@ export default function NewOrderClient() {
                   value={recipientPhone}
                   onChange={(e) =>
                     setRecipientPhone(
-                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                      e.target.value.replace(/\D/g, "").slice(0, 10),
                     )
                   }
                   className="px-8 py-6 text-xl border-4 rounded-2xl"
@@ -287,7 +423,7 @@ export default function NewOrderClient() {
                   value={recipientZip}
                   onChange={(e) =>
                     setRecipientZip(
-                      e.target.value.replace(/\D/g, "").slice(0, 5)
+                      e.target.value.replace(/\D/g, "").slice(0, 5),
                     )
                   }
                   className="px-8 py-6 text-xl border-4 rounded-2xl"
@@ -345,7 +481,7 @@ export default function NewOrderClient() {
                   value={customerPhone}
                   onChange={(e) =>
                     setCustomerPhone(
-                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                      e.target.value.replace(/\D/g, "").slice(0, 10),
                     )
                   }
                   className="px-8 py-6 text-xl border-4 rounded-2xl"
@@ -680,48 +816,14 @@ export default function NewOrderClient() {
             </div>
           </div>
 
-          {/* Shop Picker */}
-          {shops.length > 0 && (
-            <div className="bg-white rounded-3xl shadow-2xl p-10">
-              <h2 className="text-3xl font-black text-purple-600 mb-8">
-                Choose Fulfilling Shop
-              </h2>
-              <div className="space-y-6">
-                {shops.map((shop) => (
-                  <label
-                    key={shop._id}
-                    className={`flex items-center justify-between p-8 border-4 rounded-3xl cursor-pointer transition-all ${
-                      selectedShop?._id === shop._id
-                        ? "border-emerald-600 bg-emerald-50 shadow-2xl scale-105"
-                        : "border-gray-300 hover:border-purple-400"
-                    }`}
-                  >
-                    <div>
-                      <div className="text-2xl font-black">{shop.shopName}</div>
-                      <div className="text-lg text-gray-600">
-                        {shop.address} • {shop.city}, {shop.state}
-                      </div>
-                    </div>
-                    <input
-                      type="radio"
-                      name="shop"
-                      checked={selectedShop?._id === shop._id}
-                      onChange={() => setSelectedShop(shop)}
-                      className="w-8 h-8 text-emerald-600"
-                    />
-                  </label>
-                ))}
-              </div>
-
-              <button
-                onClick={sendOrder}
-                disabled={!selectedShop || !deliveryDate}
-                className="mt-10 w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-black text-4xl py-10 rounded-3xl shadow-2xl transition-all"
-              >
-                Send Order & Keep ${originatingFee} →
-              </button>
-            </div>
-          )}
+          {/* Send Order Button */}
+          <button
+            onClick={sendOrder}
+            disabled={!selectedShop || !deliveryDate}
+            className="mt-10 w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-black text-4xl py-10 rounded-3xl shadow-2xl transition-all"
+          >
+            Send Order & Keep ${originatingFee} →
+          </button>
         </div>
       </div>
     </>

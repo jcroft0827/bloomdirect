@@ -8,6 +8,9 @@ import { authOptions } from "@/lib/auth";
 import { getResend } from "@/lib/resend";
 import Shop from "@/models/Shop";
 import { getOrderEmailSubject } from "@/lib/order-email-subject";
+import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
+import { assertOrderTransition } from "@/lib/order-transition-guard";
+import { ApiError } from "@/lib/api-error";
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +25,7 @@ export async function POST(req: Request) {
     if (!["venmo", "cashapp", "zelle", "other"].includes(paymentMethod)) {
       return NextResponse.json(
         { error: "Invalid payment method" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -35,26 +38,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
-    // Only allow marking paid if status is ACCEPTED_AWAITING_PAYMENT
-    if (order.status !== OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
-      return NextResponse.json({
-        error: "Cannot mark this order as paid",
-        status: 400,
-      });
-    }
+    // ─────────────────────────────────────────────
+    // STATUS TRANSITION GUARD
+    // ─────────────────────────────────────────────
+    assertOrderTransition({
+      order,
+      nextStatus: OrderStatus.PAID_AWAITING_FULFILLMENT,
+      actorShopId: session.user.id,
+    });
 
     // Update order
     order.status = OrderStatus.PAID_AWAITING_FULFILLMENT;
     order.paymentMethod = paymentMethod;
     order.paymentMarkedPaidAt = new Date();
     order.paidAt = new Date();
-    order.activityLog.push({
-      action: "PAID",
-      message: `Marked paid via ${paymentMethod}`,
-      actorShop: session.user.id,
-    });
 
     await order.save();
+
+    // Activity Log
+    await addOrderActivity({
+      orderId: order._id,
+      action: OrderActivityActions.PAYMENT_MARKED,
+      actorShopId: session.user.id,
+      message: `Payment marked as received via ${paymentMethod.toUpperCase()}`,
+    });
 
     // Send email notification to fulfilling shop
     const originShop = await Shop.findById(order.originatingShop);
@@ -70,8 +77,8 @@ export async function POST(req: Request) {
           ` - Ready to Fulfill`,
         html: `
           <p>Order #${order.orderNumber} has been marked as paid by ${
-          originShop.shopName
-        } via ${paymentMethod.toUpperCase()}.</p>
+            originShop.shopName
+          } via ${paymentMethod.toUpperCase()}.</p>
           <p>Start preparing the order and mark it as fulfilled once done.</p>
         `,
       });
@@ -79,7 +86,21 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, order });
   } catch (error: any) {
-    console.error("PAYMENT ERROR:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+      console.error("PAYMENT ERROR:", error);
+  
+      if (error instanceof ApiError) {
+        return NextResponse.json(
+          { error: error.message, code: error.code },
+          { status: error.status },
+        );
+      }
+  
+      return NextResponse.json(
+        {
+          error: "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+          code: "SERVER_ERROR",
+        },
+        { status: 500 },
+      );
+    }
 }
