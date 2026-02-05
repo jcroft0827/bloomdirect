@@ -2,17 +2,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { RingLoader } from "react-spinners";
 import BloomSpinner from "@/components/BloomSpinner";
 import { useRouter } from "next/navigation";
-import { clear } from "console";
-import { getResend } from "@/lib/resend";
-import { Resend } from "resend";
-import { NextResponse } from "next/server";
+import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
 
 export default function DashboardClient() {
   const { data: session, status } = useSession();
@@ -36,6 +32,10 @@ export default function DashboardClient() {
   const [personalMessageVisible, setPersonalMessageVisible] = useState(false);
   const [personalMessage, setPersonalMessage] = useState("");
   const [toEmail, setToEmail] = useState("");
+  const [inviteLink, setInviteLink] = useState(
+    process.env.NEXT_PUBLIC_URL + "/register",
+  );
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const route = useRouter();
 
@@ -105,17 +105,22 @@ export default function DashboardClient() {
   // ------------------------------
   // SEND INVITE HANDLER
   // ------------------------------
-  const sendInvite = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission behavior
+  const handleSendInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!toEmail) {
+      toast.error("Please enter an email address");
+      return;
+    }
+
     try {
-      await fetch("/api/invites/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: toEmail,
-          message: personalMessage,
-        }),
+      await sendInviteRequest({
+        to: toEmail,
+        shopName,
+        inviteLink,
+        personalMessage,
       });
+
       toast.success("Invite sent successfully!");
       clearInviteFields();
     } catch (error) {
@@ -124,7 +129,20 @@ export default function DashboardClient() {
         "Failed to send invite. Please try again. If the issue persists, contact GetBloomDirect support.",
       );
     }
-  }
+  };
+
+  // ------------------------------
+  // SHOW/HIDE PERSONAL MESSAGE
+  // ------------------------------
+  const handleVisibilityPersonalMessage = async () => {
+    if (personalMessageVisible) {
+      setPersonalMessageVisible(false);
+      setPersonalMessage("");
+    } else {
+      setPersonalMessageVisible(true);
+    }
+  };
+
 
   // ------------------------------
   // RENDER
@@ -139,7 +157,7 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50">
+    <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-50 via-white to-teal-50">
       {/* Hero Header */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex flex-col items-center">
         <div className="flex items-center gap-5 w-full justify-between p-2">
@@ -298,10 +316,10 @@ export default function DashboardClient() {
       </div>
 
       {/* Beta Ad */}
-      <div className="absolute bottom-0 w-full text-2xl text-white font-semibold from-blue-400 to-slate-500 bg-gradient-to-r p-4 text-center shadow-lg hover:cursor-pointer hover:opacity-90 transition">
+      <div className="fixed bottom-0 left-0 w-full z-40 from-blue-400 to-slate-500 bg-gradient-to-r shadow-lg">
         <button
           onClick={() => setInviteFriendsVisible(true)}
-          className="w-full h-20"
+          className="w-full h-20 text-2xl text-white font-semibold hover:opacity-90 transition"
         >
           Invite a florist to join BloomDirect's beta program and help us shape
           the future of floral delivery!
@@ -315,66 +333,74 @@ export default function DashboardClient() {
           " fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6"
         }
       >
-        <div className="from-blue-300 to-white bg-gradient-to-br w-1/3 h-1/2 rounded-3xl shadow-lg">
-          <div className="flex justify-between w-full pr-10 pt-5">
+        <div
+          className="from-blue-300 to-white bg-gradient-to-br
+                w-full max-w-xl
+                max-h-[90vh]
+                rounded-3xl shadow-lg
+                flex flex-col
+                overflow-hidden"
+        >
+          <div className="flex justify-between items-center px-6 py-4">
             <button
               type="button"
-              onClick={() => setPersonalMessageVisible(true)}
-              className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition shadow-lg ml-5"
+              onClick={() => handleVisibilityPersonalMessage()}
+              className="bg-purple-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-purple-700 transition"
             >
               Add Personal Message
             </button>
 
             <button
               onClick={() => clearInviteFields()}
-              className="text-3xl font-bold text-gray-600 hover:text-gray-800"
+              className="text-2xl font-bold text-gray-600 hover:text-gray-800"
             >
               X
             </button>
           </div>
 
-          <form className="w-full m-10"
-            onSubmit={(e) => sendInvite(e)}
-          >
-            <label className="block text-xl font-semibold mb-4">
-              To: <br />
-              <span className="text-red-600 text-3xl">*</span>
-              <input
-                type="email"
-                className="mt-2 ml-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-1/2"
-                placeholder="Enter florist's email"
-                value={toEmail}
-                onChange={(e) => setToEmail(e.target.value)}
+          <div className="flex-1 overflow-y-auto px-6">
+            <form className="py-6 space-y-6" onSubmit={handleSendInvite}>
+              <label className="block text-xl font-semibold mb-4">
+                To: <br />
+                <span className="text-red-600 text-3xl">*</span>
+                <input
+                  type="email"
+                  className="mt-2 ml-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-1/2"
+                  placeholder="Enter florist's email"
+                  value={toEmail}
+                  onChange={(e) => setToEmail(e.target.value)}
+                />
+              </label>
+
+              <label className="block text-xl font-semibold mb-4">
+                From: <br />
+                <input
+                  type="text"
+                  className="mt-2 ml-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  disabled
+                  value={shopName}
+                />
+              </label>
+
+              <textarea
+                className={
+                  (personalMessageVisible ? "block" : "hidden") +
+                  " h-32 w-2/3 p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-6"
+                }
+                placeholder="Personal Message (optional)"
+                value={personalMessage}
+                onChange={(e) => setPersonalMessage(e.target.value)}
               />
-            </label>
 
-            <label className="block text-xl font-semibold mb-4">
-              From: <br />
-              <input
-                type="text"
-                className="mt-2 ml-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                disabled
-                value={shopName}
-              />
-            </label>
-
-            <textarea
-              className={
-                (personalMessageVisible ? "block" : "hidden") +
-                " h-32 w-2/3 p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-6"
-              }
-              placeholder="Personal Message (optional)"
-              value={personalMessage}
-              onChange={(e) => setPersonalMessage(e.target.value)}
-            />
-
-            <button
-              type="submit"
-              className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition shadow-lg"
-            >
-              Send Invite to Florist
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={sendingInvite}
+                className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition shadow-lg"
+              >
+                Send Invite to Florist
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

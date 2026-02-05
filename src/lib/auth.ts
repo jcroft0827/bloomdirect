@@ -40,6 +40,7 @@ export const authOptions: NextAuthOptions = {
         // Return fields that jwt() should pick up
         return {
           id: shop._id.toString(),
+          shopId: shop._id.toString(),
           email: shop.email,
           name: shop.shopName,
           isPro: shop.isPro,
@@ -59,8 +60,8 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // user exists only at sign-in
       if (user) {
-        // copy fields from authorize() result into JWT
         token.id = (user as any).id ?? token.id;
+        token.shopId = (user as any).shopId ?? token.shopId;
         token.email = (user as any).email ?? token.email;
         token.name = (user as any).name ?? token.name;
         token.isPro = (user as any).isPro ?? Boolean(token.isPro);
@@ -94,6 +95,7 @@ export const authOptions: NextAuthOptions = {
       session.user = session.user || ({} as any);
       // prefer token.id (set at login) or token.sub
       session.user.id = (token.id as string) ?? (token.sub as string) ?? session.user.id;
+      session.user.shopId = (token.shopId as string) ?? session.user.shopId;
       session.user.email = (token.email as string) ?? session.user.email;
       session.user.name = (token.name as string) ?? session.user.name;
       session.user.isPro = Boolean(token.isPro);
