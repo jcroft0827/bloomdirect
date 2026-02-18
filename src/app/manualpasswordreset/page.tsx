@@ -3,7 +3,7 @@ import Shop from "@/models/Shop";
 
 export default async function ManualPasswordReset() {
     await connectToDB();
-    const email = "gracekayden779@gmail.com";
+    const email = "jcroft0827@gmail.com";
     const newPass = "Flowers123!";
     const shop = await Shop.findOne({ email });
 

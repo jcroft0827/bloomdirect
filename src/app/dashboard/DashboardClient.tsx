@@ -26,6 +26,7 @@ export default function DashboardClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [newOrderLoading, setNewOrderLoading] = useState(false);
+  const [loadSettings, setLoadSettings]  = useState(false);
 
   // Invite Florists
   const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
@@ -143,7 +144,6 @@ export default function DashboardClient() {
     }
   };
 
-
   // ------------------------------
   // RENDER
   // ------------------------------
@@ -171,7 +171,11 @@ export default function DashboardClient() {
             )}
           </div>
           <div className="flex items-center gap-5 p-2">
-            <Link href={"/settings"}>
+            <Link 
+              href={"/settings"}
+              onClick={() => {setLoadSettings(true)}}
+            >
+              {!loadSettings ? 
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -191,6 +195,9 @@ export default function DashboardClient() {
                   d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
                 />
               </svg>
+              : 
+              <BloomSpinner />
+            }
             </Link>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
@@ -365,7 +372,7 @@ export default function DashboardClient() {
                 <span className="text-red-600 text-3xl">*</span>
                 <input
                   type="email"
-                  className="mt-2 ml-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-1/2"
+                  className="mt-2 ml-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
                   placeholder="Enter florist's email"
                   value={toEmail}
                   onChange={(e) => setToEmail(e.target.value)}
@@ -376,29 +383,30 @@ export default function DashboardClient() {
                 From: <br />
                 <input
                   type="text"
-                  className="mt-2 ml-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="mt-2 ml-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
                   disabled
                   value={shopName}
                 />
               </label>
 
-              <textarea
-                className={
-                  (personalMessageVisible ? "block" : "hidden") +
-                  " h-32 w-2/3 p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-6"
-                }
-                placeholder="Personal Message (optional)"
-                value={personalMessage}
-                onChange={(e) => setPersonalMessage(e.target.value)}
-              />
+              {personalMessageVisible && (
+                <textarea
+                  className="h-32 w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                  placeholder="Personal Message (optional)"
+                  value={personalMessage}
+                  onChange={(e) => setPersonalMessage(e.target.value)}
+                />
+              )}
 
-              <button
-                type="submit"
-                disabled={sendingInvite}
-                className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 transition shadow-lg"
-              >
-                Send Invite to Florist
-              </button>
+              <div className="border-t px-6 py-4">
+                <button
+                  type="submit"
+                  disabled={sendingInvite}
+                  className="w-full bg-purple-600 text-white py-3 rounded-xl font-semibold hover:bg-purple-700 transition"
+                >
+                  Send Invite to Florist
+                </button>
+              </div>
             </form>
           </div>
         </div>

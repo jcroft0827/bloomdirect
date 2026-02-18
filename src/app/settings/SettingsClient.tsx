@@ -1,5 +1,29 @@
 "use client";
 
+interface Shop {
+  _id: string;
+  shopName: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  logo?: string;
+  featuredBouquet?: string;
+  acceptsWalkIns?: boolean;
+  weddingConsultations?: boolean;
+  securityCode?: string;
+  deliveryRadius?: number;
+  sameDayCutoff?: string;
+  deliveryFee?: number;
+  holidaySurcharge?: number;
+  venmoHandle?: string;
+  cashAppTag?: string;
+  zellePhoneOrEmail?: string;
+  bio?: string;
+}
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -7,51 +31,303 @@ import toast, { Toaster } from "react-hot-toast";
 import { useRef } from "react";
 import { signOut } from "next-auth/react";
 import { set } from "mongoose";
+import BloomSpinner from "@/components/BloomSpinner";
+import { sign } from "crypto";
 
-export default function SettingsClient({ initialShop }: { initialShop: any }) {
-  const [shop, setShop] = useState({
-    ...initialShop,
-    logo: initialShop.logo || "",
-    featuredBouquet: initialShop.featuredBouquet || "",
-    acceptsWalkIns: initialShop.acceptsWalkIns ?? false,
-    weddingConsultations: initialShop.weddingConsultations ?? false,
-  });
-  const [passwordUpdate, setPasswordUpdate] = useState(false);
+// export default function SettingsClient({ initialShop }: { initialShop: any }) {
+export default function SettingsClient() {
+  const [shop, setShop] = useState<Shop | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [passwordUpdate, setPasswordUpdate] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showEmailForm, setShowEmailForm] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
 
-  const router = useRouter();
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const bouquetInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const bouquetInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleSave = async () => {
-    const res = await fetch("/api/shops/update", {
+  async function getImageUrl(key: string) {
+    const res = await fetch("/api/s3/view-url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(shop), // ← Send the whole shop object
+      body: JSON.stringify({ key }),
     });
 
-    if (res.ok) {
-      toast.success("Settings saved successfully!");
-      // setTimeout(() => {
-      //   router.push('/dashboard')
-      // }, 1000);
-    } else {
-      const error = await res.json();
-      toast.error(error.error || "Failed to save");
+    const { viewUrl } = await res.json();
+    return viewUrl;
+  }
+
+  useEffect(() => {
+    async function fetchShop() {
+      try {
+        const res = await fetch("/api/shops/me"); // Return current shop
+        if (res.ok) {
+          const data = await res.json();
+          setShop(data.shop);
+        } else {
+          toast.error("Failed to load shop settings");
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Failed to load shop settings");
+      } finally {
+        setLoading(false);
+      }
     }
-  };
+    fetchShop();
+  }, []);
 
   useEffect(() => {
     if ("scrollRestoration" in history) {
       history.scrollRestoration = "manual";
     }
   }, []);
+
+  if (loading || !shop) {
+    return (
+      <div className="w-full h-[70vh] flex items-center justify-center">
+        <BloomSpinner />
+      </div>
+    );
+  }
+
+  const handleSave = async () => {
+    if (!shop) return;
+
+    const allowedUpdates = {
+      shopName: shop.shopName,
+      phone: shop.phone,
+      address: shop.address,
+      city: shop.city,
+      state: shop.state,
+      zip: shop.zip,
+      logo: shop.logo,
+      featuredBouquet: shop.featuredBouquet,
+      acceptsWalkIns: shop.acceptsWalkIns,
+      weddingConsultations: shop.weddingConsultations,
+      securityCode: shop.securityCode,
+      deliveryRadius: shop.deliveryRadius,
+      sameDayCutoff: shop.sameDayCutoff,
+      deliveryFee: shop.deliveryFee,
+      holidaySurcharge: shop.holidaySurcharge,
+      venmoHandle: shop.venmoHandle,
+      cashAppTag: shop.cashAppTag,
+      zellePhoneOrEmail: shop.zellePhoneOrEmail,
+      bio: shop.bio,
+    };
+
+    try {
+      const res = await fetch("/api/shops/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(allowedUpdates),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setShop(data.shop);
+        toast.success("Settings saved successfully!");
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to save settings");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save settings");
+    }
+  };
+
+  // Upload Logo
+  const handleLogoUpload = async (file: File) => {
+    try {
+      console.log("Starting upload...");
+
+      // 1️⃣ Request signed upload URL from backend
+      const uploadRes = await fetch("/api/s3/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+        }),
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { uploadUrl, fileUrl } = await uploadRes.json();
+
+      // 2️⃣ Upload the file directly to S3
+      const s3Upload = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (!s3Upload.ok) {
+        throw new Error("Failed to upload file to S3");
+      }
+
+      console.log("Uploaded to S3");
+
+      // 3️⃣ Extract fileKey from fileUrl
+      const fileKey = fileUrl.split(".amazonaws.com/")[1];
+
+      // 4️⃣ Save fileKey to database
+      const saveRes = await fetch("/api/shops/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logo: fileKey }),
+      });
+
+      if (!saveRes.ok) {
+        throw new Error("Failed to save logo to database");
+      }
+
+      console.log("Saved fileKey to DB:", fileKey);
+
+      // 5️⃣ Get signed view URL
+      const signedRes = await fetch("/api/s3/view-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: fileKey }),
+      });
+
+      const { viewUrl } = await signedRes.json();
+
+      console.log("Got signed URL:", viewUrl);
+
+      // 6️⃣ Update UI with signed URL
+      setShop((prev) => (prev ? { ...prev, logo: viewUrl } : prev));
+    } catch (err) {
+      console.error("Logo upload error:", err);
+    }
+  };
+
+  // Upload Featured Bouquet
+  const handleBouquetUpload = async (file: File) => {
+    try {
+      console.log("Starting upload...");
+
+      // 1️⃣ Request signed upload URL from backend
+      const uploadRes = await fetch("/api/s3/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+        }),
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { uploadUrl, fileUrl } = await uploadRes.json();
+
+      // 2️⃣ Upload the file directly to S3
+      const s3Upload = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (!s3Upload.ok) {
+        throw new Error("Failed to upload file to S3");
+      }
+
+      console.log("Uploaded to S3");
+
+      // 3️⃣ Extract fileKey from fileUrl
+      const fileKey = fileUrl.split(".amazonaws.com/")[1];
+
+      // 4️⃣ Save fileKey to database
+      const saveRes = await fetch("/api/shops/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featuredBouquet: fileKey }),
+      });
+
+      if (!saveRes.ok) {
+        throw new Error("Failed to save logo to database");
+      }
+
+      console.log("Saved fileKey to DB:", fileKey);
+
+      // 5️⃣ Get signed view URL
+      const signedRes = await fetch("/api/s3/view-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: fileKey }),
+      });
+
+      const { viewUrl } = await signedRes.json();
+
+      console.log("Got signed URL:", viewUrl);
+
+      // 6️⃣ Update UI with signed URL
+      setShop((prev) => (prev ? { ...prev, featuredBouquet: viewUrl } : prev));
+    } catch (err) {
+      console.error("Logo upload error:", err);
+    }
+  };
+
+  // const [shop, setShop] = useState({
+  //   ...initialShop,
+  //   logo: initialShop.logo || "",
+  //   featuredBouquet: initialShop.featuredBouquet || "",
+  //   acceptsWalkIns: initialShop.acceptsWalkIns ?? false,
+  //   weddingConsultations: initialShop.weddingConsultations ?? false,
+  //   securityCode: initialShop.securityCode || "",
+  // });
+  // const [passwordUpdate, setPasswordUpdate] = useState(false);
+  // const [currentPassword, setCurrentPassword] = useState("");
+  // const [newPassword, setNewPassword] = useState("");
+  // const [confirmPassword, setConfirmPassword] = useState("");
+
+  // const [newEmail, setNewEmail] = useState("");
+  // const [emailPassword, setEmailPassword] = useState("");
+
+  // useEffect(() => {
+  //   setShop({
+  //     ...initialShop,
+  //     logo: initialShop.logo || "",
+  //     featuredBouquet: initialShop.featuredBouquet || "",
+  //     acceptsWalkIns: initialShop.acceptsWalkIns ?? false,
+  //     weddingConsultations: initialShop.weddingConsultations ?? false,
+  //     securityCode: initialShop.securityCode || "",
+  //   });
+  // }, [initialShop]);
+
+  // const router = useRouter();
+  // const logoInputRef = useRef<HTMLInputElement>(null);
+  // const bouquetInputRef = useRef<HTMLInputElement>(null);
+
+  // const handleSave = async () => {
+  //   const res = await fetch("/api/shops/update", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify(shop), // ← Send the whole shop object
+  //   });
+
+  //   if (res.ok) {
+  //     const data = await res.json();
+  //     setShop(data.shop);
+  //     toast.success("Settings saved successfully!");
+  //   } else {
+  //     const error = await res.json();
+  //     toast.error(error.error || "Failed to save");
+  //   }
+  // };
 
   return (
     <>
@@ -100,7 +376,9 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   type="text"
                   value={shop.venmoHandle || ""}
                   onChange={(e) =>
-                    setShop({ ...shop, venmoHandle: e.target.value })
+                    setShop((prev) =>
+                      prev ? { ...prev, venmoHandle: e.target.value } : prev,
+                    )
                   }
                   placeholder="@YourShopName"
                   className="w-full px-6 py-4 text-xl rounded-xl bg-white/20 placeholder-white/60 text-white"
@@ -114,7 +392,9 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   type="text"
                   value={shop.cashAppTag || ""}
                   onChange={(e) =>
-                    setShop({ ...shop, cashAppTag: e.target.value })
+                    setShop((prev) =>
+                      prev ? { ...prev, cashAppTag: e.target.value } : prev,
+                    )
                   }
                   placeholder="$YourShopName"
                   className="w-full px-6 py-4 text-xl rounded-xl bg-white/20 placeholder-white/60 text-white"
@@ -128,7 +408,11 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   type="text"
                   value={shop.zellePhoneOrEmail || ""}
                   onChange={(e) =>
-                    setShop({ ...shop, zellePhoneOrEmail: e.target.value })
+                    setShop((prev) =>
+                      prev
+                        ? { ...prev, zellePhoneOrEmail: e.target.value }
+                        : prev,
+                    )
                   }
                   placeholder="555-123-4567"
                   className="w-full px-6 py-4 text-xl rounded-xl bg-white/20 placeholder-white/60 text-white"
@@ -153,7 +437,9 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   <input
                     value={shop.shopName || ""}
                     onChange={(e) =>
-                      setShop({ ...shop, shopName: e.target.value })
+                      setShop((prev) =>
+                        prev ? { ...prev, shopName: e.target.value } : prev,
+                      )
                     }
                     className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
                   />
@@ -165,7 +451,9 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   <input
                     value={shop.phone || ""}
                     onChange={(e) =>
-                      setShop({ ...shop, phone: e.target.value })
+                      setShop((prev) =>
+                        prev ? { ...prev, phone: e.target.value } : prev,
+                      )
                     }
                     className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
                   />
@@ -174,6 +462,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
 
               {/* Delivery Settings */}
               <div className="grid md:grid-cols-3 gap-8">
+                {/* Delivery Radius (Miles) */}
                 <div>
                   <label className="block text-xl font-bold text-gray-700 mb-3">
                     Delivery Radius (miles)
@@ -184,14 +473,16 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                     max="100"
                     value={shop.deliveryRadius || 25}
                     onChange={(e) =>
-                      setShop({
-                        ...shop,
-                        deliveryRadius: Number(e.target.value),
-                      })
+                      setShop((prev) =>
+                        prev
+                          ? { ...prev, deliveryRadius: Number(e.target.value) }
+                          : prev,
+                      )
                     }
                     className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
                   />
                 </div>
+                {/* Same-Day Cutoff Time */}
                 <div>
                   <label className="block text-xl font-bold text-gray-700 mb-3">
                     Same-Day Cutoff Time
@@ -199,7 +490,11 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   <select
                     value={shop.sameDayCutoff || "13:00"}
                     onChange={(e) =>
-                      setShop({ ...shop, sameDayCutoff: e.target.value })
+                      setShop((prev) =>
+                        prev
+                          ? { ...prev, sameDayCutoff: e.target.value }
+                          : prev,
+                      )
                     }
                     className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
                   >
@@ -210,6 +505,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                     <option value="15:00">3:00 PM</option>
                   </select>
                 </div>
+                {/* Delivery Fee */}
                 <div>
                   <label className="block text-xl font-bold text-gray-700 mb-3">
                     Standard Delivery Fee
@@ -224,10 +520,11 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                       step="5"
                       value={shop.deliveryFee || 20}
                       onChange={(e) =>
-                        setShop({
-                          ...shop,
-                          deliveryFee: Number(e.target.value),
-                        })
+                        setShop((prev) =>
+                          prev
+                            ? { ...prev, deliveryFee: Number(e.target.value) }
+                            : prev,
+                        )
                       }
                       className="w-full pl-16 pr-8 py-6 text-xl border-4 rounded-2xl"
                     />
@@ -235,6 +532,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                 </div>
               </div>
 
+              {/* Holiday Surcharge */}
               <div>
                 <label className="block text-xl font-bold text-gray-700 mb-3">
                   Holiday Surcharge (optional)
@@ -249,10 +547,14 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                     step="5"
                     value={shop.holidaySurcharge || 0}
                     onChange={(e) =>
-                      setShop({
-                        ...shop,
-                        holidaySurcharge: Number(e.target.value),
-                      })
+                      setShop((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              holidaySurcharge: Number(e.target.value),
+                            }
+                          : prev,
+                      )
                     }
                     placeholder="0"
                     className="w-full pl-16 pr-8 py-6 text-xl border-4 rounded-2xl"
@@ -308,6 +610,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                     </>
                   )}
                 </div>
+
                 <input
                   ref={logoInputRef}
                   type="file"
@@ -315,15 +618,13 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setShop({ ...shop, logo: reader.result as string });
-                    };
-                    reader.readAsDataURL(file);
+                    if (file) {
+                      handleLogoUpload(file);
+                    }
                   }}
                 />
               </div>
+
               {/* Featured Bouquet Pic */}
               <div>
                 <label className="block text-xl font-bold mb-4">
@@ -370,20 +671,15 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setShop({
-                        ...shop,
-                        featuredBouquet: reader.result as string,
-                      });
-                    };
-                    reader.readAsDataURL(file);
+                    if (file) {
+                      handleBouquetUpload(file);
+                    }
                   }}
                 />
               </div>
             </div>
 
+            {/* Shop Bio */}
             <div className="mt-10">
               <label className="block text-xl font-bold mb-4">
                 Shop Bio (2–3 sentences)
@@ -391,7 +687,11 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
               <textarea
                 rows={4}
                 value={shop.bio || ""}
-                onChange={(e) => setShop({ ...shop, bio: e.target.value })}
+                onChange={(e) =>
+                  setShop((prev) =>
+                    prev ? { ...prev, bio: e.target.value } : prev,
+                  )
+                }
                 placeholder="Family-owned since 1985. Specializing in weddings & sympathy. Same-day delivery in Akron."
                 className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
               />
@@ -403,7 +703,11 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   type="checkbox"
                   checked={shop.acceptsWalkIns}
                   onChange={(e) =>
-                    setShop({ ...shop, acceptsWalkIns: e.target.checked })
+                    setShop((prev) =>
+                      prev
+                        ? { ...prev, acceptsWalkIns: e.target.checked }
+                        : prev,
+                    )
                   }
                   className="w-8 h-8 text-purple-600"
                 />
@@ -414,7 +718,11 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   type="checkbox"
                   checked={shop.weddingConsultations}
                   onChange={(e) =>
-                    setShop({ ...shop, weddingConsultations: e.target.checked })
+                    setShop((prev) =>
+                      prev
+                        ? { ...prev, weddingConsultations: e.target.checked }
+                        : prev,
+                    )
                   }
                   className="w-8 h-8 text-purple-600"
                 />
@@ -435,12 +743,12 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                 strokeWidth="1.5"
                 stroke="currentColor"
                 className="w-6"
-                >
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
-                  />
+                />
               </svg>
               Email History
             </p>
@@ -456,6 +764,23 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
             >
               View Email History
             </Link>
+          </div>
+
+          {/* Security Code -- BETA FEATURE-Replace with secure forgot password email link later */}
+          <div className="flex flex-col mb-12 items-center justify-center gap-8 bg-gradient-to-br from-white to-blue-200 rounded-3xl shadow-2xl p-10 md:flex-row md:gap-12">
+            <p className="font-semibold text-2xl text-gray-900 flex gap-2 items-center justify-center">
+              Security Code
+            </p>
+            <input
+              value={shop.securityCode || ""}
+              onChange={(e) =>
+                setShop((prev) =>
+                  prev ? { ...prev, securityCode: e.target.value } : prev,
+                )
+              }
+              placeholder="security code"
+              className="w-full px-8 py-6 text-xl border-4 rounded-2xl"
+            />
           </div>
 
           {/* Update Login Information */}
@@ -510,7 +835,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                           return;
                         }
 
-                        const res = await fetch("/api/auth/change-password", {
+                        const res = await fetch("/api/auth/update-password", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -522,6 +847,9 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                         if (res.ok) {
                           toast.success("Password updated.");
                           setShowPasswordForm(false);
+                          setTimeout(() => {
+                            signOut({ callbackUrl: "/login" });
+                          }, 1000);
                         } else {
                           const err = await res.json();
                           toast.error(err.error);
@@ -544,7 +872,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
             </div>
 
             {/* Update Email */}
-            <div className="text-center">
+            {/* <div className="text-center">
               {!showEmailForm ? (
                 <button
                   onClick={() => {
@@ -624,7 +952,7 @@ export default function SettingsClient({ initialShop }: { initialShop: any }) {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */}
           </div>
 
           {/* Save Button */}

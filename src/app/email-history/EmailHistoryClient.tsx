@@ -2,19 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import BloomSpinner from "@/components/BloomSpinner";
+import { EmailEvent } from "@/models/EmailEvent";
+import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
+import toast from "react-hot-toast";
 
 type EmailEvent = {
   _id: string;
-  actorId: string;
-  eventType: string;
-  label?: string;
+  type: string;
   to: string;
-  template: string;
+  subject: string;
   status: "pending" | "sent" | "failed";
-  provider?: string;
-  providerMessageId?: string;
-  providerError?: string;
-  retryCount?: number;
+  error?: string;
+  payload?: Record<string, any>;
+  resendId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -28,54 +28,87 @@ export default function EmailHistoryClient() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
 
-  const [resendingId, setResendingId] = useState<string | null>(null);
+  // ------------------------------
+  // Resend States
+  // ------------------------------
+  const [resendingId, setResendingId] = useState("");
 
-  useEffect(() => {
-    const fetchEmailEvents = async () => {
+  // ------------------------------
+  // Fetch all email events
+  // ------------------------------
+  const fetchEmailEvents = async () => {
       try {
-        const res = await fetch("/api/email-history");
+        const res = await fetch("/api/email/email-history");
         if (!res.ok) throw new Error("Failed to fetch email history");
-        const data = await res.json();
+        const data: EmailEvent[] = await res.json();
         setEvents(data);
-      } catch (err: any) {
-        setError(err.message || "Unexpected error");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unexpected error";
+        setError(message);
       } finally {
         setLoading(false);
       }
-    };
+  }
 
+  useEffect(() => {
     fetchEmailEvents();
   }, []);
 
+  // ------------------------------
+  // Filtered & searchable events
+  // ------------------------------
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
       if (statusFilter !== "all" && e.status !== statusFilter) return false;
-      if (typeFilter !== "all" && e.eventType !== typeFilter) return false;
-      if (search && !e.to.toLowerCase().includes(search.toLowerCase())) return false;
+      if (typeFilter !== "all" && e.type !== typeFilter) return false;
+      if (search && !e.to.toLowerCase().includes(search.toLowerCase()))
+        return false;
       return true;
     });
   }, [events, statusFilter, typeFilter, search]);
 
+  const eventTypes = useMemo(() => {
+    return [...new Set(events.map((e) => e.type).filter(Boolean))];
+  }, [events]);
+
+  // ------------------------------
+  // Resend email handler
+  // ------------------------------
   const handleResend = async (id: string) => {
     try {
       setResendingId(id);
-      const res = await fetch("/api/email/resend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailEventId: id }),
-      });
 
-      if (!res.ok) throw new Error("Resend failed");
+      const res = await fetch(`/api/email/email-history/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch email history");
 
-      const newEvent = await res.json();
-      setEvents((prev) => [newEvent, ...prev]);
-    } catch (err) {
-      alert("Failed to resend email.");
+      const event = await res.json();
+
+      if (event.type === "invite-florist") {
+        await sendInviteRequest({
+          to: event.to,
+          shopName: event.payload.shopName,
+          inviteLink: event.payload.inviteLink,
+          personalMessage: event.payload.personalMessage,
+        });
+      } else {
+        throw new Error("Unsupported email type");
+      }
+
+      toast.success("Invite send successfully!");
+    } catch (error) {
+      console.error("RESEND ERROR:", error);
+      toast.error(
+        "Failed to resend invite. Please try again. If the issue persists, contact GetBloomDirect support."
+    );
     } finally {
-      setResendingId(null);
+      setResendingId("");
+      fetchEmailEvents();
     }
   };
 
+  // ------------------------------
+  // Loading / error states
+  // ------------------------------
   if (loading) {
     return (
       <div className="flex h-[70vh] items-center justify-center">
@@ -85,9 +118,14 @@ export default function EmailHistoryClient() {
   }
 
   if (error) {
-    return <p className="text-center mt-12 text-red-600 font-semibold">{error}</p>;
+    return (
+      <p className="text-center mt-12 text-red-600 font-semibold">{error}</p>
+    );
   }
 
+  // ------------------------------
+  // Render
+  // ------------------------------
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-4xl font-extrabold mb-6 text-purple-700">
@@ -121,9 +159,9 @@ export default function EmailHistoryClient() {
           className="px-4 py-2 rounded-xl border border-purple-200"
         >
           <option value="all">All Types</option>
-          {[...new Set(events.map((e) => e.eventType))].map((t) => (
+          {eventTypes.map((t) => (
             <option key={t} value={t}>
-              {t.replace("_", " ")}
+              {t.replaceAll("_", " ")}
             </option>
           ))}
         </select>
@@ -135,53 +173,67 @@ export default function EmailHistoryClient() {
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredEvents.map((e) => (
-            <div
-              key={e._id}
-              className="bg-gradient-to-br from-white to-purple-50 border border-purple-100 rounded-3xl p-6 shadow-lg"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-xl text-purple-800">
-                    {e.label || e.template}
+          {filteredEvents.map((e) => {
+            const typeLabel = e.type || "UNKNOWN TYPE";
+            const statusLabel = e.status || "PENDING";
+            const createdAt = e.createdAt
+              ? new Date(e.createdAt).toLocaleString()
+              : "Unknown";
+
+            return (
+              <div
+                key={e._id} // unique key
+                className="bg-gradient-to-br from-white to-purple-50 border border-purple-100 rounded-3xl p-6 shadow-lg"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-xl text-purple-800">
+                      {e.subject}
+                    </p>
+                    <p className="text-gray-600 mt-1 text-sm">
+                      {typeLabel.replaceAll("_", " ")}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`px-3 py-1 rounded-full text-white font-semibold text-sm ${
+                      statusLabel === "sent"
+                        ? "bg-green-500"
+                        : statusLabel === "failed"
+                          ? "bg-red-500"
+                          : "bg-yellow-400 text-gray-800"
+                    }`}
+                  >
+                    {statusLabel.toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="mt-4 text-gray-700 space-y-1 text-sm">
+                  <p>
+                    <span className="font-semibold">To:</span> {e.to}
                   </p>
-                  <p className="text-gray-600 mt-1 text-sm">
-                    {e.eventType.replace("_", " ")}
+
+                  {e.error && (
+                    <p className="text-red-600 text-xs mt-1">
+                      Error: {e.error}
+                    </p>
+                  )}
+
+                  <p className="text-gray-500 text-xs mt-2">
+                    Sent: {createdAt}
                   </p>
                 </div>
 
-                <span
-                  className={`px-3 py-1 rounded-full text-white font-semibold text-sm ${
-                    e.status === "sent"
-                      ? "bg-green-500"
-                      : e.status === "failed"
-                      ? "bg-red-500"
-                      : "bg-yellow-400 text-gray-800"
-                  }`}
+                <button
+                  disabled={resendingId === e._id}
+                  onClick={() => handleResend(e._id)}
+                  className="mt-4 w-full rounded-xl bg-purple-600 text-white py-2 font-semibold hover:bg-purple-700 disabled:opacity-50"
                 >
-                  {e.status.toUpperCase()}
-                </span>
+                  {resendingId === e._id ? <BloomSpinner /> : "Resend Email"}
+                </button>
               </div>
-
-              <div className="mt-4 text-gray-700 space-y-1 text-sm">
-                <p>
-                  <span className="font-semibold">To:</span> {e.to}
-                </p>
-
-                <p className="text-gray-500 text-xs mt-2">
-                  Sent: {new Date(e.createdAt).toLocaleString()}
-                </p>
-              </div>
-
-              <button
-                disabled={resendingId === e._id}
-                onClick={() => handleResend(e._id)}
-                className="mt-4 w-full rounded-xl bg-purple-600 text-white py-2 font-semibold hover:bg-purple-700 disabled:opacity-50"
-              >
-                {resendingId === e._id ? "Resending…" : "Resend Email"}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -60,6 +60,10 @@ const shopSchema = new mongoose.Schema(
       coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
     },
 
+    // Security Code - This will be used for forgot passwords at first...
+    // will be used for other things later when secure forgot password is implemented
+    securityCode: String,
+
     // Future features
     deliveryFeesByDistance: [{ distance: Number, fee: Number }],
     deliveryFeesByZip: [String],

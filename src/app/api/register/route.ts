@@ -14,7 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email already used" }, { status: 400 });
     }
   
-    const shop = await Shop.create(body);
+    // const shop = await Shop.create(body);
+    const shop = await Shop.create({
+      ...body,
+      securityCode: "0829",
+    });
     return NextResponse.json({ success: true });
   } catch (error: any) {
         console.error("REGISTER SHOP ERROR:", error);
