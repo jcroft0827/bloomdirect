@@ -64,7 +64,6 @@ export default function LoginPage() {
 
       console.log("Response:", data);
 
-
       if (!res.ok) {
         setError(data.error || "Something went wrong");
         return;
@@ -188,16 +187,28 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <button
-          className={
-            isForgotPassword
-              ? "hidden"
-              : "text-red-500 text-lg w-full mt-5 hover:text-red-700"
-          }
-          onClick={() => setIsForgotPassword(true)}
+        <div
+          className="flex w-full justify-between items-center mt-5 px-2"
         >
-          Forgot Password
-        </button>
+          <Link
+            href="/register"
+            className="text-purple-600 text-lg hover:text-purple-800"
+          >
+            Create Account
+          </Link>
+
+          <button
+            className={
+              isForgotPassword
+                ? "hidden"
+                : "text-red-500 text-lg hover:text-red-700"
+            }
+            onClick={() => setIsForgotPassword(true)}
+          >
+            Forgot Password
+          </button>
+        </div>
+
         <button
           className={
             isForgotPassword
