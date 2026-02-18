@@ -35,7 +35,10 @@ import BloomSpinner from "@/components/BloomSpinner";
 import { sign } from "crypto";
 
 // export default function SettingsClient({ initialShop }: { initialShop: any }) {
-export default function SettingsClient() {
+type SettingsClientProps = {
+  initialShop: any;
+}
+export default function SettingsClient({ initialShop }: SettingsClientProps) {
   const [shop, setShop] = useState<Shop | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
