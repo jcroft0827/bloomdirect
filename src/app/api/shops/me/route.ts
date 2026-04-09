@@ -8,16 +8,12 @@ export async function GET() {
   try {
     await connectToDB();
     const session = await getServerSession(authOptions);
-    const shopId = session?.user?.id;
 
-    if (!shopId) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const shop = await Shop.findById(shopId);
-    if (!shop) {
-      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
-    }
+    const shop = await Shop.findById(session.user.shopId).lean();
 
     return NextResponse.json({ shop });
   } catch (error) {

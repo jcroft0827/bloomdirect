@@ -14,52 +14,87 @@ export type OrderLean = {
 
   originatingShop: string;
   originatingShopName: string;
-
-  productPhoto?: string;
-
   fulfillingShop: string;
   fulfillingShopName: string;
 
-  status: OrderStatus;
-
   recipient: {
-    firstName: string;
-    lastName: string;
-    address: string;
-    city: string;
-    state: string;
-    zip: string;
-    phone?: string;
-    message?: string;
+    firstName: string,
+    lastName?: string,
+    fullName: string,
+    address: string,
+    apt?: string,
+    city: string,
+    state: string,
+    zip: string,
+    phone?: string,
+    email?: string,
+    company?: string,
+    message?: string,
   };
-
+  
   customer?: {
     firstName?: string;
     lastName?: string;
+    fullName?: string;
     email?: string;
     phone?: string;
   };
 
-  deliveryDate: string;
+  logistics: {
+    deliveryDate: string;
+    deliveryTimeOption: string,
+    deliveryTimeFrom?: string,
+    deliveryTimeTo?: string,
+    specialInstructions?: string,
+  };
 
+  products: {
+    name?: string;
+    description?: string;
+    photo?: string;
+    price?: number;
+    qty: number;
+    taxable: boolean;
+  }[];
+
+  pricing: {
+    productsTotal: number;
+    deliveryFee: number;
+    taxAmount: number;
+    customerPays: number;
+    orderTotal: number;
+    fulfillingShopGets: number;
+    feeCharge: number;
+  };
+  
+  paymentMethods?: {
+    venmo?: string;
+    cashapp?: string;
+    zelle?: string;
+    paypal?: string;
+    default?: string;
+  };
+  
+  paymentMarkedPaidAt?: Date;
+
+  status: OrderStatus;
+  
   declineReason?: string;
   declineMessage?: string;
-  declinedAt?: Date;
   declineCount?: number;
-
-  specialInstructions?: string;
-
-  paymentMethod?: "venmo" | "cashapp" | "zelle" | "other";
-  paymentMarkedPaidAt?: string;
+  declineHistory?: {
+    shop: string;
+    shopName: string;
+    reason: string;
+    message?: string;
+    declinedAt: Date;
+  }[];
 
   activityLog?: OrderActivityLean[];
 
   acceptedAt?: string;
-  fulfilledAt?: string;
+  declinedAt?: string;
   paidAt?: string;
   completedAt?: string;
-
-  fulfillingShopGets?: number;
-
   createdAt: string;
 };

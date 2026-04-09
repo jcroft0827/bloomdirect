@@ -13,7 +13,7 @@ type Props = {
     reason: DeclineReason;
     message?: string;
   }) => void;
-  onMarkPaid?: (method: "venmo" | "cashapp" | "zelle" | "other") => void;
+  onMarkPaid?: (method: "venmo" | "cashapp" | "zelle" | "paypal") => void;
   onDelivered?: () => void;
 };
 
@@ -64,12 +64,12 @@ export default function OrderActions({
         {role === "originating" &&
           status === OrderStatus.ACCEPTED_AWAITING_PAYMENT && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {["venmo", "cashapp", "zelle", "other"].map((method) => (
+              {["venmo", "cashapp", "zelle", "paypal"].map((method) => (
                 <button
                   key={method}
                   onClick={() =>
                     onMarkPaid?.(
-                      method as "venmo" | "cashapp" | "zelle" | "other"
+                      method as "venmo" | "cashapp" | "zelle" | "paypal"
                     )
                   }
                   className="bg-gray-100 hover:bg-gray-200 font-semibold py-3 rounded-xl"
@@ -107,7 +107,7 @@ export default function OrderActions({
 
 // import { OrderStatus } from "@/lib/order-status";
 
-// type PaymentMethod = "venmo" | "cashapp" | "zelle" | "other";
+// type PaymentMethod = "venmo" | "cashapp" | "zelle" | "paypal";
 
 // type Props = {
 //   order: {
@@ -190,7 +190,7 @@ export default function OrderActions({
 //       {/* ORIGINATING SHOP */}
 //       {viewerRole === "originating" && isAwaitingPayment && (
 //         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-//           {["venmo", "cashapp", "zelle", "other"].map((method) => (
+//           {["venmo", "cashapp", "zelle", "paypal"].map((method) => (
 //             <button
 //               key={method}
 //               onClick={() => markPaid(method as PaymentMethod)}

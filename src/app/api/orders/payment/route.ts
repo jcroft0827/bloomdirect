@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     }
 
     const { orderId, paymentMethod } = await req.json();
-    if (!["venmo", "cashapp", "zelle", "other"].includes(paymentMethod)) {
+    if (!["venmo", "cashapp", "zelle", "paypal"].includes(paymentMethod)) {
       return NextResponse.json(
         { error: "Invalid payment method" },
         { status: 400 },
@@ -70,14 +70,14 @@ export async function POST(req: Request) {
 
     if (originShop?.email && fulfillShop?.email) {
       await resend.emails.send({
-        from: "BloomDirect <new-orders@getbloomdirect.com>",
+        from: "GetBloomDirect <new-orders@getbloomdirect.com>",
         to: fulfillShop.email,
         subject:
           getOrderEmailSubject(order.orderNumber, order.status) +
           ` - Ready to Fulfill`,
         html: `
           <p>Order #${order.orderNumber} has been marked as paid by ${
-            originShop.shopName
+            originShop.businessName
           } via ${paymentMethod.toUpperCase()}.</p>
           <p>Start preparing the order and mark it as fulfilled once done.</p>
         `,

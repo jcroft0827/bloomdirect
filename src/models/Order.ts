@@ -1,142 +1,115 @@
-// src/models/Order.ts
-
 import mongoose, { Schema } from "mongoose";
 import { OrderStatus } from "@/lib/order-status";
 
 const orderSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, unique: true },
 
-  originatingShop: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Shop",
-    required: true,
-  },
+  // Flow Participants
+  originatingShop: { type: Schema.Types.ObjectId, ref: "Shop", required: true },
   originatingShopName: String,
-
-  fulfillingShop: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Shop",
-    required: true,
-  },
+  fulfillingShop: { type: Schema.Types.ObjectId, ref: "Shop", required: true },
   fulfillingShopName: String,
 
+  // Recipient (Updated with apt/company)
   recipient: {
     firstName: String,
     lastName: String,
+    fullName: String,
     address: String,
+    apt: String,
     city: String,
     state: String,
     zip: String,
     phone: String,
     email: String,
+    company: String,
     message: String,
   },
 
+  // Customer
   customer: {
     firstName: String,
     lastName: String,
+    fullName: String,
     email: String,
     phone: String,
   },
 
-  deliveryDate: Date,
-
-  productName: String,
-  productDescription: String,
-  productPhoto: String,
-  specialInstructions: String,
-
-  totalCustomerPaid: Number,
-  bloomDirectFee: Number,
-  fulfillingShopGets: Number,
-
-  /* =====================
-     PAYMENT
-  ====================== */
-  paymentMethod: {
-    type: String,
-    enum: ["venmo", "cashapp", "zelle", "other"],
+  // Logistics
+  logistics: {
+    deliveryDate: Date,
+    deliveryTimeOption: String, // Matches frontend 'deliveryTimeOption'
+    deliveryTimeFrom: String,   // Matches frontend 'deliveryTimeFrom'
+    deliveryTimeTo: String,     // Matches frontend 'deliveryTimeTo'
+    specialInstructions: String,
   },
+
+
+  // Products Array
+  products: [{
+    name: { type: String, required: true },
+    description: String,
+    photo: String, 
+    price: Number,
+    qty: { type: Number, default: 1 },
+    taxable: { type: Boolean, default: true },
+  }],
+
+  // Pricing (Aligned exactly with Frontend keys)
+  pricing: {
+    productsTotal: Number,
+    deliveryFee: Number,
+    taxAmount: Number,
+    customerPays: Number,
+    orderTotal: Number,
+    fulfillingShopGets: Number,
+    feeCharge: Number,
+  },
+
+  // Payment (Pluralized to match Frontend)
+  paymentMethods: {
+    venmo: String,
+    cashapp: String,
+    zelle: String,
+    paypal: String,
+    default: String,
+  },
+
   paymentMarkedPaidAt: Date,
 
-  /* =====================
-     STATUS
-  ====================== */
   status: {
     type: String,
     enum: Object.values(OrderStatus),
     default: OrderStatus.PENDING_ACCEPTANCE,
   },
 
-  /* =====================
-     DECLINE HANDLING
-  ====================== */
-  declineReason: {
-    type: String,
-    enum: [
-      "OUT_OF_STOCK",
-      "DELIVERY_UNAVAILABLE",
-      "TOO_BUSY",
-      "PRICE_TOO_LOW",
-      "OUT_OF_AREA",
-      "OTHER",
-    ],
-  },
-
-  declineMessage: {
-    type: String,
-    trim: true,
-    maxlength: 500,
-  },
-
-  declineCount: {
-    type: Number,
-    default: 0,
-  },
-
+  declineReason: String,
+  declineMessage: String,
+  declineCount: { type: Number, default: 0 },
   declineHistory: [
     {
-      shop: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Shop",
-      },
+      shop: { type: Schema.Types.ObjectId, ref: "Shop" },
       shopName: String,
       reason: String,
       message: String,
-      declinedAt: Date,
-    },
+      declinedAt: { type: Date, default: Date.now },
+    }
   ],
 
-    /* =====================
-     Activity Log
-  ====================== */
   activityLog: [
     {
-      action: String, // "DECLINED", "REASSIGNED", "PAID", etc.
+      action: String,
       message: String,
-      actorShop: {
-        type: Schema.Types.ObjectId,
-        ref: "Shop",
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now,
-      },
-    },
+      actorShop: { type: Schema.Types.ObjectId, ref: "Shop" },
+      createdAt: { type: Date, default: Date.now },
+    }
   ],
 
-
-
-  /* =====================
-     TIMESTAMPS
-  ====================== */
   acceptedAt: Date,
   declinedAt: Date,
   paidAt: Date,
   completedAt: Date,
-
   createdAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.models.Order ||
-  mongoose.model("Order", orderSchema);
+export default mongoose.models.Order || mongoose.model("Order", orderSchema);

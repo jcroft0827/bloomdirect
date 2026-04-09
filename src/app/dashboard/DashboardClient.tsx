@@ -10,13 +10,140 @@ import BloomSpinner from "@/components/BloomSpinner";
 import { useRouter } from "next/navigation";
 import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
 
+// #region Shop
+
+interface Stripe {
+  status?: string;
+  planId?: string;
+  cancelAtPeriodEnd?: boolean;
+  trialEndsAt?: Date;
+}
+
+interface ZipZone {
+  name: string;
+  zip: string;
+  fee: number;
+}
+
+interface DistanceZone {
+  min: number;
+  max: number;
+  fee: number;
+}
+
+interface BlackoutDate {
+  date: Date;
+}
+
+interface BlackoutTime {
+  start: string;
+  end: string;
+}
+
+interface Reviews {
+  customerName?: string;
+  rating?: number;
+  comment?: string;
+  date?: Date;
+}
+
+interface Delivery {
+  deliveryMethod: string;
+  zipZones?: ZipZone[];
+  distanceZones?: DistanceZone[];
+  fallbackFee: number;
+  maxRadius: number;
+  minProductTotal: number;
+  sameDayCutoff: string;
+  holidaySurcharge: number;
+  blackoutDates?: BlackoutDate[];
+  blackoutTimes?: BlackoutTime[];
+  noMoreOrdersToday: boolean;
+  allowSameDay: boolean;
+}
+
+interface Stats {
+  ordersSent: number;
+  ordersCompleted: number;
+  ordersDeclined: number;
+  ordersReceived: number;
+  responseRate?: number;
+  avgResponseTimeMinutes?: number;
+}
+
+interface Contact {
+  phone?: string;
+  whatsapp?: string;
+  emailSecondary?: string;
+  website?: string;
+}
+
+interface Geo {
+  type: string;
+  coordinates: number[];
+}
+
+interface PaymentMethods {
+  venmoHandle?: string;
+  cashAppTag?: string;
+  zellePhoneOrEmail?: string;
+  paypalEmail?: string;
+  defaultPaymentMethod?: string;
+}
+
+interface Address {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  timezone: string;
+  geoLocation: Geo;
+}
+
+interface FeaturedBouquet {
+  name?: string;
+  price?: number;
+  description?: string;
+  image?: string;
+}
+
+interface Shop {
+  id: string;
+  businessName: string;
+  email: string;
+  role: string;
+  isVerified: boolean;
+  verifiedFlorist: boolean;
+  isSuspended: boolean;
+  suspensionReason?: string;
+  isPublic: boolean;
+  onboardingComplete: boolean;
+  networkJoinDate: Date;
+  isPro: boolean;
+  proSince: Date;
+  lastLogin: Date;
+  lastActivity: Date;
+  contact: Contact;
+  address: Address;
+  paymentMethods: PaymentMethods;
+  stripe: Stripe;
+  featuredBouquet: FeaturedBouquet;
+  delivery: Delivery;
+  stats: Stats;
+}
+
+// #endregion
+
 export default function DashboardClient() {
   const { data: session, status } = useSession();
 
   // ------------------------------
   // Local state (your preferred style)
   // ------------------------------
-  const [shopName, setShopName] = useState("Loading...");
+  const [shop, setShop] = useState<Shop | null>(null);
+  const [shopId, setShopId] = useState("");
+
   const [profit, setProfit] = useState(0);
   const [ordersSent, setOrdersSent] = useState(0);
   const [ordersReceived, setOrdersReceived] = useState(0);
@@ -26,7 +153,13 @@ export default function DashboardClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [newOrderLoading, setNewOrderLoading] = useState(false);
-  const [loadSettings, setLoadSettings]  = useState(false);
+  const [loadSettings, setLoadSettings] = useState(false);
+
+  const [orders, setOrders] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [roleFilter, setRoleFilter] = useState<
+    "originating" | "fulfilling" | "all"
+  >("all");
 
   // Invite Florists
   const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
@@ -38,7 +171,7 @@ export default function DashboardClient() {
   );
   const [sendingInvite, setSendingInvite] = useState(false);
 
-  const route = useRouter();
+  const router = useRouter();
 
   // ------------------------------
   // Fetch dashboard data
@@ -51,22 +184,16 @@ export default function DashboardClient() {
         console.log("Fetching dashboard info...");
         setIsLoading(true);
 
-        const res = await fetch("/api/dashboard/overview");
-        if (!res.ok) {
-          console.error("Dashboard API error:", res.status);
-          return;
-        }
-
+        const res = await fetch("/api/shops/me");
         const data = await res.json();
-        console.log("Dashboard data received:", data);
 
-        setShopName(data.shopName ?? "Unknown Shop");
-        setProfit(data.profit ?? 0);
-        setOrdersSent(data.ordersSent ?? 0);
-        setOrdersReceived(data.ordersReceived ?? 0);
-        setLogo(data.logo ?? null);
-        setIsPro(Boolean(data.isPro));
-        setProSince(data.proSince ?? null);
+        if (data && data.shop) {
+          if (!data.shop.onboardingComplete) {
+            router.push("/dashboard/setup");
+          }
+          setShop(data.shop);
+          setShopId(data.id);
+        }
       } catch (err) {
         console.error("Failed to load dashboard:", err);
         toast.error(
@@ -76,7 +203,6 @@ export default function DashboardClient() {
         setIsLoading(false);
       }
     }
-
     loadDashboard();
   }, [status]);
 
@@ -87,13 +213,6 @@ export default function DashboardClient() {
   }
 
   // ------------------------------
-  // DEBUG LOGGING (helps a lot!)
-  // ------------------------------
-  console.log("SESSION:", session);
-  console.log("SHOP NAME:", shopName);
-  console.log("PRO STATUS:", isPro);
-
-  // ------------------------------
   // CLEAR INVITE FIELDS
   // ------------------------------
   const clearInviteFields = () => {
@@ -102,7 +221,6 @@ export default function DashboardClient() {
     setPersonalMessageVisible(false);
     setInviteFriendsVisible(false);
   };
-
   // ------------------------------
   // SEND INVITE HANDLER
   // ------------------------------
@@ -117,7 +235,7 @@ export default function DashboardClient() {
     try {
       await sendInviteRequest({
         to: toEmail,
-        shopName,
+        businessName: shop?.businessName || "",
         inviteLink,
         personalMessage,
       });
@@ -131,7 +249,6 @@ export default function DashboardClient() {
       );
     }
   };
-
   // ------------------------------
   // SHOW/HIDE PERSONAL MESSAGE
   // ------------------------------
@@ -144,80 +261,34 @@ export default function DashboardClient() {
     }
   };
 
-  // ------------------------------
-  // RENDER
-  // ------------------------------
-
   if (isLoading) {
     return (
-      <div className="flex h-[70vh] items-center justify-center">
+      <div className="flex h-[70vh] items-center gap-8 justify-center">
+        <p>Loading, Please be patient...</p>
         <BloomSpinner size={72} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-24 bg-gradient-to-br from-blue-50 via-white to-teal-50">
-      {/* Hero Header */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex flex-col items-center">
-        <div className="flex items-center gap-5 w-full justify-between p-2">
-          <div>
-            {logo && (
-              <img
-                src={logo}
-                alt="Shop Logo"
-                className="w-20 h-20 rounded-full shadow-lg border-4 border-white"
-              />
-            )}
-          </div>
-          <div className="flex items-center gap-5 p-2">
-            <Link 
-              href={"/settings"}
-              onClick={() => {setLoadSettings(true)}}
-            >
-              {!loadSettings ? 
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-                className="w-8"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                />
-              </svg>
-              : 
-              <BloomSpinner />
-            }
-            </Link>
-            <button
-              onClick={() => signOut({ callbackUrl: "/" })}
-              className="bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-700 transition shadow-lg"
-            >
-              Log out
-            </button>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-6 py-16">
-          <h1 className="text-4xl md:text-6xl font-bold mb-4">
-            Welcome back, {shopName || "Florist"}!
-          </h1>
-          <p className="text-xl opacity-90">
-            You're saving thousands by skipping wire services.
+    <div className="w-full rounded-2xl shadow-xl bg-gradient-to-br from-blue-50 via-white to-teal-50">
+      <div className="mx-auto p-6">
+        {/* Invite A Shop */}
+        <div className="mb-12 bg-gradient-to-br from-emerald-400 to-emerald-700 rounded-3xl p-10 text-center text-white shadow-2xl flex flex-col gap-2">
+          <h2 className="text-2xl font-black tracking-wide md:text-3xl">
+            Invite A Florist To GetBloomDirect!
+          </h2>
+          <p className="tracking-wide md:text-lg">
+            Help the GetBloomDirect network grow by inviting florists to join!
           </p>
+          <button
+            className="px-4 py-2 rounded-xl shadow-2xl bg-purple-700 text-white mt-4 sm:mx-auto sm:px-20 sm:text-lg"
+            onClick={() => setInviteFriendsVisible(true)}
+          >
+            Send Invite
+          </button>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-12 -mt-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {isPro ? (
@@ -245,12 +316,13 @@ export default function DashboardClient() {
           ) : (
             /* BLURRED PAYWALL — Free users see this */
             <div className="col-span-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl p-12 text-center text-white shadow-2xl">
-              <h2 className="text-5xl font-black mb-4">
-                Unlock Your Real Numbers
+              <h2 className="text-3xl font-black mb-4 md:text-4xl">
+                {/* Unlock Your Real Numbers */}
+                Pro Coming Soon!
               </h2>
-              <p className="text-2xl mb-8 opacity-90">
-                Pro shops see live profit, unlimited orders, and get featured
-                first
+              <p className="text-xl mb-8 opacity-90 md:text-2xl">
+                Pro shops see live profit, unlimited orders, get featured first,
+                and much more!
               </p>
               <form action="/api/checkout" method="POST">
                 <input
@@ -263,53 +335,21 @@ export default function DashboardClient() {
                 />
                 <button
                   type="submit"
-                  className="bg-white text-purple-600 font-black text-3xl px-16 py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl"
+                  className="hidden bg-white text-purple-600 font-black text-3xl py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl sm:px-6"
                 >
-                  Upgrade to Pro — $29/month
+                  Upgrade to Pro
+                  <br /> $29/month
                 </button>
               </form>
-              <p className="mt-6 text-xl">
-                Cancel anytime • 400+ shops already Pro
-              </p>
+              <p className="hidden mt-6 text-xl">Cancel anytime</p>
             </div>
           )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Link
-            href="/dashboard/new-order"
-            onClick={() => setOrdersLoading(true)}
-            className="group bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-3xl p-12 text-center shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 transition-all duration-300"
-          >
-            <div className="text-6xl mb-4">Send New Order</div>
-            <p className="text-xl opacity-90">
-              Keep $20–$27 instantly → No wire fees
-            </p>
-            <div className="mt-6 text-3xl font-bold group-hover:translate-x-4 transition-transform inline-block">
-              {ordersLoading ? <BloomSpinner size={72} /> : "→"}
-            </div>
-          </Link>
-
-          <Link
-            href="/dashboard/incoming"
-            onClick={() => setNewOrderLoading(true)}
-            className="group bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-3xl p-12 text-center shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 transition-all duration-300"
-          >
-            <div className="text-6xl mb-4">Orders</div>
-            <p className="text-xl opacity-90">
-              Accept orders & earn 100% of delivery + arrangement
-            </p>
-            <div className="mt-6 text-3xl font-bold group-hover:translate-x-4 transition-transform inline-block">
-              {newOrderLoading ? <BloomSpinner size={72} /> : "→"}
-            </div>
-          </Link>
         </div>
 
         {/* Pro Tip */}
         <div
           className={
-            (isPro ? "hidden" : "block") +
+            (isPro ? "hidden" : "hidden") +
             " mt-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-3xl p-8 border border-amber-200"
           }
         >
@@ -322,8 +362,79 @@ export default function DashboardClient() {
         </div>
       </div>
 
+      {inviteFriendsVisible && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6">
+          <div className="relative w-full h-full bg-white rounded-2xl">
+            <button
+              onClick={() => setInviteFriendsVisible(false)}
+              className="absolute top-3 right-5 text-2xl text-red-600 font-black"
+            >
+              X
+            </button>
+            <div className="py-12 px-4">
+              <form
+                className="space-y-4"
+                onSubmit={handleSendInvite}
+              >
+                {/* From Shop */}
+                <p className="text-gray-600 text-lg font-bold">
+                  From:{" "}
+                  <span className="text-purple-600">{shop?.businessName}</span>
+                </p>
+                {/* To Email */}
+                <div>
+                  <div className="flex gap-1">
+                    <span className="text-red-600 text-xl">*</span>
+                    <label className="text-gray-600 text-lg font-bold">
+                      To:
+                    </label>
+                  </div>
+                  <input
+                    type="email"
+                    className="p-2 border rounded-lg w-full border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+                    placeholder="Enter florist's email"
+                    value={toEmail}
+                    onChange={(e) => setToEmail(e.target.value)}
+                  />
+                </div>
+                {!personalMessageVisible && (
+                  <button
+                    onClick={() => setPersonalMessageVisible(true)}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 transition-all text-white text-xl font-semibold rounded-xl w-full"
+                  >
+                    Add Personal Message
+                  </button>
+                )}
+                {personalMessageVisible && (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setPersonalMessageVisible(false)}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 transition-all text-white text-xl font-semibold rounded-xl w-full"
+                    >
+                      Cancel
+                    </button>
+                    <textarea
+                      className="h-32 w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
+                      placeholder="Personal Message (optional)"
+                      value={personalMessage}
+                      onChange={(e) => setPersonalMessage(e.target.value)}
+                    />
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 transition-all text-white text-xl font-semibold rounded-xl w-full"
+                >
+                  Send Invite
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Beta Ad */}
-      <div className="fixed bottom-0 left-0 w-full z-40 from-blue-400 to-slate-500 bg-gradient-to-r shadow-lg">
+      {/* <div className="fixed bottom-0 left-0 w-full z-40 from-blue-400 to-slate-500 bg-gradient-to-r shadow-lg">
         <button
           onClick={() => setInviteFriendsVisible(true)}
           className="w-full h-20 text-2xl text-white font-semibold hover:opacity-90 transition"
@@ -331,10 +442,10 @@ export default function DashboardClient() {
           Invite a florist to join BloomDirect's beta program and help us shape
           the future of floral delivery!
         </button>
-      </div>
+      </div> */}
 
       {/* Invite Friends */}
-      <div
+      {/* <div
         className={
           (inviteFriendsVisible ? "block" : "hidden") +
           " fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6"
@@ -410,7 +521,7 @@ export default function DashboardClient() {
             </form>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

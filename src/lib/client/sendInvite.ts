@@ -2,7 +2,7 @@
 
 type SendInviteInput = {
   to: string;
-  shopName: string;
+  businessName: string;
   inviteLink: string;
   personalMessage?: string;
 };

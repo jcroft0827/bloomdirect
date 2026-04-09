@@ -10,12 +10,8 @@ export async function POST(req: Request) {
     await connectToDB();
 
     const session = await getServerSession(authOptions);
-
     if (!session || !session.user?.email) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { currentPassword, newPassword } = await req.json();
@@ -23,7 +19,7 @@ export async function POST(req: Request) {
     if (!currentPassword || !newPassword) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -32,21 +28,15 @@ export async function POST(req: Request) {
     }).select("+password");
 
     if (!shop) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const isMatch = await bcrypt.compare(
-      currentPassword,
-      shop.password
-    );
+    const isMatch = await bcrypt.compare(currentPassword, shop.password);
 
     if (!isMatch) {
       return NextResponse.json(
         { error: "Current password is incorrect" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -56,12 +46,8 @@ export async function POST(req: Request) {
     await shop.save(); // pre-save hook hashes it
 
     return NextResponse.json({ success: true });
-
   } catch (error) {
     console.error("UPDATE PASSWORD ERROR:", error);
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

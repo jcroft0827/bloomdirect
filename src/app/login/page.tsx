@@ -23,6 +23,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     setError("");
     setIsLoggingIn(true);
 
@@ -81,7 +82,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md">
+      <div 
+        className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md"
+        suppressHydrationWarning
+      >
         <h1 className="text-4xl font-black text-purple-600 text-center mb-8">
           BloomDirect Login
         </h1>

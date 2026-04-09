@@ -6,9 +6,14 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const { to, shopName, inviteLink, personalMessage } = body;
+  const { to, businessName, inviteLink, personalMessage } = body;
 
-  if (!to || !shopName || !inviteLink) {
+  console.log(to);
+  console.log(businessName);
+  console.log(inviteLink);
+
+
+  if (!to || !businessName || !inviteLink) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 },
@@ -20,7 +25,7 @@ export async function POST(req: Request) {
   try {
     const result = await sendInviteFloristEmail({
       to,
-      shopName,
+      businessName,
       inviteLink,
       personalMessage,
     });
@@ -28,11 +33,11 @@ export async function POST(req: Request) {
     await EmailEvent.create({
       type: "invite-florist",
       to,
-      subject: `You've been invited to join ${shopName} on GetBloomDirect`,
+      subject: `You've been invited to join ${businessName} on GetBloomDirect`,
       status: "sent",
       resendId: result.data?.id,
       payload: {
-        shopName,
+        businessName,
         inviteLink,
         personalMessage,
       },
@@ -43,12 +48,12 @@ export async function POST(req: Request) {
     await EmailEvent.create({
         type: 'invite-florist',
         to,
-        subject: `You've been invited to join ${shopName} on GetBloomDirect`,
+        subject: `You've been invited to join ${businessName} on GetBloomDirect`,
         status: 'failed',
         error: error.message,
         payload: {
             to,
-            shopName,
+            businessName,
             inviteLink,
             personalMessage,
         },

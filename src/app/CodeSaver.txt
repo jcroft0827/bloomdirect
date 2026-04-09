@@ -1,0 +1,49 @@
+body: JSON.stringify({
+    //         fulfillingShopId: selectedShop._id,
+    //         recipient: {
+    //           firstName: recipientFirstName,
+    //           lastName: recipientLastName,
+    //           fullName: `${recipientFirstName} ${recipientLastName}`,
+    //           address:
+    //             recipientAddress + (recipientApt ? " " + recipientApt : ""),
+    //           city: recipientCity,
+    //           state: recipientState,
+    //           zip: recipientZip,
+    //           phone: recipientPhone,
+    //           email: recipientEmail || null,
+    //           message: cardMessage,
+    //         },
+    //         customer: {
+    //           firstName: customerFirstName,
+    //           lastName: customerLastName,
+    //           email: customerEmail,
+    //           phone: customerPhone,
+    //         },
+    //         deliveryDate: deliveryDate.toISOString(),
+    //         deliveryTimeOption,
+    //         deliveryTimeFrom:
+    //           deliveryTimeOption === "specific" ? deliveryTimeFrom : null,
+    //         deliveryTimeTo:
+    //           deliveryTimeOption === "specific" ? deliveryTimeTo : null,
+    //         productPhoto,
+    //         productName,
+    //         productDescription,
+    //         specialInstructions: specialInstructions || "",
+    //         pricing: {
+    //           arrangement: arrangementValue,
+    //           delivery: deliveryFee,
+    //           fee: originatingFee,
+    //           total: totalCustomerPays,
+    //         },
+    //       }),
+    //     });
+
+
+
+        productsTotal: 0.0,
+    deliveryFee: 20.0,
+    taxAmount: 0.0,
+    customerPays: 0.0,
+    orderTotal: 0.0,
+    fulfillingShopGets: 0.0,
+    feeCharge: 0.0,

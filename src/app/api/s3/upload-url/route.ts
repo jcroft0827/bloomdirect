@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       fileType
     );
 
-    return NextResponse.json({ uploadUrl, fileUrl });
+    return NextResponse.json({ uploadUrl, fileUrl, fileKey: uniqueName });
   } catch (error) {
     console.error("S3 Upload URL Error:", error);
 

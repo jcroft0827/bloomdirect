@@ -3,82 +3,447 @@ import bcrypt from "bcryptjs";
 
 const shopSchema = new mongoose.Schema(
   {
-    // Core identity (Shop acts as the "user")
-    shopName: { type: String, required: true },
-    email: { type: String, required: true, unique: true, lowercase: true },
-    password: { type: String, required: true, select: false }, // never send to client
+    // ===============================
+    // AUTH & ACCOUNT ACCESS
+    // ===============================
 
-    // Address (for search & delivery)
-    address: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String, required: true, maxlength: 2, uppercase: true },
-    zip: { type: String, required: true },
+    businessName: { type: String, required: true, trim: true },
 
-    // Contact
-    phone: { type: String, required: true },
-
-    // Delivery settings
-    deliveryRadius: { type: Number, default: 25 },
-    sameDayCutoff: { type: String, default: "13:00" },
-    deliveryFee: { type: Number, default: 20 },
-    holidaySurcharge: { type: Number, default: 0 },
-
-    // Payment methods
-    venmoHandle: String,
-    cashAppTag: String,
-    zellePhoneOrEmail: String,
-
-    // Public profile
-    logo: { type: String },
-    featuredBouquet: { type: String },
-    bio: String,
-    acceptsWalkIns: { type: Boolean, default: true },
-    weddingConsultations: { type: Boolean, default: false },
-
-    // Subscription / Stripe
-    isPro: { type: Boolean, default: false },
-    proSince: Date,
-    stripeCustomerId: String,
-    stripeSubscriptionId: String,
-    subscriptionStatus: {
+    slug: {
       type: String,
-      enum: ["active", "past_due", "canceled", "trialing", "unpaid", "inactive"],
-      default: "inactive",
+      unique: true,
+      lowercase: true,
+      trim: true,
     },
-    planId: String,
-    cancelAtPeriodEnd: { type: Boolean, default: false },
 
-    // Housekeeping
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+    },
+
+    password: {
+      type: String,
+      required: true,
+    },
+
+    role: {
+      type: String,
+      enum: ["shop", "admin"],
+      default: "shop",
+    },
+
+    securityCode: {
+      type: String,
+      default: "0829",
+    },
+
+    // ===============================
+    // STATUS / ACCOUNT STATE
+    // ===============================
+
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    verifiedFlorist: {
+      type: Boolean,
+      default: false,
+    },
+
+    isSuspended: {
+      type: Boolean,
+      default: false,
+    },
+
+    suspensionReason: String,
+
+    isPublic: {
+      type: Boolean,
+      default: true,
+    },
+
+    onboardingComplete: {
+      type: Boolean,
+      default: false,
+    },
+
+    networkJoinDate: Date,
+
+    isPro: {
+      type: Boolean,
+      default: false,
+    },
+
+    proSince: Date,
+
     lastLogin: Date,
-    lastActive: Date,
-    onboardingComplete: { type: Boolean, default: false },
-    isVerified: { type: Boolean, default: false },
 
-    // Search / geo (optional)
-    geoLocation: {
-      type: { type: String, enum: ["Point"], default: "Point" },
-      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+    lastActivity: Date,
+
+    // ===============================
+    // ACCOUNT SETUP PROGRESS
+    // ===============================
+
+    setupProgress: {
+      businessInfo: { type: Boolean, default: false },
+      paymentMethods: { type: Boolean, default: false },
+      deliverySettings: { type: Boolean, default: false },
+      financialSettings: { type: Boolean, default: false },
+      featuredBouquet: { type: Boolean, default: false },
     },
 
-    // Security Code - This will be used for forgot passwords at first...
-    // will be used for other things later when secure forgot password is implemented
-    securityCode: String,
+    // ===============================
+    // CONTACT INFORMATION
+    // ===============================
 
-    // Future features
-    deliveryFeesByDistance: [{ distance: Number, fee: Number }],
-    deliveryFeesByZip: [String],
+    contact: {
+      phone: String,
+      whatsapp: String,
+      emailSecondary: String,
+      website: String,
+    },
+
+    // ===============================
+    // PHYSICAL LOCATION
+    // ===============================
+
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      zip: String,
+
+      country: {
+        type: String,
+        default: "US",
+      },
+
+      timezone: {
+        type: String,
+        default: "America/New_York",
+      },
+
+      geoLocation: {
+        type: { type: String, enum: ["Point"], default: "Point" },
+
+        coordinates: {
+          type: [Number],
+          default: [0, 0], // [longitude, latitude]
+        },
+      },
+    },
+
+    // ===============================
+    // PAYMENT METHODS
+    // ===============================
+
+    paymentMethods: {
+      venmoHandle: String,
+
+      cashAppTag: String,
+
+      zellePhoneOrEmail: String,
+
+      paypalEmail: String,
+
+      defaultPaymentMethod: {
+        type: String,
+        enum: ["venmo", "cashapp", "zelle", "paypal"],
+      },
+    },
+
+    // ===============================
+    // STRIPE / SUBSCRIPTIONS
+    // ===============================
+
+    stripe: {
+      customerId: String,
+
+      subscriptionId: String,
+
+      status: String,
+
+      planId: String,
+
+      cancelAtPeriodEnd: {
+        type: Boolean,
+        default: false,
+      },
+
+      trialEndsAt: Date,
+    },
+
+    // ===============================
+    // DELIVERY ENGINE
+    // ===============================
+
+    delivery: {
+      method: {
+        type: String,
+        enum: ["zip", "distance"],
+        default: "zip",
+      },
+
+      zipZones: [
+        {
+          name: String,
+          zip: String,
+          fee: Number,
+        },
+      ],
+
+      distanceZones: [
+        {
+          min: Number,
+          max: Number,
+          fee: Number,
+        },
+      ],
+
+      fallbackFee: {
+        type: Number,
+        default: 0,
+      },
+
+      maxRadius: Number,
+
+      minProductTotal: {
+        type: Number,
+        default: 0,
+      },
+
+      sameDayCutoff: {
+        type: String,
+        default: "14:00",
+      },
+
+      holidayDates: [{ name: String, date: Date}],
+
+      holidaySurcharge: { type: Number, default: 0 },
+
+      blackoutDates: [Date],
+
+      blackoutTimes: [
+        {
+          start: String,
+          end: String,
+        },
+      ],
+
+      noMoreOrdersToday: {
+        type: Boolean,
+        default: false,
+      },
+
+      noMoreOrdersForDate: [Date],
+
+      allowSameDay: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
+    // ===============================
+    // TAXES & FEES
+    // ===============================
+
+    financials: {
+      taxPercentage: {
+        type: Number,
+        default: 0,
+      },
+
+      deliveryTaxed: {
+        type: Boolean,
+        default: false,
+      },
+
+      feeTaxed: {
+        type: Boolean,
+        default: false,
+      },
+
+      feeType: {
+        type: String,
+        enum: ["%", "flat"],
+        default: "flat",
+      },
+
+      feeValue: {
+        type: Number,
+        default: 0,
+      },
+    },
+
+    // ===============================
+    // NETWORK RELATIONSHIPS
+    // ===============================
+
+    preferredFlorists: [
+      {
+        shopId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Shop",
+        },
+
+        name: String,
+
+        zip: String,
+      },
+    ],
+
+    blockedFlorists: [
+      {
+        shopId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Shop",
+        },
+
+        reason: String,
+      },
+    ],
+
+    // ===============================
+    // NETWORK STATS
+    // ===============================
+
+    stats: {
+      ordersSent: {
+        type: Number,
+        default: 0,
+      },
+
+      ordersReceived: {
+        type: Number,
+        default: 0,
+      },
+
+      ordersCompleted: {
+        type: Number,
+        default: 0,
+      },
+
+      ordersDeclined: {
+        type: Number,
+        default: 0,
+      },
+
+      responseRate: Number,
+
+      avgResponseTimeMinutes: Number,
+    },
+
+    // ===============================
+    // BRANDING
+    // ===============================
+
+    branding: {
+      logo: String,
+
+      bannerImage: String,
+
+      bio: String,
+
+      primaryColor: {
+        type: String,
+        default: "#000000",
+      },
+
+      socialLinks: {
+        instagram: String,
+        facebook: String,
+        pinterest: String,
+        tiktok: String,
+      },
+
+      featuredReviewId: mongoose.Schema.Types.ObjectId,
+    },
+
+    // ===============================
+    // FEATURED PRODUCT
+    // ===============================
+
+    featuredBouquet: {
+      name: String,
+
+      price: Number,
+
+      description: String,
+
+      image: String,
+    },
+
+    // ===============================
+    // PUBLIC REVIEWS
+    // ===============================
+
+    reviews: [
+      {
+        customerName: String,
+
+        rating: {
+          type: Number,
+          min: 1,
+          max: 5,
+        },
+
+        comment: String,
+
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  },
 );
 
-// Hash password before save if changed
+// ===============================
+// PASSWORD HASHING
+// ===============================
+
 shopSchema.pre("save", function (next) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const doc: any = this;
-  if (doc.isModified("password")) {
-    doc.password = bcrypt.hashSync(doc.password, 10);
-  }
+  if (!this.isModified("password")) return next();
+
+  this.password = bcrypt.hashSync(this.password, 10);
+
   next();
+});
+
+// ===============================
+// SLUG GENERATION
+// ===============================
+
+shopSchema.pre("save", function (next) {
+  if (this.isModified("businessName") && !this.slug) {
+    this.slug = this.businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  }
+
+  next();
+});
+
+// ===============================
+// INDEXES
+// ===============================
+
+// Geo index for distance queries
+shopSchema.index({
+  "address.geoLocation": "2dsphere",
+});
+
+// Text search
+shopSchema.index({
+  businessName: "text",
+  "address.zip": "text",
 });
 
 export default mongoose.models.Shop || mongoose.model("Shop", shopSchema);

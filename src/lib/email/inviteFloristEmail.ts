@@ -4,7 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 type InviteFloristEmailInput = {
   to: string;
-  shopName: string;
+  businessName: string;
   inviteLink: string;
   personalMessage?: string;
 };
@@ -12,7 +12,7 @@ type InviteFloristEmailInput = {
 export async function sendInviteFloristEmail(input: InviteFloristEmailInput) {
   const messageSection = input.personalMessage
     ? `
-      <p><em>Personal message from ${input.shopName}:</em></p>
+      <p><em>Personal message from ${input.businessName}:</em></p>
       <blockquote>${input.personalMessage}</blockquote>
     `
     : "";
@@ -20,7 +20,7 @@ export async function sendInviteFloristEmail(input: InviteFloristEmailInput) {
   return resend.emails.send({
     from: "Get Bloom Direct <no-reply@getbloomdirect.com>",
     to: input.to,
-    subject: `You’ve been invited to join ${input.shopName} on Get Bloom Direct`,
+    subject: `You’ve been invited to join ${input.businessName} on Get Bloom Direct`,
     html: `
 <div style="background-color: #f9f9f9; padding: 40px 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
   <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; border-top: 6px solid #af4ee4; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -29,7 +29,7 @@ export async function sendInviteFloristEmail(input: InviteFloristEmailInput) {
         <h1 style="color: #333333; font-size: 24px; margin-top: 0;">Hi there,</h1>
         
         <p style="color: #555555; font-size: 16px; line-height: 1.6;">
-          <strong style="color: #af4ee4;">${input.shopName}</strong> has invited you to join <span style="font-weight: bold; color: #333333;">GetBloomDirect</span>.
+          <strong style="color: #af4ee4;">${input.businessName}</strong> has invited you to join <span style="font-weight: bold; color: #333333;">GetBloomDirect</span>.
         </p>
 
         <div style="margin: 25px 0; border-left: 4px solid #af4ee4; padding-left: 20px; color: #666666; font-style: italic;">
