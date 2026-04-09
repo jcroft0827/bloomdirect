@@ -93,7 +93,7 @@ export default function OrderClient({
 
       if (res.ok) {
         toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
-        fetchOrders();
+        //fetchOrders();
       } else {
         const error = await res.json();
         toast.error(error.error || "Failed to update order");
@@ -436,6 +436,7 @@ export default function OrderClient({
                         orderId: order._id.toString(),
                         reason: "",
                         message: "",
+                        loading: true,
                       });
                     }}
                   >
