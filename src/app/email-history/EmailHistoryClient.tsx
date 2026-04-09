@@ -86,7 +86,7 @@ export default function EmailHistoryClient() {
       if (event.type === "invite-florist") {
         await sendInviteRequest({
           to: event.to,
-          shopName: event.payload.shopName,
+          businessName: event.payload.businessName,
           inviteLink: event.payload.inviteLink,
           personalMessage: event.payload.personalMessage,
         });
