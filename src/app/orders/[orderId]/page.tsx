@@ -54,7 +54,6 @@ export default async function OrderPage({ params }: { params: { orderId: string 
   return (
     <OrderClient 
       order={JSON.parse(JSON.stringify(order))}
-      availableShops={JSON.parse(JSON.stringify(availableShops))}
       isFulfilling={isFulfilling}
       isOriginating={isOriginating}
     />
