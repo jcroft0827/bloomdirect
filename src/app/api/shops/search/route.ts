@@ -54,7 +54,13 @@ export async function POST(req: Request) {
       delTimeFrom,
       delTimeTo,
       currentShopId,
+      excludedShopIds = [],
     } = await req.json();
+
+    const idsToExclude = [
+      ...(currentShopId ? [new Types.ObjectId(currentShopId)] : []),
+      ...excludedShopIds.map((id: string) => new Types.ObjectId(id))
+    ]
 
     // 1. Geocode Destination (OpenCage)
     const newAddress = address.replace(/ /g, "+");
@@ -86,7 +92,7 @@ export async function POST(req: Request) {
       },
       {
         $match: {
-          ...(currentShopId && { _id: { $ne: new Types.ObjectId(currentShopId) } }),
+          _id: { $nin: idsToExclude },
           isSuspended: false,
           isPublic: true,
           "delivery.blackoutDates": { $ne: deliveryDate.toDate() },

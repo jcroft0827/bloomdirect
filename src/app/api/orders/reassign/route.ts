@@ -23,24 +23,24 @@ export async function POST(req: Request) {
     }
 
     const { orderId, newFulfillingShopId } = await req.json();
-
+    
     if (!orderId || !newFulfillingShopId) {
       return NextResponse.json(
         { error: "Missing orderId or newFulfillingShopId" },
         { status: 400 },
       );
     }
-
+    
     const order = await Order.findById(orderId);
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
-
+    
     // Only originating shop can reassign
     if (order.originatingShop.toString() !== session.user.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
-
+    
     // Must be declined first
     if (order.status !== OrderStatus.DECLINED) {
       return NextResponse.json(
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-
+    
     // Prevent reassigning to same shop
     if (order.fulfillingShop.toString() === newFulfillingShopId) {
       return NextResponse.json(
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-
+    
     const newShop = await Shop.findById(newFulfillingShopId);
     if (!newShop) {
       return NextResponse.json(
@@ -65,40 +65,41 @@ export async function POST(req: Request) {
       );
     }
 
+    
     /**
      * RESET ORDER STATE
-     */
-    order.fulfillingShop = newShop._id;
-    order.fulfillingShopName = newShop.shopName;
-
+    */
+   order.fulfillingShop = newShop._id;
+   order.fulfillingShopName = newShop.businessName;
+  
+   order.acceptedAt = undefined;
+   order.declinedAt = undefined;
+   order.completedAt = undefined;
+   
+   order.declineReason = undefined;
+   order.declineMessage = undefined;
+   
+   order.reassignCount = (order.reassignCount || 0) + 1;
+   
+   // ─────────────────────────────────────────────
+   // STATUS TRANSITION GUARD
+   // ─────────────────────────────────────────────
+   assertOrderTransition({
+     order,
+     nextStatus: OrderStatus.PENDING_ACCEPTANCE,
+     actorShopId: session.user.id,
+    });
+    
     order.status = OrderStatus.PENDING_ACCEPTANCE;
 
-    order.acceptedAt = undefined;
-    order.declinedAt = undefined;
-    order.completedAt = undefined;
-
-    order.declineReason = undefined;
-    order.declineMessage = undefined;
-
-    order.reassignCount = (order.reassignCount || 0) + 1;
-
-    // ─────────────────────────────────────────────
-    // STATUS TRANSITION GUARD
-    // ─────────────────────────────────────────────
-    assertOrderTransition({
-      order,
-      nextStatus: OrderStatus.PENDING_ACCEPTANCE,
-      actorShopId: session.user.id,
-    });
-
     await order.save();
-
+    
     // Activity Log
     await addOrderActivity({
       orderId: order._id,
       action: OrderActivityActions.ORDER_REASSIGNED,
       actorShopId: session.user.id,
-      message: `Order reassigned to ${newShop.shopName}`,
+      message: `Order reassigned to ${newShop.businessName}`,
     });
 
     /**
@@ -108,11 +109,11 @@ export async function POST(req: Request) {
       const resend = getResend();
 
       await resend.emails.send({
-        from: "BloomDirect <new-orders@getbloomdirect.com>",
+        from: "GetBloomDirect <new-orders@getbloomdirect.com>",
         to: newShop.email,
         subject: getOrderEmailSubject(order.orderNumber, order.status),
         html: `
-          <p>You have received a new order on <strong>BloomDirect</strong>.</p>
+          <p>You have received a new order on <strong>GetBloomDirect</strong>.</p>
           <p><strong>Order #:</strong> ${order.orderNumber}</p>
           <p>Please log in to review and accept the order.</p>
         `,

@@ -5,13 +5,19 @@ import type { OrderLean } from "@/types/order";
 import Link from "next/link";
 import { OrderStatus } from "@/lib/order-status";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import BloomSpinner from "@/components/BloomSpinner";
+import Shop from "@/models/Shop";
 
 interface OrderClientProps {
   order: OrderLean;
-  availableShops: any[];
   isFulfilling: boolean;
   isOriginating: boolean;
+}
+
+interface Shop {
+  _id: string;
+  businessName: string;
 }
 
 interface Decline {
@@ -23,39 +29,48 @@ interface Decline {
 
 export default function OrderClient({
   order,
-  availableShops,
   isFulfilling,
   isOriginating,
 }: OrderClientProps) {
-
-    const router = useRouter();
+  const router = useRouter();
   const role = isOriginating ? "ORIGINATING" : "FULFILLING";
   const [actionOrderId, setActionOrderId] = useState<string | null>(null);
   const [decline, setDecline] = useState<Decline | null>(null);
+  const [handlingStatus, setHandlingStatus] = useState(false);
+  const [availableShops, setAvailableShops] = useState<Shop[]>([]);
+  const [reassignShop, setReassignShop] = useState("");
+  const [understand, setUnderstand] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    if (order.status === "DECLINED") {
+      searchShops();
+    }
+  }, [order.status]);
 
   const handleMarkPaid = async (
-    e: React.FormEvent, // Add the event
     orderId: string,
-    method: string,
+    method: "venmo" | "cashapp" | "zelle" | "paypal",
   ) => {
-    e.preventDefault(); // Stop the page from reloading/redirecting
-
     try {
+      setHandlingStatus(true);
       const res = await fetch("/api/orders/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId, paymentMethod: method }),
       });
-
       if (res.ok) {
         toast.success(`Order marked as paid via ${method.toUpperCase()}!`);
         router.refresh();
-      } else {
-        throw new Error("Failed to update");
       }
     } catch (err) {
+      setHandlingStatus(false);
       console.error("Failed to mark order as paid", err);
-      toast.error("Failed to mark order as paid.");
+      toast.error(
+        "Failed to mark order as paid. Please try again. If the problem persists, contact GetBloomDirect support.",
+      );
+    } finally {
+      setHandlingStatus(false);
     }
   };
 
@@ -77,11 +92,12 @@ export default function OrderClient({
     return `${hours}:${strMinutes} ${ampm}`;
   };
 
-    const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
     if (actionOrderId === orderId) return; // Prevent duplicate actions
 
     try {
       setActionOrderId(orderId);
+      setHandlingStatus(true);
 
       const res = await fetch("/api/orders/status", {
         method: "POST",
@@ -93,12 +109,91 @@ export default function OrderClient({
 
       if (res.ok) {
         toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
-        //fetchOrders();
+        router.refresh();
       } else {
+        setHandlingStatus(false);
         const error = await res.json();
         toast.error(error.error || "Failed to update order");
       }
     } catch (error) {
+      setHandlingStatus(false);
+      console.error("Failed to update order", error);
+      toast.error(
+        "Failed to update order. Please try again. If the problem persists, contact GetBloomDirect support.",
+      );
+    } finally {
+      setHandlingStatus(false);
+    }
+  };
+
+  const searchShops = async () => {
+    try {
+      setHandlingStatus(true);
+
+      const excludedIds = (order.activityLog ?? [])
+        .map((log: any) => log.actorShop)
+        .filter((id: string | null | undefined) => id !=null);
+
+      const res = await fetch("/api/shops/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: order.recipient.address,
+          city: order.recipient.city,
+          state: order.recipient.state,
+          zip: order.recipient.zip,
+          delDate: order.logistics.deliveryDate,
+          delTimeOpt: order.logistics.deliveryTimeOption,
+          delTimeFrom: order.logistics.deliveryTimeFrom,
+          delTimeTo: order.logistics.deliveryTimeTo,
+          currentShopId: order.originatingShop,
+          excludedShopIds: excludedIds,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Search failed");
+
+      const filteredShops = (data || []).filter(
+        (shop: any) => shop.businessName != order.fulfillingShopName
+      );
+
+      setAvailableShops(filteredShops);
+
+      if (!filteredShops || filteredShops.length === 0) {
+        toast.error("No GetBloomDirect shops in that area yet — invite them!");
+      }
+    } catch (error) {
+      console.error("Error finding shops", error);
+      toast.error(
+        "Error finding shops. Please try again. If the problem persists, contact GetBloomDirect support.",
+      );
+    } finally {
+      setHandlingStatus(false);
+    }
+  };
+
+  const handleReassign = async (orderId: string, newShopId: string) => {
+    try {
+      setHandlingStatus(true);
+
+      const res = await fetch("/api/orders/reassign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, newFulfillingShopId: newShopId })
+      });
+
+      if (res.ok) {
+        toast.success('Order updated');
+        router.refresh();
+      } else {
+        setHandlingStatus(false);
+        const error = await res.json();
+        toast.error(error.error || "Failed to update order");
+      }
+    } catch (error) {
+      setHandlingStatus(false);
       console.error("Failed to update order", error);
       toast.error(
         "Failed to update order. Please try again. If the problem persists, contact GetBloomDirect support.",
@@ -199,6 +294,7 @@ export default function OrderClient({
 
         {/* MAIN CONTENT */}
         <div className="grid lg:grid-cols-3 gap-6">
+
           {/* LEFT – Order Details + Products */}
           <div className="bg-white rounded-3xl shadow-xl p-6 space-y-6">
             <div className="text-center">
@@ -418,11 +514,16 @@ export default function OrderClient({
             {/* ACCEPT / DECLINE */}
             {isFulfilling &&
               order.status === OrderStatus.PENDING_ACCEPTANCE && (
-                <div>
+                <div className="flex flex-col gap-4">
                   <button
                     type="button"
-                    disabled={actionOrderId === order._id}
-                    onClick={() => handleStatus(order._id, OrderStatus.ACCEPTED_AWAITING_PAYMENT)}
+                    disabled={handlingStatus}
+                    onClick={() =>
+                      handleStatus(
+                        order._id,
+                        OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+                      )
+                    }
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-4 rounded-2xl"
                   >
                     Accept Order
@@ -439,6 +540,7 @@ export default function OrderClient({
                         loading: true,
                       });
                     }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xl py-4 rounded-2xl"
                   >
                     Decline Order
                   </button>
@@ -546,119 +648,142 @@ export default function OrderClient({
                     </span>
                   </p>
 
-                  {["venmo", "cashapp", "zelle", "paypal"].map((method) => (
-                    <form
-                      key={method}
-                      onSubmit={(e) =>
-                        handleMarkPaid(e, order._id.toString(), method)
-                      }
-                    >
-                      <input
-                        type="hidden"
-                        name="orderId"
-                        value={order._id.toString()}
-                      />
-                      <input
-                        type="hidden"
-                        name="paymentMethod"
-                        value={method}
-                      />
-                      <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">
-                        Paid via {method.toUpperCase()}
-                      </button>
-                    </form>
-                  ))}
+                  <div className="flex flex-col gap-2">
+                    {(["venmo", "cashapp", "zelle", "paypal"] as const).map(
+                      (method) => (
+                        <button
+                          disabled={handlingStatus}
+                          key={method}
+                          onClick={() => handleMarkPaid(order._id, method)}
+                          className={`
+                          w-full text-white font-bold py-3 rounded-xl shadow-lg transition-all
+                          ${
+                            method === "venmo"
+                              ? "bg-blue-500 hover:bg-blue-600"
+                              : method === "cashapp"
+                                ? "bg-green-500 hover:bg-green-600"
+                                : method === "zelle"
+                                  ? "bg-purple-500 hover:bg-purple-600"
+                                  : "bg-gray-500 hover:bg-gray-600"
+                          }
+                        `}
+                        >
+                          Paid via {method.toUpperCase()}
+                        </button>
+                      ),
+                    )}
+                  </div>
                 </div>
               )}
 
             {/* MARK DELIVERED */}
             {isFulfilling &&
               order.status === OrderStatus.PAID_AWAITING_FULFILLMENT && (
-                <form action="/api/orders/status" method="POST">
-                  <input
-                    type="hidden"
-                    name="orderId"
-                    value={order._id.toString()}
-                  />
-                  <input
-                    type="hidden"
-                    name="status"
-                    value={OrderStatus.COMPLETED}
-                  />
-                  <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xl py-4 rounded-2xl">
-                    Mark as Delivered
+                <div>
+                  <button
+                    type="button"
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black text-xl py-4 rounded-2xl"
+                    disabled={handlingStatus}
+                    onClick={() =>
+                      handleStatus(order._id, OrderStatus.COMPLETED)
+                    }
+                  >
+                    {handlingStatus ? (
+                      <div className="flex gap-2 items-center w-full justify-center">
+                        <span>Marking as Delivered</span>
+                        <span>
+                          <BloomSpinner size={28} />
+                        </span>
+                      </div>
+                    ) : (
+                      "Mark as Delivered"
+                    )}
                   </button>
-                </form>
+                </div>
               )}
 
             {/* REASSIGN ORDER */}
             {isOriginating &&
-              order.status === OrderStatus.DECLINED &&
-              availableShops.length > 0 && (
-                <div className="space-y-4 border-t pt-6">
-                  <h3 className="text-lg font-black text-purple-700">
-                    Reassign Order
-                  </h3>
+              order.status === OrderStatus.DECLINED && (
+                <>
+                  {availableShops.length > 0 ? (
+                    <div className="space-y-4 border-t pt-6">
+                      <h3 className="text-lg font-black text-purple-700">
+                        Reassign Order
+                      </h3>
 
-                  <p className="text-sm text-gray-600">
-                    This order was declined. Choose another shop to fulfill it.
-                  </p>
+                      <p className="text-sm text-gray-600">
+                        This order was declined. Choose another shop to fulfill it.
+                      </p>
 
-                  <p className="text-sm text-gray-500">
-                    Once reassigned, the new shop will receive this order and
-                    can choose to accept or decline it. You will be notified by
-                    email.
-                  </p>
+                      <p className="text-sm text-gray-500">
+                        Once reassigned, the new shop will receive this order and
+                        can choose to accept or decline it. You will be notified by
+                        email.
+                      </p>
 
-                  <p className="text-xs text-red-500 text-center">
-                    This action cannot be undone.
-                  </p>
+                      <p className="text-xs text-red-500 text-center">
+                        This action cannot be undone.
+                      </p>
 
-                  <form
-                    action="/api/orders/reassign"
-                    method="POST"
-                    className="space-y-3"
-                  >
-                    <input
-                      type="hidden"
-                      name="orderId"
-                      value={order._id.toString()}
-                    />
-
-                    <select
-                      name="newFulfillingShopId"
-                      required
-                      className="w-full rounded-xl border border-gray-300 px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="">Select a shop…</option>
-
-                      {availableShops.map((shop) => (
-                        <option
-                          key={shop._id.toString()}
-                          value={shop._id.toString()}
-                        >
-                          {shop.shopName}
-                        </option>
-                      ))}
-                    </select>
-
-                    <label className="flex items-start gap-3 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
+                      <select
+                        name="newFulfillingShopId"
+                        value={reassignShop}
                         required
-                        className="mt-1 accent-purple-600"
-                      />
-                      I understand this order will be sent to a new shop.
-                    </label>
+                        disabled={handlingStatus}
+                        onChange={(e) => setReassignShop(e.target.value)}
+                        className="w-full rounded-xl border border-gray-300 px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                      >
+                        <option value="">
+                          {handlingStatus ? "Searching for shops..." : "Select a shop..."}
+                        </option>
+                        {availableShops.map((shop) => (
+                          <option
+                            key={shop?._id}
+                            value={shop?._id}
+                          >
+                            {shop?.businessName}
+                          </option>
+                        ))}
+                      </select>
 
-                    <button
-                      type="submit"
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-4 rounded-2xl"
-                    >
-                      Reassign Order
-                    </button>
-                  </form>
-                </div>
+                      <label
+                        className="flex items-start gap-3 text-sm text-gray-700"
+                      >
+                        <input 
+                          type="checkbox"
+                          required
+                          checked={understand}
+                          onChange={() => setUnderstand(!understand)}
+                          className="mt-1 accent-purple-600"
+                        />
+                        I understand this order will be sent to a new shop.
+                      </label>
+
+                      <button
+                        type="button"
+                        disabled={!understand || handlingStatus || reassignShop === ""}
+                        onClick={() => handleReassign(order._id, reassignShop)}
+                        className={(!understand || handlingStatus || reassignShop === "" ? "bg-gray-600" : "bg-purple-600 hover:bg-purple-700") + 
+                          " w-full text-white font-black py-4 rounded-2xl"}
+                      >
+                        Reassign Order
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 border-t pt-6">
+                      <p className="text-lg mt-4 text-center sm:text-start md:max-w-lg">
+                        GetBloomDirect is expanding quickly. We don't currently have another partner florist available to service this order - but we'd love to change that!
+                      </p>
+                      <Link
+                        href={"/dashboard"}
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-lg px-4 py-2 rounded-2xl shadow-lg mt-5 transition-all"
+                      >
+                        Invite another florist in that area
+                      </Link>   
+                    </div>
+                  )}
+                </>
               )}
 
             {/* FALLBACK */}

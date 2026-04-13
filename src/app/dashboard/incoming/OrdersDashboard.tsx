@@ -14,14 +14,16 @@ export default function OrdersDashboard() {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [roleFilter, setRoleFilter] = useState<
-    "originating" | "fulfilling" | "all"
-  >("all");
-  const [dateFilter, setDateFilter] = useState({
-    start: new Date(), // Or null
-    end: new Date(),
+
+  const [activeFilters, setActiveFilters] = useState({
+    status: [] as string[],
+    role: "all" as "originating" | "fulfilling" | "all",
+    dateRange: { start: "", end: "" }, // Use empty strings instead of null/Date
+    dateType: "Order Date",
+    preset: "",
   });
+
+  const [draftFilters, setDraftFilters] = useState(activeFilters);
 
   const [declineOrderId, setDeclineOrderId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState<string>("");
@@ -31,7 +33,9 @@ export default function OrdersDashboard() {
   const [actionOrderId, setActionOrderId] = useState<string | null>(null);
 
   const [mobileFilters, setMobileFilters] = useState(false);
-  const [dateSearchType, setDateSearchType] = useState("Order Date");
+  const [desktopFilters, setDesktopFilters] = useState(false);
+
+  const [declineSearch, setDeclineSearch] = useState(false);
 
   const router = useRouter();
 
@@ -61,19 +65,36 @@ export default function OrdersDashboard() {
 
   const fetchOrders = async () => {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
-      if (statusFilter.length) params.append("status", statusFilter.join(","));
-      if (roleFilter !== "all") params.append("role", roleFilter);
+
+      // Pull from activeFilters object
+      const { status, role, dateRange, dateType } = activeFilters;
+
+      if (status.length) params.append("status", status.join(","));
+      if (role !== "all") params.append("role", role);
+
+      // Date Filters
+      if (dateRange.start) {
+        const start = new Date(`${dateRange.start}T00:00:00`);
+        params.append("startDate", start.toISOString());
+      }
+      if (dateRange.end) {
+        const end = new Date(`${dateRange.end}T23:59:59`);
+        params.append("endDate", end.toISOString());
+      }
+
+      params.append("dateType", dateType);
 
       const res = await fetch(`/api/orders?${params.toString()}`);
       const data = await res.json();
 
-      if (!res.ok) {
+      if (res.ok) {
+        setOrders(data.orders || []);
+      } else {
         toast.error(data.error || "Failed to load orders.");
         return;
       }
-
-      setOrders(data.orders || []);
     } catch (err) {
       console.error("Failed to load orders", err);
       toast.error(
@@ -84,11 +105,16 @@ export default function OrdersDashboard() {
     }
   };
 
+  // Runs when filters change
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 15000); // Refresh every 15s
-    return () => clearInterval(interval);
-  }, [statusFilter, roleFilter]);
+  }, [activeFilters]);
+
+  // Runs once (polling)
+  // useEffect(() => {
+  //   const interval = setInterval(fetchOrders, 15000);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
     if (actionOrderId === orderId) return; // Prevent duplicate actions
@@ -141,9 +167,21 @@ export default function OrdersDashboard() {
     }
   };
 
-  const formatDateForInput = (date: any) => {
+  const formatDateForInput = (date: Date | null) => {
     if (!date) return "";
     return date.toISOString().split("T")[0];
+  };
+
+  const handleApply = () => {
+    setActiveFilters(draftFilters);
+    setMobileFilters(false);
+    setDesktopFilters(false);
+  };
+
+  const handleCancel = () => {
+    setDraftFilters(activeFilters);
+    setMobileFilters(false);
+    setDesktopFilters(false);
   };
 
   if (loading) {
@@ -153,6 +191,27 @@ export default function OrdersDashboard() {
       </div>
     );
   }
+
+  const getButtonStyle = (presetName: string) => {
+    const isActive = draftFilters.preset === presetName;
+    return `w-full border rounded-lg p-2 lg:p-1 shadow-md font-medium transition-colors ${
+      isActive
+        ? "bg-emerald-600 text-white border-emerald-600"
+        : "bg-white text-gray-700 border-gray-200"
+    }`;
+  };
+
+  const clearFilters = () => {
+    setActiveFilters({
+      status: [],
+      role: "all",
+      dateRange: { start: "", end: "" },
+      dateType: "Order Date",
+      preset: "",
+    });
+
+    setDraftFilters(activeFilters);
+  };
 
   const statusLabels: Record<string, string> = {
     PENDING_ACCEPTANCE: "Pending Acceptance",
@@ -181,49 +240,317 @@ export default function OrdersDashboard() {
             <h1 className="text-4xl font-black text-center text-purple-600">
               Orders
             </h1>
-            <p className="text-center text-lg text-gray-700">
-              Manage all orders — sent and received
+            <p className="text-center text-xl text-gray-700">
+              Showing <b>{orders.length}</b> Orders
             </p>
           </div>
 
           <OrderFlowHelper />
 
-          {/* Filters - MOBILE */}
-          <div className="flex mb-8 items-center gap-6 px-4 py-2 bg-white rounded-xl shadow-md">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="rounded-xl p-2 border w-full shadow-md"
-            >
-              <option value="all">All Orders</option>
-              <option value="originating">Sent Orders</option>
-              <option value="fulfilling">Incoming Orders</option>
-            </select>
-
-            <button
-              type="button"
-              onClick={() => setMobileFilters(true)}
-              className="border p-2 rounded-xl shadow-md"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-                className="size-6"
+          {/* Filters */}
+          <div className="mb-8 px-4 py-2 bg-white rounded-xl shadow-md transition-all duration-300">
+            <div className="flex items-center gap-6">
+              <select
+                value={activeFilters.role}
+                onChange={(e) =>
+                  setActiveFilters({
+                    ...activeFilters,
+                    role: e.target.value as any,
+                  })
+                }
+                className="rounded-xl p-2 border w-full shadow-md"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"
-                />
-              </svg>
-            </button>
+                <option value="all">All Orders</option>
+                <option value="originating">Sent Orders</option>
+                <option value="fulfilling">Incoming Orders</option>
+              </select>
+
+              {/* Mobile Filters Button */}
+              <button
+                type="button"
+                onClick={() => setMobileFilters(true)}
+                className="border p-2 rounded-xl shadow-md lg:hidden"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.5"
+                  stroke="currentColor"
+                  className="size-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"
+                  />
+                </svg>
+              </button>
+              {/* Desktop Filters Button */}
+              <button
+                type="button"
+                onClick={() => setDesktopFilters(true)}
+                className="border p-2 rounded-xl shadow-md hidden lg:block"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.5"
+                  stroke="currentColor"
+                  className="size-6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Desktop Filters */}
+            <div
+              className={`grid transition-all duration-500 ease-in-out overflow-hidden
+                    ${desktopFilters ? "grid-row-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}
+                  `}
+            >
+              <div className="min-h-0">
+                <div className="pt-4 border-t border-gray-200 mt-2 text-gray-600 text-sm space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <h3 className="text-xl font-medium">Order Filters</h3>
+                      <button
+                        onClick={clearFilters}
+                        className="text-indigo-700 text-xl"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                    {/* Apply + Cancel Button */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleApply}
+                        className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold rounded-lg w-full"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancel}
+                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-lg font-semibold rounded-lg w-full"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                  {/* Date Filters */}
+                  <div className="space-y-2">
+                    {/* Header */}
+                    <div className="flex items-center gap-6">
+                      <h4 className="font-medium">Date Filters</h4>
+                      <label className="flex gap-1">
+                        <input
+                          type="radio"
+                          name="dateSearch"
+                          checked={draftFilters.dateType === "Order Date"}
+                          value={"Order Date"}
+                          onChange={(e) =>
+                            setDraftFilters({
+                              ...draftFilters,
+                              dateType: e.target.value,
+                            })
+                          }
+                        />
+                        Order Date
+                      </label>
+                    </div>
+                    {/* Filters */}
+                    <div className="flex flex-col w-full gap-2">
+                      {/* Start Date + End Date */}
+                      <div className="flex items-center gap-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500 ml-1">
+                            Start Date
+                          </span>
+                          <input
+                            type="date"
+                            value={draftFilters.dateRange.start}
+                            onChange={(e) =>
+                              setDraftFilters({
+                                ...draftFilters,
+                                preset: "",
+                                dateRange: {
+                                  ...draftFilters.dateRange,
+                                  start: e.target.value,
+                                },
+                              })
+                            }
+                            className="border rounded-lg px-2 py-1 w-full"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500 ml-1">
+                            End Date
+                          </span>
+                          <input
+                            type="date"
+                            value={draftFilters.dateRange.end}
+                            onChange={(e) =>
+                              setDraftFilters({
+                                ...draftFilters,
+                                preset: "", // Clear preset highlight
+                                dateRange: {
+                                  ...draftFilters.dateRange,
+                                  end: e.target.value,
+                                },
+                              })
+                            }
+                            className="border rounded-lg px-2 py-1 w-full"
+                          />
+                        </div>
+                      </div>
+                      {/* Buttons */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          className={`${getButtonStyle("next7")}`}
+                          onClick={(e) => {
+                            const today = new Date();
+                            const nextWeek = new Date();
+                            nextWeek.setDate(today.getDate() + 7);
+
+                            setDraftFilters({
+                              ...draftFilters,
+                              preset: "next7",
+                              dateRange: {
+                                start: today.toISOString().split("T")[0],
+                                end: nextWeek.toISOString().split("T")[0],
+                              },
+                            });
+                          }}
+                        >
+                          Next 7 Days
+                        </button>
+                        <button
+                          className={`${getButtonStyle("last7")}`}
+                          onClick={(e) => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setDate(end.getDate() - 7);
+
+                            setDraftFilters({
+                              ...draftFilters,
+                              preset: "last7",
+                              dateRange: {
+                                start: start.toISOString().split("T")[0],
+                                end: end.toISOString().split("T")[0],
+                              },
+                            });
+                          }}
+                        >
+                          Last 7 Days
+                        </button>
+                        <button
+                          className={`${getButtonStyle("last30")}`}
+                          onClick={(e) => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setDate(end.getDate() - 30);
+
+                            setDraftFilters({
+                              ...draftFilters,
+                              preset: "last30",
+                              dateRange: {
+                                start: start.toISOString().split("T")[0],
+                                end: end.toISOString().split("T")[0],
+                              },
+                            });
+                          }}
+                        >
+                          Last 30 Days
+                        </button>
+                        <button
+                          className={`${getButtonStyle("last6months")} col-span-2`}
+                          onClick={(e) => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setMonth(end.getMonth() - 6);
+
+                            setDraftFilters({
+                              ...draftFilters,
+                              preset: "last6months",
+                              dateRange: {
+                                start: start.toISOString().split("T")[0],
+                                end: end.toISOString().split("T")[0],
+                              },
+                            });
+                          }}
+                        >
+                          Last 6 Months
+                        </button>
+                        <button
+                          className={`${getButtonStyle("last1year")}`}
+                          onClick={(e) => {
+                            const end = new Date();
+                            const start = new Date();
+                            start.setFullYear(end.getFullYear() - 1);
+
+                            setDraftFilters({
+                              ...draftFilters,
+                              preset: "last1year",
+                              dateRange: {
+                                start: start.toISOString().split("T")[0],
+                                end: end.toISOString().split("T")[0],
+                              },
+                            });
+                          }}
+                        >
+                          Last 1 Year
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Order Status Filters */}
+                  <div className="space-y-2">
+                    <h4>Order Status Filters</h4>
+                    <div className="flex items-center gap-y-2 gap-x-4 flex-wrap">
+                      {Object.entries(statusLabels).map(([key, label]) => (
+                        <label
+                          key={key}
+                          className="flex gap-2 items-center cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded accent-emerald-600"
+                            checked={draftFilters.status.includes(key)}
+                            onChange={() => {
+                              const isSelected =
+                                draftFilters.status.includes(key);
+                              const nextStatus = isSelected
+                                ? draftFilters.status.filter((s) => s !== key) // Remove if already there
+                                : [...draftFilters.status, key]; // Add if not there
+
+                              setDraftFilters({
+                                ...draftFilters,
+                                status: nextStatus,
+                              });
+                            }}
+                          />
+                          <span className="text-sm text-gray-700">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Filters */}
-          <div className="hidden mb-8 flex-wrap gap-4 items-center justify-between">
+          {/* <div className="hidden mb-8 flex-wrap gap-4 items-center justify-between">
             <div>
               <label></label>
               <select
@@ -254,7 +581,7 @@ export default function OrdersDashboard() {
                 ))}
               </select>
             </div>
-          </div>
+          </div> */}
 
           {orders.length === 0 ? (
             <div className="text-center py-32">
@@ -397,11 +724,20 @@ export default function OrdersDashboard() {
                           session?.user?.id === order.originatingShop && (
                             <div className="flex flex-col gap-2 justify-center w-full">
                               <p className="font-bold text-lg capitalize">
-                                Preferred Payment Method: {order.paymentMethods.default}
+                                Preferred Payment Method:{" "}
+                                <span className="text-lg uppercase text-emerald-600">
+                                  {order.paymentMethods.default}
+                                </span>
                               </p>
+
                               <div className="flex flex-wrap gap-2 justify-center w-full">
                                 {(
-                                  ["venmo", "cashapp", "zelle", "paypal"] as const
+                                  [
+                                    "venmo",
+                                    "cashapp",
+                                    "zelle",
+                                    "paypal",
+                                  ] as const
                                 ).map((method) => (
                                   <button
                                     disabled={actionOrderId === order._id}
@@ -450,12 +786,14 @@ export default function OrdersDashboard() {
                       <p className="text-purple-600 font-bold text-lg">
                         Delivery Date <br />
                         <span className="text-black text-xl font-black">
-                            {new Date(order.logistics.deliveryDate).toLocaleDateString("en-US", {
-                              weekday: "long",
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
+                          {new Date(
+                            order.logistics.deliveryDate,
+                          ).toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </span>
                       </p>
                       {/* Del Time Method */}
@@ -511,7 +849,8 @@ export default function OrdersDashboard() {
 
                     {/* RIGHT: View Order Button + Products */}
                     <div className="flex flex-col gap-4 lg:col-span-2 2xl:col-span-1">
-                      <Link href={`/orders/${order._id}`}
+                      <Link
+                        href={`/orders/${order._id}`}
                         className="self-center px-8 py-1 rounded-md shadow-md bg-purple-600 border border-purple-600 text-white transition-all hover:text-purple-600 hover:bg-white"
                       >
                         View Order
@@ -580,19 +919,20 @@ export default function OrdersDashboard() {
       {/* Mobile Filters */}
       {mobileFilters && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="fixed inset-10 z-60 bg-white rounded-xl px-4 py-14">
-            <button
-              type="button"
-              onClick={() => setMobileFilters(false)}
-              className="absolute top-2 right-4 text-red-500 text-xl"
-            >
-              X
-            </button>
-            <h3 className="text-xl font-medium absolute top-2 left-4">
-              Order Filters
-            </h3>
+          <div className="fixed inset-10 z-60 bg-white rounded-xl p-4 flex flex-col">
+            <h3 className="text-xl font-medium mb-2">Order Filters</h3>
 
-            <div className="w-full">
+            <div>
+              <button
+                onClick={clearFilters}
+                className="text-indigo-700 text-xl"
+              >
+                Clear Filters
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 my-4 pr-2">
+              {/* Date Filters */}
               <div className="flex flex-col gap-4 pb-4 mb-4 border-b border-opacity-75">
                 <h4 className="font-medium">Date Filters</h4>
                 <div className="grid grid-cols-2 items-center w-full gap-y-2">
@@ -600,67 +940,223 @@ export default function OrdersDashboard() {
                     <input
                       type="radio"
                       name="dateSearch"
-                      checked={dateSearchType === "Order Date"}
+                      checked={draftFilters.dateType === "Order Date"}
                       value={"Order Date"}
-                      onChange={(e) => setDateSearchType(e.target.value)}
+                      onChange={(e) =>
+                        setDraftFilters({
+                          ...draftFilters,
+                          dateType: e.target.value,
+                        })
+                      }
                     />
                     Order Date
                   </label>
-                  <label className="flex gap-1">
+                  {/* <label className="flex gap-1">
                     <input
                       type="radio"
                       name="dateSearch"
-                      checked={dateSearchType === "Delivery Date"}
+                      checked={draftFilters.dateType === "Delivery Date"}
                       value={"Delivery Date"}
-                      onChange={(e) => setDateSearchType(e.target.value)}
+                      onChange={(e) =>
+                        setDraftFilters({
+                          ...draftFilters,
+                          dateType: e.target.value,
+                        })
+                      }
                     />
                     Delivery Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formatDateForInput(dateFilter.start)}
-                    onChange={(e) =>
-                      setDateFilter({
-                        ...dateFilter,
-                        start: new Date(e.target.value),
-                      })
-                    }
-                    className="border rounded-lg px-2 py-1 w-full col-span-2"
-                  />
+                  </label> */}
+                  <div className="grid grid-cols-1 items-center w-full gap-2 col-span-2">
+                    {/* Start Date */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500 ml-1">
+                        Start Date
+                      </span>
+                      <input
+                        type="date"
+                        value={draftFilters.dateRange.start}
+                        onChange={(e) =>
+                          setDraftFilters({
+                            ...draftFilters,
+                            preset: "",
+                            dateRange: {
+                              ...draftFilters.dateRange,
+                              start: e.target.value,
+                            },
+                          })
+                        }
+                        className="border rounded-lg px-2 py-1 w-full"
+                      />
+                    </div>
+
+                    {/* End Date */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500 ml-1">
+                        End Date
+                      </span>
+                      <input
+                        type="date"
+                        value={draftFilters.dateRange.end}
+                        onChange={(e) =>
+                          setDraftFilters({
+                            ...draftFilters,
+                            preset: "", // Clear preset highlight
+                            dateRange: {
+                              ...draftFilters.dateRange,
+                              end: e.target.value,
+                            },
+                          })
+                        }
+                        className="border rounded-lg px-2 py-1 w-full"
+                      />
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-2 col-span-2">
                     <button
-                      className="w-full border rounded-lg p-2 shadow-md font-medium col-span-2"
-                      onClick={() => {
+                      className={`${getButtonStyle("next7")} col-span-2`}
+                      onClick={(e) => {
                         const today = new Date();
                         const nextWeek = new Date();
                         nextWeek.setDate(today.getDate() + 7);
 
-                        setDateFilter({
-                          start: today,
-                          end: nextWeek,
+                        setDraftFilters({
+                          ...draftFilters,
+                          preset: "next7",
+                          dateRange: {
+                            start: today.toISOString().split("T")[0],
+                            end: nextWeek.toISOString().split("T")[0],
+                          },
                         });
                       }}
                     >
                       Next 7 Days
                     </button>
-                    <button className="w-full border rounded-lg p-2 shadow-md font-medium">
+                    <button
+                      className={`${getButtonStyle("last7")}`}
+                      onClick={(e) => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 7);
+
+                        setDraftFilters({
+                          ...draftFilters,
+                          preset: "last7",
+                          dateRange: {
+                            start: start.toISOString().split("T")[0],
+                            end: end.toISOString().split("T")[0],
+                          },
+                        });
+                      }}
+                    >
                       Last 7 Days
                     </button>
-                    <button className="w-full border rounded-lg p-2 shadow-md font-medium">
+                    <button
+                      className={`${getButtonStyle("last30")}`}
+                      onClick={(e) => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setDate(end.getDate() - 30);
+
+                        setDraftFilters({
+                          ...draftFilters,
+                          preset: "last30",
+                          dateRange: {
+                            start: start.toISOString().split("T")[0],
+                            end: end.toISOString().split("T")[0],
+                          },
+                        });
+                      }}
+                    >
                       Last 30 Days
                     </button>
-                    <button className="w-full border rounded-lg p-2 shadow-md font-medium col-span-2">
+                    <button
+                      className={`${getButtonStyle("last6months")} col-span-2`}
+                      onClick={(e) => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setMonth(end.getMonth() - 6);
+
+                        setDraftFilters({
+                          ...draftFilters,
+                          preset: "last6months",
+                          dateRange: {
+                            start: start.toISOString().split("T")[0],
+                            end: end.toISOString().split("T")[0],
+                          },
+                        });
+                      }}
+                    >
                       Last 6 Months
                     </button>
-                    <button className="w-full border rounded-lg p-2 shadow-md font-medium col-span-2">
+                    <button
+                      className={`${getButtonStyle("last1year")} col-span-2`}
+                      onClick={(e) => {
+                        const end = new Date();
+                        const start = new Date();
+                        start.setFullYear(end.getFullYear() - 1);
+
+                        setDraftFilters({
+                          ...draftFilters,
+                          preset: "last1year",
+                          dateRange: {
+                            start: start.toISOString().split("T")[0],
+                            end: end.toISOString().split("T")[0],
+                          },
+                        });
+                      }}
+                    >
                       Last 1 Year
                     </button>
                   </div>
                 </div>
               </div>
+              {/* Order Status Filters */}
               <div>
                 <h4>Order Status Filters</h4>
+                <div className="space-y-2">
+                  {Object.entries(statusLabels).map(([key, label]) => (
+                    <label
+                      key={key}
+                      className="flex gap-2 items-center cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded accent-emerald-600"
+                        checked={draftFilters.status.includes(key)}
+                        onChange={() => {
+                          const isSelected = draftFilters.status.includes(key);
+                          const nextStatus = isSelected
+                            ? draftFilters.status.filter((s) => s !== key) // Remove if already there
+                            : [...draftFilters.status, key]; // Add if not there
+
+                          setDraftFilters({
+                            ...draftFilters,
+                            status: nextStatus,
+                          });
+                        }}
+                      />
+                      <span className="text-sm text-gray-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
+            </div>
+            {/* Apply + Cancel Button */}
+            <div className="flex gap-4 w-full justify-center pt-4 border-t">
+              <button
+                type="button"
+                onClick={handleApply}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xl font-bold rounded-xl w-full"
+              >
+                Apply
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xl font-bold rounded-xl w-full"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

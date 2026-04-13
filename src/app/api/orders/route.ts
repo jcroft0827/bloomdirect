@@ -16,12 +16,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const query = url.searchParams;
+    const query = new URL(req.url).searchParams;
 
     // Filters
-    const statusFilter = query.get("status")?.split(",") as OrderStatus[] | undefined;
+    const statusFilter = query.get("status")?.split(",");
     const roleFilter = query.get("role"); // "originating" | "fulfilling" | undefined
+
+    const startDate = query.get("startDate");
+    const endDate = query.get("endDate");
+    const dateType = query.get("dateType");
 
     const baseFilter: any = {
       $or: [
@@ -30,12 +33,33 @@ export async function GET(req: Request) {
       ],
     };
 
-    // Apply status filter if provided
+    // Date Range Logic
+    if (startDate || endDate) {
+      // Map UI label to DB field
+      const dbField = dateType === "Delivery Date" ? "deliveryDate" : "createdAt";
+      const dateQuery: any = {};
+
+      if (startDate) {
+        const s = new Date(startDate);
+        s.setUTCHours(0, 0, 0, 0);
+        dateQuery.$gte = s;
+      }
+
+      if (endDate) {
+        const e = new Date(endDate);
+        e.setUTCHours(23, 59, 59, 999);
+        dateQuery.$lte = e;
+      }
+
+      baseFilter[dbField] = dateQuery;
+    }
+
+    // Status Logic
     if (statusFilter?.length) {
       baseFilter.status = { $in: statusFilter };
     }
 
-    // Apply role filter if provided
+    // Role Logic
     if (roleFilter === "originating") {
       baseFilter.originatingShop = session.user.id;
       delete baseFilter.$or;

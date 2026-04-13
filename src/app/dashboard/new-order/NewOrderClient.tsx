@@ -544,15 +544,13 @@ export default function NewOrderClient() {
 
       const data = await res.json();
 
-      console.log(data);
-
       if (!res.ok) throw new Error(data.error || "Search failed");
 
       setShops(data || []);
       setFindShopSuccess(data?.length > 0);
 
       if (!data || data.length === 0) {
-        toast.error("No BloomDirect shops in that area yet — invite them!");
+        toast.error("No GetBloomDirect shops in that area yet — invite them!");
         setNoShopsInArea(true);
       }
 
@@ -676,7 +674,7 @@ export default function NewOrderClient() {
           fulfillingShopGets: pricing.fulfillingShopGets,
           feeCharge: pricing.feeCharge,
         },
-        products: products.map((p) => ({
+        products: updatedProducts.map((p) => ({
           name: p.name,
           price: parseFloat(p.price),
           description: p.description,
@@ -749,16 +747,16 @@ export default function NewOrderClient() {
         deliveryFee: state.deliveryCharge || 0,
       });
 
-      const newPhoto = state.featuredBouquet?.image
-        ? `${cfBase}/${state.featuredBouquet.image}`
-        : "";
+      // const newPhoto = state.featuredBouquet?.image
+      //   ? `${cfBase}/${state.featuredBouquet.image}`
+      //   : "";
 
       setProducts([
         {
           name: state.featuredBouquet?.name || "",
           price: state.featuredBouquet?.price || "",
           description: state.featuredBouquet?.description || "",
-          photo: newPhoto || "",
+          photo: state.featuredBouquet?.image,
           taxable: true,
           qty: 1,
           file: null,
@@ -1811,15 +1809,19 @@ export default function NewOrderClient() {
                                     src={product.photo}
                                     alt={product.name}
                                     className="w-24 h-24 p-1 rounded-lg object-cover border border-purple-200 cursor-zoom-in hover:opacity-80 transition"
-                                    onClick={() =>
-                                      setZoomedImage(product.photo)
-                                    }
+                                    onClick={() => setZoomedImage(product.photo)}
                                   />
                                   {/* Optional: Clear photo button */}
                                   <button
                                     onClick={() => {
                                       const newProducts = [...products];
+
+                                      if (newProducts[index].photo.startsWith('blob:')) {
+                                        URL.revokeObjectURL(newProducts[index].photo);
+                                      }
+
                                       newProducts[index].photo = "";
+                                      newProducts[index].file = null;
                                       setProducts(newProducts);
                                     }}
                                     className="absolute -top-2 -right-2 bg-white rounded-full shadow-md text-red-500 hover:text-red-700 p-0.5 opacity-0 group-hover:opacity-100 transition"
