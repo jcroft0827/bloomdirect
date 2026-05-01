@@ -14,7 +14,6 @@ export default async function SettingsPage() {
 
   // 🟢 NEW — Load shop by the user's ID
   const shop = await Shop.findById(session.user.id);
-  console.log(session.user.id);
 
   if (!shop) {
     // If somehow no shop exists, redirect them to shop creation

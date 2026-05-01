@@ -50,7 +50,7 @@ interface DeliveryState {
   maxRadius: number;
   minProductTotal: number;
   sameDayCutoff: string;
-  noMoreOrdersToday: boolean;
+  noMoreOrdersTodayUntil: Date | null;
   allowSameDay: boolean;
   zipZones: ZipZone[];
   distanceZones: DistanceZone[];
@@ -125,7 +125,6 @@ type SettingsClientProps = {
 const COUNTRIES = ["US", "CA"];
 
 export default function SettingsClient({ initialShop }: SettingsClientProps) {
-
   type ZoneError = {
     name?: string; // For Zip
     zip?: string; // For Zip
@@ -181,7 +180,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
       maxRadius: 0,
       minProductTotal: 0,
       sameDayCutoff: "14:00",
-      noMoreOrdersToday: false,
+      noMoreOrdersTodayUntil: null,
       allowSameDay: true,
       zipZones: [],
       distanceZones: [],
@@ -258,7 +257,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   // #endregion
 
   // #region useEffects
-  
+
   useEffect(() => {
     async function fetchShop() {
       try {
@@ -337,9 +336,15 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
         payload = {
           securityCode: shop.securityCode,
         };
-      } else if (sectionKey === "noMoreOrdersToday") {
+      } else if (sectionKey === "noMoreOrdersTodayUntil") {
+        const isCurrentlyPaused = !!shop.delivery.noMoreOrdersTodayUntil;
+
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+
         payload = {
-          noMoreOrdersToday: !shop.delivery.noMoreOrdersToday,
+          noMoreOrdersTodayUntil: isCurrentlyPaused ? null : tomorrow,
         };
 
         const res = await fetch("/api/shops/settings", {
@@ -951,7 +956,12 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   const normalSection =
     "bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl space-y-4 shadow-2xl p-5 border-4 border-purple-200 relative flex flex-col items-center";
   const previewP = "text-xl font-semibold capitalize xl:text-2xl";
-  const paymentMethodInput = "px-6 py-3 text-xl rounded-xl bg-white/20 placeholder-white/60 text-white text-center sm:px-4 sm:text-lg";
+  const paymentMethodInput =
+    "px-6 py-3 text-xl rounded-xl bg-white/20 placeholder-white/60 text-white text-center sm:px-4 sm:text-lg";
+
+  const isPaused =
+    !!shop.delivery.noMoreOrdersTodayUntil &&
+    new Date(shop.delivery.noMoreOrdersTodayUntil) > new Date();
 
   return (
     <>
@@ -993,41 +1003,49 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 gap-4 text-center lg:grid-cols-2">
-
           {/* No More Orders Today -- UPDATE DATABASE WHEN THIS IS CLICKED */}
           <div className="lg:col-span-2">
             <label className="grid grid-cols-1 gap-1 text-center w-40 mx-auto lg:mx-0 lg:grid-cols-2 lg:w-96 lg:items-center cursor-pointer group">
               <input
                 type="checkbox"
                 id="delivery"
-                name="noMoreOrdersToday"
-                checked={shop.delivery.noMoreOrdersToday}
+                name="noMoreOrdersTodayUntil"
+                checked={isPaused}
                 onChange={() => {
+                  const isCurrentlyPaused =
+                    !!shop.delivery.noMoreOrdersTodayUntil;
+
+                  const tomorrow = new Date();
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  tomorrow.setHours(0, 0, 0, 0);
+
                   setShop((prev) => ({
                     ...prev,
                     delivery: {
                       ...prev.delivery,
-                      noMoreOrdersToday: !prev.delivery.noMoreOrdersToday,
+                      noMoreOrdersTodayUntil: isCurrentlyPaused
+                        ? null
+                        : tomorrow,
                     },
                   }));
-                  handleSave("noMoreOrdersToday");
+                  handleSave("noMoreOrdersTodayUntil");
                 }}
                 className="hidden" // Hide the default box
               />
               <span className="font-medium text-gray-700 sm:text-lg">
-                Stop Orders Today
+                Pause Orders Today
               </span>
               <div
                 className={`
-                        px-6 py-2 rounded-lg font-bold transition-all duration-200 uppercase tracking-wider text-center
-                        ${
-                          shop.delivery.noMoreOrdersToday
-                            ? "bg-green-500 text-white shadow-[0_4px_0_0_#15803d] active:shadow-none active:translate-y-1"
-                            : "bg-red-500 text-white shadow-inner translate-y-1 opacity-80 ring-2 ring-red-700/20"
-                        }
-                      `}
+    px-6 py-2 rounded-lg font-bold transition-all duration-200 uppercase tracking-wider text-center
+    ${
+      isPaused
+        ? "bg-green-500 text-white shadow-[0_4px_0_0_#15803d] active:shadow-none active:translate-y-1"
+        : "bg-red-500 text-white shadow-inner translate-y-1 opacity-80 ring-2 ring-red-700/20"
+    }
+  `}
               >
-                {shop.delivery.noMoreOrdersToday ? "Yes" : "No"}
+                {isPaused ? "Yes" : "No"}
               </div>
             </label>
           </div>
@@ -1397,44 +1415,44 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     className={normalInput}
                   />
                 </div>
-                  {/* Shop City */}
-                  <div className="col-span-2">
-                    <label className={normalLabel}>Shop City</label>
-                    <input
-                      type="text"
-                      placeholder="Flower City"
-                      value={shop.address.city}
-                      onChange={(e) => updateAddress("city", e.target.value)}
-                      className={normalInput}
-                    />
-                  </div>
-                  {/* Shop State */}
-                  <div className="col-span-1">
-                    <label className={normalLabel}>Shop State</label>
-                    <input
-                      type="text"
-                      placeholder="NY"
-                      value={shop.address.state}
-                      onChange={(e) => {
-                        updateAddress("state", e.target.value);
-                      }}
-                      className={normalInput}
-                    />
-                  </div>
-                  {/* Shop Zip */}
-                  <div className="col-span-1">
-                    <label className={normalLabel}>Shop Zip</label>
-                    <input
-                      type="text"
-                      placeholder="14036"
-                      value={shop.address.zip}
-                      maxLength={5}
-                      onChange={(e) => {
-                        updateAddress("zip", e.target.value);
-                      }}
-                      className={normalInput}
-                    />
-                  </div>
+                {/* Shop City */}
+                <div className="col-span-2">
+                  <label className={normalLabel}>Shop City</label>
+                  <input
+                    type="text"
+                    placeholder="Flower City"
+                    value={shop.address.city}
+                    onChange={(e) => updateAddress("city", e.target.value)}
+                    className={normalInput}
+                  />
+                </div>
+                {/* Shop State */}
+                <div className="col-span-1">
+                  <label className={normalLabel}>Shop State</label>
+                  <input
+                    type="text"
+                    placeholder="NY"
+                    value={shop.address.state}
+                    onChange={(e) => {
+                      updateAddress("state", e.target.value);
+                    }}
+                    className={normalInput}
+                  />
+                </div>
+                {/* Shop Zip */}
+                <div className="col-span-1">
+                  <label className={normalLabel}>Shop Zip</label>
+                  <input
+                    type="text"
+                    placeholder="14036"
+                    value={shop.address.zip}
+                    maxLength={5}
+                    onChange={(e) => {
+                      updateAddress("zip", e.target.value);
+                    }}
+                    className={normalInput}
+                  />
+                </div>
                 {/* Shop Country */}
                 <div className="col-span-2">
                   <label className={normalLabel}>Shop Country</label>
@@ -1666,8 +1684,12 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                               onClick={() => removeZone(index)}
                               className="px-4 py-1 w-full bg-red-500 text-white rounded-md sm:text-red-500 sm:p-2 sm:w-auto sm:bg-transparent sm:rounded-none lg:bg-red-500 lg:px-4 lg:py-1 lg:w-full lg:text-white lg:rounded-md"
                             >
-                              <span className="hidden sm:block lg:hidden">X</span>
-                              <span className="sm:hidden lg:block">Remove Zone</span>
+                              <span className="hidden sm:block lg:hidden">
+                                X
+                              </span>
+                              <span className="sm:hidden lg:block">
+                                Remove Zone
+                              </span>
                             </button>
                           </div>
                           {zoneErrors[index]?.fields && (
@@ -1864,9 +1886,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
                     {shop.delivery.distanceZones.map((zone, index) => (
                       <React.Fragment key={index}>
-                        <div
-                          className="p-3 rounded-lg border bg-white"
-                        >
+                        <div className="p-3 rounded-lg border bg-white">
                           <div className="grid grid-cols-3 gap-10">
                             <div>
                               <label className={normalLabel}>Min</label>
@@ -1889,7 +1909,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   // Zip Zones
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-y-10 lg:grid-cols-1 lg:gap-y-4">
                     {shop.delivery.zipZones.map((zone, index) => (
-                      <div key={index} className="border-b pb-4 sm:border-0 sm:pb-0">
+                      <div
+                        key={index}
+                        className="border-b pb-4 sm:border-0 sm:pb-0"
+                      >
                         <div className="grid grid-cols-2 gap-y-4 gap-x-8 flex-1 bg-white rounded-lg p-5">
                           {/* Zone Name */}
                           <div className="col-span-2">
@@ -2146,11 +2169,13 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <div>
                     {shop.financials.deliveryTaxed ? (
                       <label className="text-emerald-600 text-xl">
-                        Delivery<br/> Taxed
+                        Delivery
+                        <br /> Taxed
                       </label>
                     ) : (
                       <label className="text-red-600 text-xl">
-                        Delivery<br/> Not Taxed
+                        Delivery
+                        <br /> Not Taxed
                       </label>
                     )}
                   </div>
@@ -2158,11 +2183,13 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <div>
                     {shop.financials.feeTaxed ? (
                       <label className="text-emerald-600 text-xl">
-                        Fee<br/> Taxed
+                        Fee
+                        <br /> Taxed
                       </label>
                     ) : (
                       <label className="text-red-600 text-xl">
-                        Fee<br/> Not Taxed
+                        Fee
+                        <br /> Not Taxed
                       </label>
                     )}
                   </div>
@@ -2230,7 +2257,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                           />
                         </svg>
                         <p className="text-2xl font-bold text-purple-600">
-                          {uploadingImg ? "Uploading..." : "Click to upload logo"}
+                          {uploadingImg
+                            ? "Uploading..."
+                            : "Click to upload logo"}
                         </p>
                         <p className="text-lg text-gray-600">
                           Square image recommended
@@ -2302,10 +2331,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowFB(false)}
                             className="w-full flex"
                           >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">X</span>
-                            <span 
-                              className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden"
-                            >
+                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
+                              X
+                            </span>
+                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
                               Cancel Edit
                             </span>
                           </button>
@@ -2325,13 +2354,22 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             className="w-full flex"
                           >
                             <span className="hidden sm:block">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6 text-red-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.5"
+                                stroke="currentColor"
+                                className="size-6 text-red-500"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                />
                               </svg>
                             </span>
-                            <span 
-                              className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden"
-                            >
+                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
                               Remove
                             </span>
                           </button>
@@ -2341,21 +2379,23 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       <div className="flex flex-col items-center gap-2 sm:flex-row md:flex-col md:gap-1 xl:flex-row xl:gap-2 xl:justify-between">
                         <div className="flex items-center gap-2 sm:w-full md:w-auto">
                           <div className="w-10 h-10 p-1">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="32"
-                        height="32"
-                        viewBox="0 0 32 32"
-                        className="bg-[#0866FF] rounded-full"
-                      >
-                        <path
-                          fill="white"
-                          d="M16,2c-7.732,0-14,6.268-14,14,0,6.566,4.52,12.075,10.618,13.588v-9.31h-2.887v-4.278h2.887v-1.843c0-4.765,2.156-6.974,6.835-6.974,.887,0,2.417,.174,3.043,.348v3.878c-.33-.035-.904-.052-1.617-.052-2.296,0-3.183,.87-3.183,3.13v1.513h4.573l-.786,4.278h-3.787v9.619c6.932-.837,12.304-6.74,12.304-13.897,0-7.732-6.268-14-14-14Z"
-                        />
-                      </svg>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="32"
+                              height="32"
+                              viewBox="0 0 32 32"
+                              className="bg-[#0866FF] rounded-full"
+                            >
+                              <path
+                                fill="white"
+                                d="M16,2c-7.732,0-14,6.268-14,14,0,6.566,4.52,12.075,10.618,13.588v-9.31h-2.887v-4.278h2.887v-1.843c0-4.765,2.156-6.974,6.835-6.974,.887,0,2.417,.174,3.043,.348v3.878c-.33-.035-.904-.052-1.617-.052-2.296,0-3.183,.87-3.183,3.13v1.513h4.573l-.786,4.278h-3.787v9.619c6.932-.837,12.304-6.74,12.304-13.897,0-7.732-6.268-14-14-14Z"
+                              />
+                            </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                          {shop.branding.socialLinks.facebook ? shop.branding.socialLinks.facebook : "Add Your Facebook Profile!"}
+                            {shop.branding.socialLinks.facebook
+                              ? shop.branding.socialLinks.facebook
+                              : "Add Your Facebook Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2364,7 +2404,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowFB(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.facebook ? "Edit" : "Add"}
+                            {shop.branding.socialLinks.facebook
+                              ? "Edit"
+                              : "Add"}
                           </button>
                         </div>
                       </div>
@@ -2429,10 +2471,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowInsta(false)}
                             className="w-full flex"
                           >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">X</span>
-                            <span 
-                              className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden"
-                            >
+                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
+                              X
+                            </span>
+                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
                               Cancel Edit
                             </span>
                           </button>
@@ -2452,13 +2494,22 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             className="w-full flex"
                           >
                             <span className="hidden sm:block">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6 text-red-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.5"
+                                stroke="currentColor"
+                                className="size-6 text-red-500"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                />
                               </svg>
                             </span>
-                            <span 
-                              className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden"
-                            >
+                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
                               Remove
                             </span>
                           </button>
@@ -2505,7 +2556,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.instagram ? shop.branding.socialLinks.instagram : "Add Your Instagram Profile!"}
+                            {shop.branding.socialLinks.instagram
+                              ? shop.branding.socialLinks.instagram
+                              : "Add Your Instagram Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2514,7 +2567,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowInsta(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.instagram ? "Edit" : "Add"}
+                            {shop.branding.socialLinks.instagram
+                              ? "Edit"
+                              : "Add"}
                           </button>
                         </div>
                       </div>
@@ -2556,10 +2611,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowPin(false)}
                             className="w-full flex"
                           >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">X</span>
-                            <span 
-                              className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden"
-                            >
+                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
+                              X
+                            </span>
+                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
                               Cancel Edit
                             </span>
                           </button>
@@ -2579,13 +2634,22 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             className="w-full flex"
                           >
                             <span className="hidden sm:block">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6 text-red-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.5"
+                                stroke="currentColor"
+                                className="size-6 text-red-500"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                />
                               </svg>
                             </span>
-                            <span 
-                              className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden"
-                            >
+                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
                               Remove
                             </span>
                           </button>
@@ -2609,7 +2673,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.pinterest ? shop.branding.socialLinks.pinterest : "Add Your Pinterest Profile!"}
+                            {shop.branding.socialLinks.pinterest
+                              ? shop.branding.socialLinks.pinterest
+                              : "Add Your Pinterest Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2618,7 +2684,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowPin(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.pinterest ? "Edit" : "Add"}
+                            {shop.branding.socialLinks.pinterest
+                              ? "Edit"
+                              : "Add"}
                           </button>
                         </div>
                       </div>
@@ -2657,10 +2725,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowTik(false)}
                             className="w-full flex"
                           >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">X</span>
-                            <span 
-                              className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden"
-                            >
+                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
+                              X
+                            </span>
+                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
                               Cancel Edit
                             </span>
                           </button>
@@ -2679,14 +2747,23 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             }}
                             className="w-full flex"
                           >
-                             <span className="hidden sm:block">
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6 text-red-500">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            <span className="hidden sm:block">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.5"
+                                stroke="currentColor"
+                                className="size-6 text-red-500"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                />
                               </svg>
                             </span>
-                            <span 
-                              className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden"
-                            >
+                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
                               Remove
                             </span>
                           </button>
@@ -2707,7 +2784,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.tiktok ? shop.branding.socialLinks.tiktok : "Add Your TikTok Profile!"}
+                            {shop.branding.socialLinks.tiktok
+                              ? shop.branding.socialLinks.tiktok
+                              : "Add Your TikTok Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2761,7 +2840,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 {shop.branding?.bio ? (
                   <div className="pb-4 border-b border-opacity-75">
                     <label className={normalLabel}>Shop Bio</label>
-                    <p className="font-semibold sm:text-lg sm:max-w-lg">{shop.branding.bio}</p>
+                    <p className="font-semibold sm:text-lg sm:max-w-lg">
+                      {shop.branding.bio}
+                    </p>
                   </div>
                 ) : (
                   <p>No Bio set yet!</p>
@@ -2785,10 +2866,18 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             />
                           </svg>
                         </div>
-                        <a href={shop.branding.socialLinks.facebook} target="_blank" className="font-medium">{shop.branding.socialLinks.facebook}</a>
+                        <a
+                          href={shop.branding.socialLinks.facebook}
+                          target="_blank"
+                          className="font-medium"
+                        >
+                          {shop.branding.socialLinks.facebook}
+                        </a>
                       </div>
                     ) : (
-                      <p className="font-medium text-red-500">No Facebook link set up yet!</p>
+                      <p className="font-medium text-red-500">
+                        No Facebook link set up yet!
+                      </p>
                     )}
                     {shop.branding.socialLinks.instagram ? (
                       <div className="flex items-center justify-center gap-4 pb-4 border-b-2 border-opacity-75">
@@ -2829,10 +2918,18 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             />
                           </svg>
                         </div>
-                        <a href={shop.branding.socialLinks.instagram} target="_blank" className="font-medium">{shop.branding.socialLinks.instagram}</a>
+                        <a
+                          href={shop.branding.socialLinks.instagram}
+                          target="_blank"
+                          className="font-medium"
+                        >
+                          {shop.branding.socialLinks.instagram}
+                        </a>
                       </div>
                     ) : (
-                      <p className="font-medium text-red-500">No Instagram link set up yet!</p>
+                      <p className="font-medium text-red-500">
+                        No Instagram link set up yet!
+                      </p>
                     )}
                     {shop.branding.socialLinks.pinterest ? (
                       <div className="flex items-center justify-center gap-4 pb-4 border-b-2 border-opacity-75">
@@ -2850,10 +2947,18 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             />
                           </svg>
                         </div>
-                        <a href={shop.branding.socialLinks.pinterest} target="_blank" className="font-medium">{shop.branding.socialLinks.pinterest}</a>
+                        <a
+                          href={shop.branding.socialLinks.pinterest}
+                          target="_blank"
+                          className="font-medium"
+                        >
+                          {shop.branding.socialLinks.pinterest}
+                        </a>
                       </div>
                     ) : (
-                      <p className="font-medium text-red-500">No Pinterest link set up yet!</p>
+                      <p className="font-medium text-red-500">
+                        No Pinterest link set up yet!
+                      </p>
                     )}
                     {shop.branding.socialLinks.tiktok ? (
                       <div className="flex items-center justify-center gap-4">
@@ -2867,10 +2972,18 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             <path d="M24.562,7.613c-1.508-.983-2.597-2.557-2.936-4.391-.073-.396-.114-.804-.114-1.221h-4.814l-.008,19.292c-.081,2.16-1.859,3.894-4.039,3.894-.677,0-1.315-.169-1.877-.465-1.288-.678-2.169-2.028-2.169-3.582,0-2.231,1.815-4.047,4.046-4.047,.417,0,.816,.069,1.194,.187v-4.914c-.391-.053-.788-.087-1.194-.087-4.886,0-8.86,3.975-8.86,8.86,0,2.998,1.498,5.65,3.783,7.254,1.439,1.01,3.19,1.606,5.078,1.606,4.886,0,8.86-3.975,8.86-8.86V11.357c1.888,1.355,4.201,2.154,6.697,2.154v-4.814c-1.345,0-2.597-.4-3.647-1.085Z"></path>
                           </svg>
                         </div>
-                        <a href={shop.branding.socialLinks.tiktok} target="_blank" className="font-medium">{shop.branding.socialLinks.tiktok}</a>
+                        <a
+                          href={shop.branding.socialLinks.tiktok}
+                          target="_blank"
+                          className="font-medium"
+                        >
+                          {shop.branding.socialLinks.tiktok}
+                        </a>
                       </div>
                     ) : (
-                      <p className="font-medium text-red-500">No TikTok link set up yet!</p>
+                      <p className="font-medium text-red-500">
+                        No TikTok link set up yet!
+                      </p>
                     )}
                   </div>
                 ) : (
@@ -3040,7 +3153,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     />
                   </div>
                 ) : (
-                  <p className="sm:col-span-2 lg:col-span-1">No featured bouquet image added yet!</p>
+                  <p className="sm:col-span-2 lg:col-span-1">
+                    No featured bouquet image added yet!
+                  </p>
                 )}
               </div>
             )}
@@ -3350,14 +3465,14 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         Confirm New Password
                       </label>
                       <div className="relative flex items-center w-full">
-                      <input
-                        type={showConfirmPw ? "text" : "password"}
-                        placeholder="Confirm new password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className={`${normalInput} w-full pr-10`}
-                      />
-                                              <button
+                        <input
+                          type={showConfirmPw ? "text" : "password"}
+                          placeholder="Confirm new password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className={`${normalInput} w-full pr-10`}
+                        />
+                        <button
                           type="button"
                           onClick={() => setShowConfirmPw(!showConfirmPw)}
                           className="absolute right-3 text-gray-500 hover:text-gray-700 transition-colors"
@@ -3517,7 +3632,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
               )}
             </div> */}
           </div>
-
         </div>
       </div>
     </>

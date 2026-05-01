@@ -12,6 +12,7 @@ interface BlackoutTime {
 interface ShopResponse {
   _id: string;
   businessName: string;
+  slug: string;
   address: {
     street: string;
     city: string;
@@ -99,8 +100,13 @@ export async function POST(req: Request) {
           "delivery.noMoreOrdersForDate": { $ne: deliveryDate.toDate() },
           ...(isToday
             ? {
-                "delivery.noMoreOrdersToday": false,
                 "delivery.allowSameDay": true,
+                
+                $or: [
+                  { "delivery.noMoreOrdersTodayUntil": null },
+                  { "delivery.noMoreOrdersTodayUntil": { $exists: false } },
+                  { "delivery.noMoreOrdersTodayUntil": { $lte: new Date() } },
+                ],
               }
             : {}),
         },
@@ -196,6 +202,7 @@ export async function POST(req: Request) {
       {
         $project: {
           businessName: 1,
+          slug: 1,
           address: 1,
           "contact.phone": 1,
           verifiedFlorist: 1,

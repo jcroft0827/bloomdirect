@@ -11,6 +11,8 @@ import { getOrderEmailSubject } from "@/lib/order-email-subject";
 import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
 import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
+import { sendOrderEvent } from "@/lib/send-order-event";
+import { PAYMENT_METHODS, PaymentMethod } from "@/lib/order-payment-methods";
 
 export async function POST(req: Request) {
   try {
@@ -21,8 +23,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { orderId, paymentMethod } = await req.json();
-    if (!["venmo", "cashapp", "zelle", "paypal"].includes(paymentMethod)) {
+    const { orderId, paymentMethodUsed } = await req.json();
+
+    if (!orderId || !paymentMethodUsed) {
+      return NextResponse.json(
+        { error: "Missing orderId or paymentMethodUsed" },
+        { status: 400 },
+      );
+    }
+
+    if (!PAYMENT_METHODS.includes(paymentMethodUsed)) {
       return NextResponse.json(
         { error: "Invalid payment method" },
         { status: 400 },
@@ -30,6 +40,7 @@ export async function POST(req: Request) {
     }
 
     const order = await Order.findById(orderId);
+
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
@@ -38,6 +49,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
+    const paymentValue = order.paymentMethods?.[paymentMethodUsed as PaymentMethod];
+
+    if (typeof paymentValue !== "string" || paymentValue.trim() === "") {
+      return NextResponse.json(
+        { error: "That payment method is not available for this order" },
+        { status: 400 },
+      );
+    }
+
+    if (order.status !== OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
+      return NextResponse.json(
+        { error: "Order is not eligible to be marked as paid" },
+        { status: 400 },
+      );
+    }
+    
     // ─────────────────────────────────────────────
     // STATUS TRANSITION GUARD
     // ─────────────────────────────────────────────
@@ -47,28 +74,54 @@ export async function POST(req: Request) {
       actorShopId: session.user.id,
     });
 
-    // Update order
-    order.status = OrderStatus.PAID_AWAITING_FULFILLMENT;
-    order.paymentMethod = paymentMethod;
-    order.paymentMarkedPaidAt = new Date();
-    order.paidAt = new Date();
+    const now = new Date();
 
-    await order.save();
+    const updatedOrder = await Order.findOneAndUpdate(
+      {
+        _id: orderId,
+        originatingShop: session.user.id,
+        status: OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+      },
+      {
+        $set: {
+          status: OrderStatus.PAID_AWAITING_FULFILLMENT,
+          paymentMethodUsed,
+          paidAt: now,
+        },
+      },
+      { new: true }
+    );
 
+    if (!updatedOrder) {
+      return NextResponse.json(
+        {
+          error: "Order could not be marked as paid. It may have already been updated.",
+        },
+        { status: 409 },
+      );
+    }
+    
     // Activity Log
     await addOrderActivity({
       orderId: order._id,
       action: OrderActivityActions.PAYMENT_MARKED,
       actorShopId: session.user.id,
-      message: `Payment marked as received via ${paymentMethod.toUpperCase()}`,
+      message: `Payment marked as received via ${paymentMethodUsed.toUpperCase()}`,
+    });
+    
+    await sendOrderEvent({
+      event: "order.paid",
+      order,
+      actorShopId: session?.user?.id,
     });
 
-    // Send email notification to fulfilling shop
+
     const originShop = await Shop.findById(order.originatingShop);
     const fulfillShop = await Shop.findById(order.fulfillingShop);
-    const resend = getResend();
-
+    
+    
     if (originShop?.email && fulfillShop?.email) {
+      const resend = getResend();
       await resend.emails.send({
         from: "GetBloomDirect <new-orders@getbloomdirect.com>",
         to: fulfillShop.email,
@@ -78,7 +131,7 @@ export async function POST(req: Request) {
         html: `
           <p>Order #${order.orderNumber} has been marked as paid by ${
             originShop.businessName
-          } via ${paymentMethod.toUpperCase()}.</p>
+          } via ${paymentMethodUsed.toUpperCase()}.</p>
           <p>Start preparing the order and mark it as fulfilled once done.</p>
         `,
       });
@@ -86,21 +139,22 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, order });
   } catch (error: any) {
-      console.error("PAYMENT ERROR:", error);
-  
-      if (error instanceof ApiError) {
-        return NextResponse.json(
-          { error: error.message, code: error.code },
-          { status: error.status },
-        );
-      }
-  
+    console.error("PAYMENT ERROR:", error);
+
+    if (error instanceof ApiError) {
       return NextResponse.json(
-        {
-          error: "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
-          code: "SERVER_ERROR",
-        },
-        { status: 500 },
+        { error: error.message, code: error.code },
+        { status: error.status },
       );
     }
+
+    return NextResponse.json(
+      {
+        error:
+          "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+        code: "SERVER_ERROR",
+      },
+      { status: 500 },
+    );
+  }
 }

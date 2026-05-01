@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import BloomSpinner from "@/components/BloomSpinner";
 import Shop from "@/models/Shop";
+import { formatCurrencyFromCents } from "@/lib/format-currency";
 
 interface OrderClientProps {
   order: OrderLean;
@@ -132,7 +133,7 @@ export default function OrderClient({
 
       const excludedIds = (order.activityLog ?? [])
         .map((log: any) => log.actorShop)
-        .filter((id: string | null | undefined) => id !=null);
+        .filter((id: string | null | undefined) => id != null);
 
       const res = await fetch("/api/shops/search", {
         method: "POST",
@@ -156,7 +157,7 @@ export default function OrderClient({
       if (!res.ok) throw new Error(data.error || "Search failed");
 
       const filteredShops = (data || []).filter(
-        (shop: any) => shop.businessName != order.fulfillingShopName
+        (shop: any) => shop.businessName != order.fulfillingShopName,
       );
 
       setAvailableShops(filteredShops);
@@ -181,11 +182,11 @@ export default function OrderClient({
       const res = await fetch("/api/orders/reassign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, newFulfillingShopId: newShopId })
+        body: JSON.stringify({ orderId, newFulfillingShopId: newShopId }),
       });
 
       if (res.ok) {
-        toast.success('Order updated');
+        toast.success("Order updated");
         router.refresh();
       } else {
         setHandlingStatus(false);
@@ -294,7 +295,6 @@ export default function OrderClient({
 
         {/* MAIN CONTENT */}
         <div className="grid lg:grid-cols-3 gap-6">
-
           {/* LEFT – Order Details + Products */}
           <div className="bg-white rounded-3xl shadow-xl p-6 space-y-6">
             <div className="text-center">
@@ -318,14 +318,16 @@ export default function OrderClient({
               <p className="text-lg text-gray-600 font-semibold">
                 Fulfilling Shop Gets:{" "}
                 <span className="text-emerald-600 font-bold text-xl">
-                  ${order.pricing.fulfillingShopGets.toFixed(2)}
+                  {formatCurrencyFromCents(
+                    order.pricing.fulfillingShopGetsCents,
+                  )}
                 </span>
               </p>
               {/* Delivery Fee */}
               <p className="text-lg text-gray-600 font-semibold">
                 Delivery Fee:{" "}
                 <span className="text-emerald-600 font-bold text-xl">
-                  {order.pricing.deliveryFee.toFixed(2)}
+                  {formatCurrencyFromCents(order.pricing.deliveryFeeCents)}
                 </span>
               </p>
             </div>
@@ -336,10 +338,19 @@ export default function OrderClient({
                   key={product.id || index}
                   className="mb-2 flex gap-2 p-2 rounded-lg bg-gray-50"
                 >
-                  {/* Add Image Here */}
-                  <div className="min-w-24 max-h-24 min-h-24 border rounded-lg p-1">
-                    Image Goes Here
-                  </div>
+                  {product.photo ? (
+                    <div className="w-24 h-24 border rounded-lg p-1 overflow-hidden">
+                      <img
+                        src={product.photo}
+                        alt={product.name}
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="min-w-24 max-h-24 min-h-24 border rounded-lg p-1">
+                      No Image
+                    </div>
+                  )}
                   <div className="flex flex-col w-full">
                     <span className="text-black text-xl font-bold">
                       {product.name}
@@ -348,7 +359,7 @@ export default function OrderClient({
                       <p>
                         <span className="text-sm font-semibold">Price:</span>{" "}
                         <span className="text-emerald-600 font-semibold">
-                          ${product.price.toFixed(2)}
+                          {formatCurrencyFromCents(product.priceCents)}
                         </span>
                       </p>
                       <p>
@@ -703,88 +714,93 @@ export default function OrderClient({
               )}
 
             {/* REASSIGN ORDER */}
-            {isOriginating &&
-              order.status === OrderStatus.DECLINED && (
-                <>
-                  {availableShops.length > 0 ? (
-                    <div className="space-y-4 border-t pt-6">
-                      <h3 className="text-lg font-black text-purple-700">
-                        Reassign Order
-                      </h3>
+            {isOriginating && order.status === OrderStatus.DECLINED && (
+              <>
+                {availableShops.length > 0 ? (
+                  <div className="space-y-4 border-t pt-6">
+                    <h3 className="text-lg font-black text-purple-700">
+                      Reassign Order
+                    </h3>
 
-                      <p className="text-sm text-gray-600">
-                        This order was declined. Choose another shop to fulfill it.
-                      </p>
+                    <p className="text-sm text-gray-600">
+                      This order was declined. Choose another shop to fulfill
+                      it.
+                    </p>
 
-                      <p className="text-sm text-gray-500">
-                        Once reassigned, the new shop will receive this order and
-                        can choose to accept or decline it. You will be notified by
-                        email.
-                      </p>
+                    <p className="text-sm text-gray-500">
+                      Once reassigned, the new shop will receive this order and
+                      can choose to accept or decline it. You will be notified
+                      by email.
+                    </p>
 
-                      <p className="text-xs text-red-500 text-center">
-                        This action cannot be undone.
-                      </p>
+                    <p className="text-xs text-red-500 text-center">
+                      This action cannot be undone.
+                    </p>
 
-                      <select
-                        name="newFulfillingShopId"
-                        value={reassignShop}
-                        required
-                        disabled={handlingStatus}
-                        onChange={(e) => setReassignShop(e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                      >
-                        <option value="">
-                          {handlingStatus ? "Searching for shops..." : "Select a shop..."}
+                    <select
+                      name="newFulfillingShopId"
+                      value={reassignShop}
+                      required
+                      disabled={handlingStatus}
+                      onChange={(e) => setReassignShop(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                    >
+                      <option value="">
+                        {handlingStatus
+                          ? "Searching for shops..."
+                          : "Select a shop..."}
+                      </option>
+                      {availableShops.map((shop) => (
+                        <option key={shop?._id} value={shop?._id}>
+                          {shop?.businessName}
                         </option>
-                        {availableShops.map((shop) => (
-                          <option
-                            key={shop?._id}
-                            value={shop?._id}
-                          >
-                            {shop?.businessName}
-                          </option>
-                        ))}
-                      </select>
+                      ))}
+                    </select>
 
-                      <label
-                        className="flex items-start gap-3 text-sm text-gray-700"
-                      >
-                        <input 
-                          type="checkbox"
-                          required
-                          checked={understand}
-                          onChange={() => setUnderstand(!understand)}
-                          className="mt-1 accent-purple-600"
-                        />
-                        I understand this order will be sent to a new shop.
-                      </label>
+                    <label className="flex items-start gap-3 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={understand}
+                        onChange={() => setUnderstand(!understand)}
+                        className="mt-1 accent-purple-600"
+                      />
+                      I understand this order will be sent to a new shop.
+                    </label>
 
-                      <button
-                        type="button"
-                        disabled={!understand || handlingStatus || reassignShop === ""}
-                        onClick={() => handleReassign(order._id, reassignShop)}
-                        className={(!understand || handlingStatus || reassignShop === "" ? "bg-gray-600" : "bg-purple-600 hover:bg-purple-700") + 
-                          " w-full text-white font-black py-4 rounded-2xl"}
-                      >
-                        Reassign Order
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 border-t pt-6">
-                      <p className="text-lg mt-4 text-center sm:text-start md:max-w-lg">
-                        GetBloomDirect is expanding quickly. We don't currently have another partner florist available to service this order - but we'd love to change that!
-                      </p>
-                      <Link
-                        href={"/dashboard"}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-lg px-4 py-2 rounded-2xl shadow-lg mt-5 transition-all"
-                      >
-                        Invite another florist in that area
-                      </Link>   
-                    </div>
-                  )}
-                </>
-              )}
+                    <button
+                      type="button"
+                      disabled={
+                        !understand || handlingStatus || reassignShop === ""
+                      }
+                      onClick={() => handleReassign(order._id, reassignShop)}
+                      className={
+                        (!understand || handlingStatus || reassignShop === ""
+                          ? "bg-gray-600"
+                          : "bg-purple-600 hover:bg-purple-700") +
+                        " w-full text-white font-black py-4 rounded-2xl"
+                      }
+                    >
+                      Reassign Order
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4 border-t pt-6">
+                    <p className="text-lg mt-4 text-center sm:text-start md:max-w-lg">
+                      GetBloomDirect is expanding quickly. We don't currently
+                      have another partner florist available to service this
+                      order - but we'd love to change that!
+                    </p>
+                    <Link
+                      href={"/dashboard"}
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-lg px-4 py-2 rounded-2xl shadow-lg mt-5 transition-all"
+                    >
+                      Invite another florist in that area
+                    </Link>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* FALLBACK */}
             {!(

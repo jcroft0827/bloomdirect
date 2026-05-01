@@ -1,5 +1,8 @@
-import mongoose from "mongoose";
+// models/Shop.ts
+
+import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
+import { unique } from "next/dist/build/utils";
 
 const shopSchema = new mongoose.Schema(
   {
@@ -220,7 +223,7 @@ const shopSchema = new mongoose.Schema(
         default: "14:00",
       },
 
-      holidayDates: [{ name: String, date: Date}],
+      holidayDates: [{ name: String, date: Date }],
 
       holidaySurcharge: { type: Number, default: 0 },
 
@@ -233,9 +236,9 @@ const shopSchema = new mongoose.Schema(
         },
       ],
 
-      noMoreOrdersToday: {
-        type: Boolean,
-        default: false,
+      noMoreOrdersTodayUntil: {
+        type: Date,
+        default: null,
       },
 
       noMoreOrdersForDate: [Date],
@@ -382,7 +385,7 @@ const shopSchema = new mongoose.Schema(
 
     reviews: [
       {
-        customerName: String,
+        shopName: String,
 
         rating: {
           type: Number,
@@ -398,6 +401,44 @@ const shopSchema = new mongoose.Schema(
         },
       },
     ],
+
+    // ===============================
+    // POS API
+    // ===============================
+
+    isApiReadOnly: {
+      type: Boolean,
+      default: false,
+    },
+
+    apiAccess: {
+      enabled: { type: Boolean, default: false },
+
+      keyPrefix: { type: String, default: null },
+      keyHash: { type: String, default: null, select: false },
+      keyLastFour: { type: String, default: null },
+
+      keyCreatedAt: { type: Date, default: null },
+      keyRotatedAt: { type: Date, default: null },
+      keyDisabledAt: { type: Date, default: null },
+
+      lastUsedAt: { type: Date, default: null },
+      lastUsedIp: { type: String, default: null },
+      lastUsedUserAgent: { type: String, default: null },
+
+      lastKeyPreviewShownAt: { type: Date, default: null },
+
+      createdByShopId: {
+        type: Schema.Types.ObjectId,
+        ref: "Shop",
+        default: null,
+      },
+      rotatedByShopId: {
+        type: Schema.Types.ObjectId,
+        ref: "Shop",
+        default: null,
+      },
+    },
   },
   {
     timestamps: true,

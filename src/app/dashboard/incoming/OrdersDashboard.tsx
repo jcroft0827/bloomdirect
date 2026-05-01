@@ -1,13 +1,20 @@
+// /app/dashboard/incoming/OrdersDashboard.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import toast, { Toaster } from "react-hot-toast";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OrderStatus } from "@/lib/order-status";
 import OrderFlowHelper from "@/components/OrderFlowHelper";
+import { formatCurrencyFromCents } from "@/lib/format-currency";
+
+import {
+  getAvailablePaymentMethods,
+  getPreferredPaymentMethod,
+  PaymentMethod,
+} from "@/lib/order-payment-methods";
 
 export default function OrdersDashboard() {
   const { data: session, status } = useSession();
@@ -34,8 +41,6 @@ export default function OrdersDashboard() {
 
   const [mobileFilters, setMobileFilters] = useState(false);
   const [desktopFilters, setDesktopFilters] = useState(false);
-
-  const [declineSearch, setDeclineSearch] = useState(false);
 
   const router = useRouter();
 
@@ -149,27 +154,33 @@ export default function OrdersDashboard() {
     orderId: string,
     method: "venmo" | "cashapp" | "zelle" | "paypal",
   ) => {
+    if (actionOrderId === orderId) return;
+    
     try {
+      setActionOrderId(orderId);
+
       const res = await fetch("/api/orders/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, paymentMethod: method }),
+        body: JSON.stringify({ orderId, paymentMethodUsed: method }),
       });
+
+      const data = await res.json();
+
       if (res.ok) {
         toast.success(`Order marked as paid via ${method.toUpperCase()}!`);
         fetchOrders();
+      } else {
+        toast.error(data.error || "Failed to mark order as paid");
       }
     } catch (err) {
       console.error("Failed to mark order as paid", err);
       toast.error(
         "Failed to mark order as paid. Please try again. If the problem persists, contact GetBloomDirect support.",
       );
+    } finally {
+      setActionOrderId(null);
     }
-  };
-
-  const formatDateForInput = (date: Date | null) => {
-    if (!date) return "";
-    return date.toISOString().split("T")[0];
   };
 
   const handleApply = () => {
@@ -202,22 +213,21 @@ export default function OrdersDashboard() {
   };
 
   const clearFilters = () => {
-    setActiveFilters({
+    const resetFilters = {
       status: [],
-      role: "all",
+      role: "all" as const,
       dateRange: { start: "", end: "" },
       dateType: "Order Date",
       preset: "",
-    });
-
-    setDraftFilters(activeFilters);
+    };
+    setActiveFilters(resetFilters);
+    setDraftFilters(resetFilters);
   };
 
   const statusLabels: Record<string, string> = {
     PENDING_ACCEPTANCE: "Pending Acceptance",
     ACCEPTED_AWAITING_PAYMENT: "Accepted — Awaiting Payment",
     PAID_AWAITING_FULFILLMENT: "Paid — In Production",
-    FULFILLED_PENDING_CONFIRMATION: "Delivered — Awaiting Confirmation",
     COMPLETED: "Completed",
     DECLINED: "Declined",
   };
@@ -617,14 +627,18 @@ export default function OrdersDashboard() {
                         <p className="text-xl font-bold text-gray-600">
                           Order Total:{" "}
                           <span className="text-emerald-600">
-                            ${order.pricing.fulfillingShopGets}
+                            {formatCurrencyFromCents(
+                              order.pricing.orderTotalCents,
+                            )}
                           </span>
                         </p>
                         {/* Delivery Fee */}
                         <p className="font-bold text-gray-600">
                           Delivery Charge:{" "}
                           <span className="text-emerald-600">
-                            ${order.pricing.deliveryFee.toFixed(2)}
+                            {formatCurrencyFromCents(
+                              order.pricing.deliveryFeeCents,
+                            )}
                           </span>
                         </p>
 
@@ -719,48 +733,51 @@ export default function OrdersDashboard() {
                           )}
 
                         {/* Payment buttons → Only originating shop */}
-                        {order.status ===
-                          OrderStatus.ACCEPTED_AWAITING_PAYMENT &&
-                          session?.user?.id === order.originatingShop && (
-                            <div className="flex flex-col gap-2 justify-center w-full">
-                              <p className="font-bold text-lg capitalize">
-                                Preferred Payment Method:{" "}
-                                <span className="text-lg uppercase text-emerald-600">
-                                  {order.paymentMethods.default}
-                                </span>
-                              </p>
+                        {order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT &&
+                          session?.user?.id === order.originatingShop && (() => {
+                            const availablePaymentMethods = getAvailablePaymentMethods(order.paymentMethods);
+                            const preferredPaymentMethod = getPreferredPaymentMethod(order.paymentMethods);
 
-                              <div className="flex flex-wrap gap-2 justify-center w-full">
-                                {(
-                                  [
-                                    "venmo",
-                                    "cashapp",
-                                    "zelle",
-                                    "paypal",
-                                  ] as const
-                                ).map((method) => (
-                                  <button
-                                    disabled={actionOrderId === order._id}
-                                    key={method}
-                                    onClick={() =>
-                                      handleMarkPaid(order._id, method)
-                                    }
-                                    className={`flex-1 max-w-xs py-3 rounded-3xl font-black text-white px-2 ${
-                                      method === "venmo"
-                                        ? "bg-blue-500 hover:bg-blue-600"
-                                        : method === "cashapp"
-                                          ? "bg-green-500 hover:bg-green-600"
-                                          : method === "zelle"
-                                            ? "bg-purple-500 hover:bg-purple-600"
-                                            : "bg-gray-500 hover:bg-gray-600"
-                                    }`}
-                                  >
-                                    {method.toUpperCase()}
-                                  </button>
-                                ))}
+                            return (
+                              <div className="flex flex-col gap-2 justify-center w-full">
+                                <p className="font-bold text-lg capitalize">
+                                  Preferred Payment Method:{" "}
+                                  <span className="text-lg uppercase text-emerald-600">
+                                    {preferredPaymentMethod ? preferredPaymentMethod : "None Available"}
+                                  </span>
+                                </p>
+                                <div className="flex flex-wrap gap-2 justify-center w-full">
+                                  {availablePaymentMethods.map((method) => (
+                                    <button
+                                      disabled={actionOrderId === order._id}
+                                      key={method}
+                                      onClick={() => handleMarkPaid(order._id, method)}
+                                      className={`flex-1 max-w-xs py-3 rounded-3xl font-black text-white px-2 ${
+                                        method === "venmo"
+                                          ? "bg-blue-500 hover:bg-blue-600"
+                                          : method === "cashapp"
+                                            ? "bg-green-500 hover:bg-green-600"
+                                            : method === "zelle"
+                                              ? "bg-purple-500 hover:bg-purple-600"
+                                              : "bg-gray-500 hover:bg-gray-600"
+                                      }`}
+                                    >
+                                      <div>{method.toUpperCase()}</div>
+                                      <div className="text-xs font-medium opacity-90 break-all">
+                                        {order.paymentMethods?.[method]}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {availablePaymentMethods.length === 0 && (
+                                  <p className="text-sm text-red-600 font-semibold">
+                                    No payment methods are available for this order.
+                                  </p>
+                                )}
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                         {/* Mark Delivered (Fulfilling Shop) */}
                         {order.status ===
@@ -849,12 +866,20 @@ export default function OrdersDashboard() {
 
                     {/* RIGHT: View Order Button + Products */}
                     <div className="flex flex-col gap-4 lg:col-span-2 2xl:col-span-1">
-                      <Link
-                        href={`/orders/${order._id}`}
-                        className="self-center px-8 py-1 rounded-md shadow-md bg-purple-600 border border-purple-600 text-white transition-all hover:text-purple-600 hover:bg-white"
-                      >
-                        View Order
-                      </Link>
+                      <div className="flex gap-4 justify-center">
+                        <Link
+                          href={`/orders/${order._id}`}
+                          className="self-center px-8 py-1 rounded-md shadow-md bg-purple-600 border border-purple-600 text-white transition-all hover:text-purple-600 hover:bg-white"
+                        >
+                          View Order
+                        </Link>
+                        <Link
+                          href={`/dashboard/orders/messages/${order._id}`}
+                          className="self-center px-8 py-1 rounded-md shadow-md bg-purple-600 border border-purple-600 text-white transition-all hover:text-purple-600 hover:bg-white"
+                        >
+                          Messages
+                        </Link>
+                      </div>
                       {/* Products */}
                       <div className="overflow-y-scroll max-h-96">
                         {order.products.map((product: any, index: any) => (
@@ -862,10 +887,19 @@ export default function OrdersDashboard() {
                             key={product.id || index}
                             className="mb-2 flex gap-2 p-2 rounded-lg bg-gray-50"
                           >
-                            {/* Add Image Here */}
-                            <div className="min-w-24 max-h-24 min-h-24 border rounded-lg p-1">
-                              Image Goes Here
-                            </div>
+                            {product.photo ? (
+                              <div className="w-24 h-24 border rounded-lg p-1 overflow-hidden">
+                                <img
+                                  src={product.photo}
+                                  alt={product.name}
+                                  className="object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="min-w-24 max-h-24 min-h-24 border rounded-lg p-1">
+                                No Image
+                              </div>
+                            )}
                             <div className="flex flex-col w-full">
                               <span className="text-black text-xl font-bold">
                                 {product.name}
@@ -876,7 +910,9 @@ export default function OrdersDashboard() {
                                     Price:
                                   </span>{" "}
                                   <span className="text-emerald-600 font-semibold">
-                                    ${product.price.toFixed(2)}
+                                    {formatCurrencyFromCents(
+                                      product.priceCents,
+                                    )}
                                   </span>
                                 </p>
                                 <p>

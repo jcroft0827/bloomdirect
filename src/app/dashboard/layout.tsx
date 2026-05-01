@@ -9,7 +9,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [shopName, setShopName] = useState("");
   const [shopLogo, setShopLogo] = useState("Add Logo");
+  const [slug, setSlug] = useState("");
   const [onBoarded, setOnBoarded] = useState(false);
+  const [pro, setPro] = useState(false);
   const today = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -32,6 +34,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           }
           setShopName(data.shop.businessName);
           setShopLogo(data.shop.branding.logo || "Add Logo");
+          setSlug(data.shop.slug);
+          console.log(data.shop);
+          setPro(data.shop.isPro);
         }
 
       } catch (err) {
@@ -48,7 +53,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <aside className="w-64 bg-white border-r flex-col justify-between rounded-2xl shadow-lg hidden lg:flex p-6">
           <div>
             <h2 className="text-xl font-bold mb-8">GetBloomDirect</h2>
-            <NavLinks pathname={pathname} />
+            <NavLinks slug={slug} pro={pro} pathname={pathname} />
           </div>
         </aside>
       )}
@@ -72,7 +77,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <X size={24} />
           </button>
         </div>
-        <NavLinks pathname={pathname} onClose={() => setShowNav(false)} />
+        <NavLinks slug={slug} pro={pro} pathname={pathname} onClose={() => setShowNav(false)} />
       </aside>
 
       <div className="flex flex-col w-full">
@@ -131,6 +136,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   }
                 >
                   Settings
+                </span>
+                <span
+                  className={
+                    pathname === "/dashboard/pos-integration" ? "block" : "hidden"
+                  }
+                >
+                  POS Integration
                 </span>
               </h2>
             </div>

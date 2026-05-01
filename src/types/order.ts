@@ -2,9 +2,81 @@ import { OrderStatus } from "@/lib/order-status";
 
 export interface OrderActivityLean {
   action: string;
-  actorShop?: string;
+  actorShopId?: string;
   message?: string;
   createdAt: string;
+}
+
+export interface OrderDeclineHistoryLean {
+  shopId: string;
+  shopName: string;
+  reason: string;
+  message?: string;
+  declinedAt: string;
+}
+
+export interface OrderPaymentMethodsLean {
+  venmo?: string;
+  cashapp?: string;
+  zelle?: string;
+  paypal?: string;
+  default?: "venmo" | "cashapp" | "zelle" | "paypal";
+}
+
+export interface OrderRecipientLean {
+  firstName?: string;
+  lastName?: string;
+  fullName: string;
+  address: string;
+  apt?: string;
+  city: string;
+  state: string;
+  zip: string;
+  phone?: string;
+  email?: string;
+  company?: string;
+  message?: string;
+}
+
+export interface OrderCustomerLean {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface OrderLogisticsLean {
+  deliveryDate: string;
+  deliveryTimeOption: string;
+  deliveryTimeFrom?: string;
+  deliveryTimeTo?: string;
+  specialInstructions?: string;
+}
+
+export interface OrderProductLean {
+  id?: string;
+  productId?: string;
+  name: string;
+  description?: string;
+  photo?: string;
+  priceCents: number;
+  qty: number;
+  taxable: boolean;
+}
+
+export interface OrderPricingLean {
+  productsSubtotalCents: number;
+  deliveryFeeCents: number;
+  taxCents: number;
+
+  orderTotalCents: number;
+
+  originatingShopFeeType?: "flat" | "percentage";
+  originatingShopFeeValue?: number;
+
+  originatingShopKeepsCents: number;
+  fulfillingShopGetsCents: number;
 }
 
 export type OrderLean = {
@@ -17,84 +89,33 @@ export type OrderLean = {
   fulfillingShop: string;
   fulfillingShopName: string;
 
-  recipient: {
-    firstName: string,
-    lastName?: string,
-    fullName: string,
-    address: string,
-    apt?: string,
-    city: string,
-    state: string,
-    zip: string,
-    phone?: string,
-    email?: string,
-    company?: string,
-    message?: string,
-  };
-  
-  customer?: {
-    firstName?: string;
-    lastName?: string;
-    fullName?: string;
-    email?: string;
-    phone?: string;
-  };
+  recipient: OrderRecipientLean;
+  customer?: OrderCustomerLean;
 
-  logistics: {
-    deliveryDate: string;
-    deliveryTimeOption: string,
-    deliveryTimeFrom?: string,
-    deliveryTimeTo?: string,
-    specialInstructions?: string,
-  };
+  logistics: OrderLogisticsLean;
 
-  products: {
-    name?: string;
-    description?: string;
-    photo?: string;
-    price?: number;
-    qty: number;
-    taxable: boolean;
-  }[];
+  products: OrderProductLean[];
 
-  pricing: {
-    productsTotal: number;
-    deliveryFee: number;
-    taxAmount: number;
-    customerPays: number;
-    orderTotal: number;
-    fulfillingShopGets: number;
-    feeCharge: number;
-  };
-  
-  paymentMethods?: {
-    venmo?: string;
-    cashapp?: string;
-    zelle?: string;
-    paypal?: string;
-    default?: string;
-  };
-  
-  paymentMarkedPaidAt?: Date;
+  pricing: OrderPricingLean;
+
+  paymentMethods?: OrderPaymentMethodsLean;
+  paymentMethod?: "venmo" | "cashapp" | "zelle" | "paypal";
 
   status: OrderStatus;
-  
+
   declineReason?: string;
   declineMessage?: string;
-  declineCount?: number;
-  declineHistory?: {
-    shop: string;
-    shopName: string;
-    reason: string;
-    message?: string;
-    declinedAt: Date;
-  }[];
+  declineHistory?: OrderDeclineHistoryLean[];
 
   activityLog?: OrderActivityLean[];
 
+  paymentMarkedPaidAt?: string;
   acceptedAt?: string;
   declinedAt?: string;
   paidAt?: string;
   completedAt?: string;
   createdAt: string;
+  updatedAt?: string;
+
+  reassignCount?: number;
 };

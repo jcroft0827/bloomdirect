@@ -1,3 +1,4 @@
+// /lib/order-status.ts
 export enum OrderStatus {
   PENDING_ACCEPTANCE = "PENDING_ACCEPTANCE",
   ACCEPTED_AWAITING_PAYMENT = "ACCEPTED_AWAITING_PAYMENT",

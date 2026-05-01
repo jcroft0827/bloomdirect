@@ -9,6 +9,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import ToolTip from "@/components/ToolTip";
 import { searchGoogleFlorists } from "@/app/actions";
 import BloomSpinner from "@/components/BloomSpinner";
+import Link from "next/link";
 
 // #region Interfaces
 
@@ -291,6 +292,7 @@ export default function NewOrderClient() {
   });
   const [editDeliveryFee, setEditDeliveryFee] = useState(false);
   const [editOriginatingFee, setEditOriginatingFee] = useState(false);
+  const [originatingFeeValue, setOriginatingFeeValue] = useState<number>(0);
 
   // Shops
   const [shops, setShops] = useState<any[]>([]);
@@ -335,6 +337,7 @@ export default function NewOrderClient() {
           feeType: data.shop.financials.feeType,
           feeValue: data.shop.financials.feeValue,
         });
+        setOriginatingFeeValue(data.shop.financials.feeValue || 0);
       } catch (err) {
         console.error("Failed to load shop data", err);
       }
@@ -343,18 +346,74 @@ export default function NewOrderClient() {
   }, []);
 
   // Calculate Totals
-  useEffect(() => {
-    const { deliveryFee } = pricing;
-    const { taxPercentage, feeType, feeValue, deliveryTaxed, feeTaxed } =
-      sendingShop;
+  // useEffect(() => {
+  //   const { deliveryFee } = pricing;
+  //   const { taxPercentage, feeType, feeValue, deliveryTaxed, feeTaxed } =
+  //     sendingShop;
 
-    // 1. Calculate Product Totals
+  //   // 1. Calculate Product Totals
+  //   const { taxableSubtotal, nonTaxableSubtotal } = products.reduce(
+  //     (acc, p) => {
+  //       const price = parseFloat(p.price as string) || 0;
+  //       p.taxable
+  //         ? (acc.taxableSubtotal += price)
+  //         : (acc.nonTaxableSubtotal += price);
+  //       return acc;
+  //     },
+  //     { taxableSubtotal: 0, nonTaxableSubtotal: 0 },
+  //   );
+
+  //   const productTotal = taxableSubtotal + nonTaxableSubtotal;
+
+  //   // 2. Calculate the actual Fee Charge (The dollar amount)
+  //   // If feeType is %, it calculates 35% of $111.16 = $38.91
+  //   const feeCharge =
+  //     feeType === "%" ? productTotal * (feeValue / 100) : feeValue;
+
+  //   // 3. Determine the Taxable Basis
+  //   let taxableBasis = taxableSubtotal;
+  //   if (taxPercentage > 0) {
+  //     if (deliveryTaxed) taxableBasis += deliveryFee;
+  //     if (feeTaxed) taxableBasis += feeCharge;
+  //   }
+  //   const taxAmount = taxableBasis * (taxPercentage / 100);
+
+  //   // 4. Final Totals
+  //   const finalTotal = productTotal + deliveryFee + feeCharge + taxAmount;
+  //   const fulfillingShopGets = productTotal + deliveryFee;
+
+  //   // 5. Update State
+  //   setPricing((prev) => ({
+  //     ...prev,
+  //     productsTotal: productTotal,
+  //     // Store the calculated dollar amount separately from the database feeValue
+  //     feeCharge: parseFloat(roundToHundredth(feeCharge)),
+  //     taxAmount: parseFloat(roundToHundredth(taxAmount)),
+  //     customerPays: parseFloat(roundToHundredth(finalTotal)),
+  //     orderTotal: parseFloat(roundToHundredth(finalTotal)),
+  //     fulfillingShopGets: parseFloat(roundToHundredth(fulfillingShopGets)),
+  //   }));
+  // }, [
+  //   products,
+  //   pricing.deliveryFee,
+  //   sendingShop.taxPercentage,
+  //   sendingShop.feeType,
+  //   sendingShop.feeValue,
+  //   sendingShop.deliveryTaxed,
+  //   sendingShop.feeTaxed,
+  // ]);
+  useEffect(() => {
+    const deliveryFee = Number(pricing.deliveryFee) || 0;
+    const taxPercentage = Number(sendingShop.taxPercentage) || 0;
+
     const { taxableSubtotal, nonTaxableSubtotal } = products.reduce(
       (acc, p) => {
         const price = parseFloat(p.price as string) || 0;
-        p.taxable
-          ? (acc.taxableSubtotal += price)
-          : (acc.nonTaxableSubtotal += price);
+        if (p.taxable) {
+          acc.taxableSubtotal += price;
+        } else {
+          acc.nonTaxableSubtotal += price;
+        }
         return acc;
       },
       { taxableSubtotal: 0, nonTaxableSubtotal: 0 },
@@ -362,42 +421,39 @@ export default function NewOrderClient() {
 
     const productTotal = taxableSubtotal + nonTaxableSubtotal;
 
-    // 2. Calculate the actual Fee Charge (The dollar amount)
-    // If feeType is %, it calculates 35% of $111.16 = $38.91
     const feeCharge =
-      feeType === "%" ? productTotal * (feeValue / 100) : feeValue;
+      sendingShop.feeType === "%"
+        ? productTotal * (Number(originatingFeeValue) / 100)
+        : Number(originatingFeeValue);
 
-    // 3. Determine the Taxable Basis
-    let taxableBasis = taxableSubtotal;
-    if (taxPercentage > 0) {
-      if (deliveryTaxed) taxableBasis += deliveryFee;
-      if (feeTaxed) taxableBasis += feeCharge;
-    }
+    const taxableBasis =
+      taxableSubtotal +
+      (sendingShop.deliveryTaxed ? deliveryFee : 0) +
+      (sendingShop.feeTaxed ? feeCharge : 0);
+
     const taxAmount = taxableBasis * (taxPercentage / 100);
 
-    // 4. Final Totals
     const finalTotal = productTotal + deliveryFee + feeCharge + taxAmount;
-    const fulfillingShopGets = productTotal + deliveryFee;
 
-    // 5. Update State
     setPricing((prev) => ({
       ...prev,
-      productsTotal: productTotal,
-      // Store the calculated dollar amount separately from the database feeValue
+      productsTotal: parseFloat(roundToHundredth(productTotal)),
       feeCharge: parseFloat(roundToHundredth(feeCharge)),
       taxAmount: parseFloat(roundToHundredth(taxAmount)),
       customerPays: parseFloat(roundToHundredth(finalTotal)),
       orderTotal: parseFloat(roundToHundredth(finalTotal)),
-      fulfillingShopGets: parseFloat(roundToHundredth(fulfillingShopGets)),
+      fulfillingShopGets: parseFloat(
+        roundToHundredth(productTotal + deliveryFee),
+      ),
     }));
   }, [
     products,
     pricing.deliveryFee,
     sendingShop.taxPercentage,
-    sendingShop.feeType,
-    sendingShop.feeValue,
     sendingShop.deliveryTaxed,
     sendingShop.feeTaxed,
+    sendingShop.feeType,
+    originatingFeeValue,
   ]);
 
   // Auto-fill city/state from ZIP
@@ -549,6 +605,8 @@ export default function NewOrderClient() {
       setShops(data || []);
       setFindShopSuccess(data?.length > 0);
 
+      console.log(data);
+
       if (!data || data.length === 0) {
         toast.error("No GetBloomDirect shops in that area yet — invite them!");
         setNoShopsInArea(true);
@@ -571,18 +629,159 @@ export default function NewOrderClient() {
   };
 
   // Send Order
+  // const sendOrder = async () => {
+  //   try {
+  //     setSendingOrder(true);
+  //     // Validations
+  //     if (!selectedShop && !googleShop) {
+  //       setSendingOrder(false);
+  //       return toast.error("Select a fulfilling shop!");
+  //     }
+  //     if (!logistics.deliveryDate) {
+  //       setSendingOrder(false);
+  //       return toast.error("Select delivery date!");
+  //     }
+  //     if (
+  //       !recipient.firstName ||
+  //       !recipient.lastName ||
+  //       !recipient.phone ||
+  //       !recipient.address ||
+  //       !recipient.zip ||
+  //       !recipient.city ||
+  //       !recipient.state
+  //     ) {
+  //       setSendingOrder(false);
+  //       return toast.error("Enter all recipient information!");
+  //     }
+
+  //     // Upload images to s3 and get the CloudFront URLs
+  //     const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
+
+  //     // Use Promise.all to upload all product images at once (concurrently)
+  //     const updatedProducts = await Promise.all(
+  //       products.map(async (p) => {
+  //         // If there's no file object, return the product as is (or with existing photo string)
+  //         if (!p.file) return { ...p, photo: p.photo || "" };
+
+  //         // Get signed URL from your existing API
+  //         const uploadRes = await fetch("/api/s3/upload-url", {
+  //           method: "POST",
+  //           headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify({
+  //             fileName: p.file.name,
+  //             fileType: p.file.type,
+  //           }),
+  //         });
+
+  //         if (!uploadRes.ok) throw new Error("Failed to get upload URL");
+  //         const { uploadUrl, fileKey } = await uploadRes.json();
+
+  //         // Upload the actual file to s3
+  //         await fetch(uploadUrl, {
+  //           method: "PUT",
+  //           headers: { "Content-Type": p.file.type },
+  //           body: p.file,
+  //         });
+
+  //         // Return the product with the CloudFront URL
+  //         return {
+  //           ...p,
+  //           photo: `${cfBase}/${fileKey}`,
+  //         };
+  //       }),
+  //     );
+
+  //     const payload = {
+  //       fulfillingShopId: fulfillShopId,
+  //       recipient: {
+  //         firstName: recipient.firstName,
+  //         lastName: recipient.lastName,
+  //         fullName: `${recipient.firstName} ${recipient.lastName}`,
+  //         address: recipient.address,
+  //         apt: recipient.apt || "",
+  //         city: recipient.city,
+  //         state: recipient.state,
+  //         zip: recipient.zip,
+  //         phone: recipient.phone,
+  //         email: recipient.email || null,
+  //         company: recipient.company || "",
+  //         message: cardMessage || "",
+  //       },
+  //       customer: {
+  //         firstName: customer.firstName || "",
+  //         lastName: customer.lastName || "",
+  //         fullName: `${customer.firstName} ${customer.lastName}`,
+  //         email: customer.email || "",
+  //         phone: customer.phone || "",
+  //       },
+  //       logistics: {
+  //         deliveryDate: logistics.deliveryDate.toISOString(),
+  //         deliveryTimeOption: logistics.timeOption,
+  //         deliveryTimeFrom:
+  //           logistics.timeOption === "specific" ? logistics.timeFrom : null,
+  //         deliveryTimeTo:
+  //           logistics.timeOption === "specific" ? logistics.timeTo : null,
+  //         specialInstructions: logistics.specialInstructions || "",
+  //       },
+  //       pricing: {
+  //         productsTotal: pricing.productsTotal,
+  //         deliveryFee: pricing.deliveryFee,
+  //         taxAmount: pricing.taxAmount,
+  //         customerPays: pricing.customerPays,
+  //         orderTotal: pricing.orderTotal,
+  //         fulfillingShopGets: pricing.fulfillingShopGets,
+  //         feeCharge: pricing.feeCharge,
+  //       },
+  //       products: updatedProducts.map((p) => ({
+  //         name: p.name,
+  //         price: parseFloat(p.price),
+  //         description: p.description,
+  //         qty: p.qty,
+  //         taxable: p.taxable,
+  //         photo: p.photo,
+  //       })),
+  //       paymentMethods: {
+  //         venmo: fulfillingShop?.paymentMethods?.venmoHandle,
+  //         cashapp: fulfillingShop?.paymentMethods?.cashAppTag,
+  //         zelle: fulfillingShop?.paymentMethods?.zellePhoneOrEmail,
+  //         paypal: fulfillingShop?.paymentMethods?.paypalEmail,
+  //         default: fulfillingShop?.paymentMethods?.defaultPaymentMethod,
+  //       },
+  //     };
+
+  //     const res = await fetch("/api/orders/create", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(payload),
+  //     });
+
+  //     if (!res.ok) throw new Error("Failed to create order");
+
+  //     toast.success("Order sent successfully!");
+
+  //     router.push("/dashboard");
+  //   } catch (error) {
+  //     setSendingOrder(false);
+  //     console.error("Failed to send order", error);
+  //     toast.error("Failed to send order. Please try again.");
+  //   } finally {
+  //     setSendingOrder(false);
+  //   }
+  // };
   const sendOrder = async () => {
     try {
       setSendingOrder(true);
-      // Validations
-      if (!selectedShop && !googleShop) {
-        setSendingOrder(false);
+
+      const usingGoogleShop = !!googleShop?.name && !selectedShop?._id;
+
+      if (!selectedShop && !usingGoogleShop) {
         return toast.error("Select a fulfilling shop!");
       }
+
       if (!logistics.deliveryDate) {
-        setSendingOrder(false);
         return toast.error("Select delivery date!");
-      } 
+      }
+
       if (
         !recipient.firstName ||
         !recipient.lastName ||
@@ -592,20 +791,15 @@ export default function NewOrderClient() {
         !recipient.city ||
         !recipient.state
       ) {
-        setSendingOrder(false);
         return toast.error("Enter all recipient information!");
       }
 
-      // Upload images to s3 and get the CloudFront URLs
       const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
 
-      // Use Promise.all to upload all product images at once (concurrently)
       const updatedProducts = await Promise.all(
         products.map(async (p) => {
-          // If there's no file object, return the product as is (or with existing photo string)
           if (!p.file) return { ...p, photo: p.photo || "" };
 
-          // Get signed URL from your existing API
           const uploadRes = await fetch("/api/s3/upload-url", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -616,25 +810,24 @@ export default function NewOrderClient() {
           });
 
           if (!uploadRes.ok) throw new Error("Failed to get upload URL");
+
           const { uploadUrl, fileKey } = await uploadRes.json();
 
-          // Upload the actual file to s3
           await fetch(uploadUrl, {
             method: "PUT",
             headers: { "Content-Type": p.file.type },
             body: p.file,
           });
 
-          // Return the product with the CloudFront URL
           return {
             ...p,
             photo: `${cfBase}/${fileKey}`,
           };
-        })
+        }),
       );
 
       const payload = {
-        fulfillingShopId: fulfillShopId,
+        fulfillingShopId: selectedShop?._id || "",
         recipient: {
           firstName: recipient.firstName,
           lastName: recipient.lastName,
@@ -665,15 +858,6 @@ export default function NewOrderClient() {
             logistics.timeOption === "specific" ? logistics.timeTo : null,
           specialInstructions: logistics.specialInstructions || "",
         },
-        pricing: {
-          productsTotal: pricing.productsTotal,
-          deliveryFee: pricing.deliveryFee,
-          taxAmount: pricing.taxAmount,
-          customerPays: pricing.customerPays,
-          orderTotal: pricing.orderTotal,
-          fulfillingShopGets: pricing.fulfillingShopGets,
-          feeCharge: pricing.feeCharge,
-        },
         products: updatedProducts.map((p) => ({
           name: p.name,
           price: parseFloat(p.price),
@@ -689,6 +873,19 @@ export default function NewOrderClient() {
           paypal: fulfillingShop?.paymentMethods?.paypalEmail,
           default: fulfillingShop?.paymentMethods?.defaultPaymentMethod,
         },
+        deliveryFeeOverride: Number(pricing.deliveryFee) || 0,
+        originatingShopFeeOverride: {
+          feeType: sendingShop.feeType || "flat",
+          feeValue: Number(originatingFeeValue) || 0,
+        },
+        usingGoogleShop,
+        googleShop: usingGoogleShop
+          ? {
+              name: googleShop.name,
+              phone: googleShop.phone || "",
+              address: googleShop.address || "",
+            }
+          : null,
       };
 
       const res = await fetch("/api/orders/create", {
@@ -700,10 +897,8 @@ export default function NewOrderClient() {
       if (!res.ok) throw new Error("Failed to create order");
 
       toast.success("Order sent successfully!");
-
       router.push("/dashboard");
     } catch (error) {
-      setSendingOrder(false);
       console.error("Failed to send order", error);
       toast.error("Failed to send order. Please try again.");
     } finally {
@@ -1369,6 +1564,27 @@ export default function NewOrderClient() {
                               </p>
                             </div>
                             <div className="text-center sm:text-start sm:mt-2">
+                              {/* View Account */}
+                              <Link
+                                href={`/dashboard/shops/${shop.slug}`}
+                                className="uppercase mb-2 cursor-pointer transition-all hover:text-purple-600 flex hover:gap-1 items-center"
+                              >
+                                View Account
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth="1.5"
+                                  stroke="currentColor"
+                                  className="size-5"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="m8.25 4.5 7.5 7.5-7.5 7.5"
+                                  />
+                                </svg>
+                              </Link>
                               {/* Shop Name & Phone Number */}
                               <div className="flex flex-col sm:flex-row items-center sm:gap-2 text-xl font-bold">
                                 <h3 className="sm:flex">
@@ -1809,15 +2025,23 @@ export default function NewOrderClient() {
                                     src={product.photo}
                                     alt={product.name}
                                     className="w-24 h-24 p-1 rounded-lg object-cover border border-purple-200 cursor-zoom-in hover:opacity-80 transition"
-                                    onClick={() => setZoomedImage(product.photo)}
+                                    onClick={() =>
+                                      setZoomedImage(product.photo)
+                                    }
                                   />
                                   {/* Optional: Clear photo button */}
                                   <button
                                     onClick={() => {
                                       const newProducts = [...products];
 
-                                      if (newProducts[index].photo.startsWith('blob:')) {
-                                        URL.revokeObjectURL(newProducts[index].photo);
+                                      if (
+                                        newProducts[index].photo.startsWith(
+                                          "blob:",
+                                        )
+                                      ) {
+                                        URL.revokeObjectURL(
+                                          newProducts[index].photo,
+                                        );
                                       }
 
                                       newProducts[index].photo = "";
@@ -2363,7 +2587,7 @@ export default function NewOrderClient() {
                           </p>
                         </div>
                         {/* Originating Fee */}
-                        <div>
+                        {/* <div>
                           <div className="relative">
                             <label className="block text-xl opacity-90">
                               Your profit (fee)
@@ -2438,6 +2662,79 @@ export default function NewOrderClient() {
                             }
                             placeholder="25"
                           />
+                        </div> */}
+                        <div>
+                          <div className="relative">
+                            <label className="block text-xl opacity-90">
+                              Your profit (fee){" "}
+                              <span className="text-white text-xl font-bold">
+                                {sendingShop.feeType === "%" ? "%" : "$"}
+                              </span>
+                            </label>
+                            <div className="absolute top-1 right-2">
+                              <button
+                                onClick={() =>
+                                  setEditOriginatingFee((prev) => !prev)
+                                }
+                                title="Edit Originating Fee"
+                              >
+                                {editOriginatingFee ? (
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth="1.5"
+                                    stroke="currentColor"
+                                    className="size-6 text-emerald-500"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth="1.5"
+                                    stroke="currentColor"
+                                    className="size-6"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={originatingFeeValue}
+                              readOnly={!editOriginatingFee}
+                              onChange={(e) =>
+                                setOriginatingFeeValue(Number(e.target.value))
+                              }
+                              className={
+                                (editOriginatingFee
+                                  ? "border-2 border-emerald-500"
+                                  : "border-none") +
+                                " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
+                              }
+                              placeholder={
+                                sendingShop.feeType === "%" ? "15" : "25"
+                              }
+                              step={
+                                sendingShop.feeType === "%" ? "0.01" : "0.01"
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
                       {/* Customer Pays + Fee Charge + Fulfilling Shop Gets */}

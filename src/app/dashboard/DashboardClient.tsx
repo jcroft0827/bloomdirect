@@ -321,7 +321,7 @@ export default function DashboardClient() {
                 Pro Coming Soon!
               </h2>
               <p className="text-xl mb-8 opacity-90 md:text-2xl">
-                Pro shops see live profit, unlimited orders, get featured first,
+                Pro shops see live profit, gain access to POS Integration, get featured first,
                 and much more!
               </p>
               <form action="/api/checkout" method="POST">

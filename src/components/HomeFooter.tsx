@@ -45,6 +45,11 @@ export default function HomeFooter() {
                   Get Started
                 </Link>
               </li>
+              <li>
+                <Link href="/api-docs/external/v1" className="hover:text-white">
+                  POS Development
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -11,6 +11,7 @@ import Shop from "@/models/Shop";
 import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
 import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
+import { sendOrderEvent } from "@/lib/send-order-event";
 
 export async function POST(req: Request) {
   try {
@@ -101,6 +102,12 @@ export async function POST(req: Request) {
       await Shop.findByIdAndUpdate(order.fulfillingShop, {
         $inc: { "stats.ordersDeclined": 1 },
       });
+
+      await sendOrderEvent({
+        event: "order.declined",
+        order,
+        actorShopId: session?.user?.id,
+      });
     }
 
     // ─────────────────────────────────────────────
@@ -127,6 +134,12 @@ export async function POST(req: Request) {
         message: `Order accepted, awaiting payment`,
       });
 
+      await sendOrderEvent({
+        event: "order.accepted",
+        order,
+        actorShopId: session?.user?.id,
+      });
+
       // Clear any previous decline data
       order.declineReason = undefined;
       order.declineMessage = undefined;
@@ -146,6 +159,12 @@ export async function POST(req: Request) {
       // Update the Fulfilling Shop's stats
       await Shop.findByIdAndUpdate(order.fulfillingShop, {
         $inc: { "stats.ordersCompleted": 1 },
+      });
+
+      await sendOrderEvent({
+        event: "order.completed",
+        order,
+        actorShopId: session?.user?.id,
       });
     }
 
