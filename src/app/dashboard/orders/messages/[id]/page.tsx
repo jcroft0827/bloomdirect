@@ -5,6 +5,7 @@ import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import OrderMessages from "./OrderMessages";
+import { Toaster } from "react-hot-toast";
 
 export default async function MessagesPage({
   params,
@@ -49,6 +50,7 @@ export default async function MessagesPage({
         loggedInShopId={shopId}
         order={JSON.parse(JSON.stringify(order))}
       />
+      <Toaster />
     </div>
   );
 }

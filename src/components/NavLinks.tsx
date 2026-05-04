@@ -1,5 +1,8 @@
+"use client";
+
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // 1. Define an interface for the props
 interface NavLinksProps {
@@ -15,6 +18,14 @@ export const NavLinks = ({ slug, pro, pathname, onClose }: NavLinksProps) => {
     pathname === path
       ? "bg-emerald-100 text-emerald-700"
       : "hover:bg-gray-100 text-gray-600";
+
+    const router = useRouter();
+
+    const logOut = () => {
+      signOut({ redirect: false });
+      if (onClose) onClose();
+      router.push("/");  
+    }
 
   return (
     <>
@@ -76,7 +87,7 @@ export const NavLinks = ({ slug, pro, pathname, onClose }: NavLinksProps) => {
         )}
         <button 
           type="button"
-          onClick={() => signOut()}
+          onClick={() => logOut()}
           className="w-full text-left p-3 text-red-600 hover:bg-red-50 rounded-lg"
         >
           Logout

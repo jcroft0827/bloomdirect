@@ -1,5 +1,6 @@
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
+import Notifications from "@/models/Notifications";
 import Order from "@/models/Order";
 import OrderMessages from "@/models/OrderMessages";
 import { getServerSession } from "next-auth";
@@ -50,7 +51,21 @@ export async function GET(
       },
     );
 
-    const messages = await OrderMessages.find({ orderId: id })
+    await Notifications.updateMany(
+      {
+        order: id,
+        receivingShop: shopId,
+        read: false,
+      },
+      {
+        $set: {
+          read: true,
+          readAt: new Date(),
+        },
+      },
+    );
+
+    const messages = await OrderMessages.find({ order: id })
       .populate("sendingShop", "businessName")
       .populate("receivingShop", "businessName")
       .sort({ createdAt: 1 });

@@ -1,59 +1,109 @@
 "use client";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
-import { ReactNode, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { NavLinks } from "@/components/NavLinks";
-import { Menu, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
+import Link from "next/link";
+
+interface Branding {
+  logo: string;
+}
+interface Shop {
+  _id: string;
+  businessName: string;
+  branding: Branding;
+  slug: string;
+  onboardingComplete: boolean;
+  isPro: boolean;
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
-  const [shopName, setShopName] = useState("");
-  const [shopLogo, setShopLogo] = useState("Add Logo");
-  const [slug, setSlug] = useState("");
-  const [onBoarded, setOnBoarded] = useState(false);
-  const [pro, setPro] = useState(false);
+  const hasRefreshed = useRef(false);
+
+  const [shop, setShop] = useState<Shop | null>(null);
   const today = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
   }).format(new Date());
   const [showNav, setShowNav] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Load shop info
-  useEffect(() => {
-    async function loadShop() {
-      try {
-        const res = await fetch("/api/shops/me");
-        const data = await res.json();
-
-        if (data && data.shop) {
-          if (data.shop.onboardingComplete) {
-            setOnBoarded(true);
-          } else {
-            setOnBoarded(false);
-          }
-          setShopName(data.shop.businessName);
-          setShopLogo(data.shop.branding.logo || "Add Logo");
-          setSlug(data.shop.slug);
-          console.log(data.shop);
-          setPro(data.shop.isPro);
-        }
-
-      } catch (err) {
-        console.error("Failed to load shop data", err);
+  async function loadShop() {
+    try {
+      const res = await fetch("/api/shops/me");
+      const data = await res.json();
+      if (data?.shop) {
+        setShop(data.shop);
+        console.log("Shop data loaded:", data.shop);
       }
+    } catch (err) {
+      console.error("Failed to load shop data", err);
     }
+  }
+
+  // load notifications
+  async function loadNotifications() {
+    if (!shop?._id) return;
+
+    try {
+      const res = await fetch(`/api/notifications/${shop?._id}/pull`);
+      const data = await res.json();
+      setNotifications(data);
+    } catch (err) {
+      console.error("Failed to load notifications", err);
+    }
+  }
+
+  useEffect(() => {
+    function handleRefreshNotifications() {
+      loadNotifications();
+    }
+
+    window.addEventListener(
+      "refresh-notifications",
+      handleRefreshNotifications,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "refresh-notifications",
+        handleRefreshNotifications,
+      );
+    };
+  }, [shop?._id]);
+
+  // Click Notification
+  const handleClickNotification = async (notification: any) => {
+    router.push(
+      `/dashboard/orders/messages/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
+    );
+    await loadNotifications();
+    setShowNotifications(false);
+  };
+
+  useEffect(() => {
     loadShop();
   }, []);
+
+  useEffect(() => {
+    if (shop?._id) {
+      loadNotifications();
+    }
+  }, [shop?._id]);
 
   return (
     <div className="flex h-screen bg-emerald-50 md:p-4 lg:gap-10 lg:p-10 overflow-hidden">
       {/* Desktop Sidebar (Static) */}
-      {onBoarded && (
+      {shop?.onboardingComplete && (
         <aside className="w-64 bg-white border-r flex-col justify-between rounded-2xl shadow-lg hidden lg:flex p-6">
           <div>
             <h2 className="text-xl font-bold mb-8">GetBloomDirect</h2>
-            <NavLinks slug={slug} pro={pro} pathname={pathname} />
+            <NavLinks slug={shop.slug} pro={shop.isPro} pathname={pathname} />
           </div>
         </aside>
       )}
@@ -77,7 +127,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <X size={24} />
           </button>
         </div>
-        <NavLinks slug={slug} pro={pro} pathname={pathname} onClose={() => setShowNav(false)} />
+        <NavLinks
+          slug={shop?.slug || ""}
+          pro={shop?.isPro || false}
+          pathname={pathname}
+          onClose={() => setShowNav(false)}
+        />
       </aside>
 
       <div className="flex flex-col w-full">
@@ -86,11 +141,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             {/* Logo + Greeting */}
             <div>
               {/* Greeting */}
-              {onBoarded ? (
+              {shop?.onboardingComplete ? (
                 <div>
                   <h1 className="font-semibold text-gray-700 capitalize md:text-xl lg:text-start lg:text-base xl:text-xl">
                     Welcome back,{" "}
-                    <span className="text-purple-600">{shopName}</span>!
+                    <span className="text-purple-600">
+                      {shop?.businessName}
+                    </span>
+                    !
                   </h1>
                   <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
                     You're saving thousands by skipping wire services
@@ -99,7 +157,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               ) : (
                 <div>
                   <h1 className="font-semibold text-gray-700 capitalize md:text-xl lg:text-start lg:text-base xl:text-xl">
-                    Welcome <span className="text-purple-600">{shopName}</span>!
+                    Welcome{" "}
+                    <span className="text-purple-600">
+                      {shop?.businessName}
+                    </span>
+                    !
                   </h1>
                   <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
                     Please finish your account setup to start sending &
@@ -139,7 +201,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </span>
                 <span
                   className={
-                    pathname === "/dashboard/pos-integration" ? "block" : "hidden"
+                    pathname === "/dashboard/pos-integration"
+                      ? "block"
+                      : "hidden"
                   }
                 >
                   POS Integration
@@ -147,9 +211,76 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </h2>
             </div>
             {/* Today's Date + Search + Notifications + Emails */}
-            <div className="hidden lg:block">
+            <div className="flex gap-2">
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  type="button"
+                  className="p-2 rounded-full hover:text-yellow-400 transition-colors"
+                  onClick={() => setShowNotifications(!showNotifications)}
+                >
+                  <Bell size={24} />
+
+                  {notifications.length > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                      {notifications.length}
+                    </div>
+                  )}
+                </button>
+
+                {/* Notifications Dropdown */}
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50">
+                    <div className="p-4 border-b">
+                      <h3 className="text-lg font-semibold">Notifications</h3>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <p className="p-4 text-gray-500">
+                          No new notifications
+                        </p>
+                      ) : (
+                        notifications.map((notification: any) => (
+                          <div
+                            key={notification._id}
+                            className="hover:bg-gray-100 transition-colors p-2"
+                          >
+                            <button
+                              onClick={() =>
+                                handleClickNotification(notification)
+                              }
+                              className="w-full text-left"
+                            >
+                              <p>
+                                <strong>Type:</strong> {notification.type}
+                              </p>
+                              <p>
+                                <strong>From: </strong>{" "}
+                                {notification.sendingShop?.businessName ||
+                                  "Unknown"}
+                              </p>
+                              {notification.message.length > 10 ? (
+                                <p>
+                                  <strong>Message: </strong>
+                                  {notification.message.substring(0, 20)}...
+                                </p>
+                              ) : (
+                                <p>
+                                  <strong>Message: </strong>
+                                  {notification.message}
+                                </p>
+                              )}
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Today's Date */}
-              <div className="border px-4 py-1 rounded-xl shadow-lg font-semibold lg:px-2 cursor-default">
+              <div className="hidden lg:block border px-4 py-1 rounded-xl shadow-lg font-semibold lg:px-2 cursor-default">
                 {today}
               </div>
             </div>
