@@ -79,11 +79,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Click Notification
   const handleClickNotification = async (notification: any) => {
-    router.push(
-      `/dashboard/orders/messages/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
-    );
-    await loadNotifications();
-    setShowNotifications(false);
+    try {
+      if (notification.type === "NewMessage") {
+        router.push(
+          `/dashboard/orders/messages/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
+        );
+      } else if (notification.type === "OrderUpdate") {
+        // For order update notifications, navigate to the order details page
+        router.push(
+          `/dashboard/orders/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
+        );
+      } else {
+        // For other notification types, just mark as read for now
+      }
+      await loadNotifications();
+      setShowNotifications(false);
+    } catch (error) {
+      
+    }
   };
 
   useEffect(() => {

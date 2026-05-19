@@ -22,6 +22,12 @@ export default function HomePricing() {
 
         {/* Pro plan */}
         <div className="mx-auto mt-12 max-w-md rounded-3xl bg-white p-10 shadow-2xl">
+          <h3 className="text-2xl font-bold text-gray-900">Florist Pro</h3>
+          <p className="mt-4 text-5xl font-black text-purple-600">
+            Coming Soon
+          </p>
+        </div>
+        {/* <div className="mx-auto mt-12 max-w-md rounded-3xl bg-white p-10 shadow-2xl">
           <span className="inline-block rounded-full bg-purple-100 px-4 py-1 text-sm font-semibold text-purple-700">
             Most Popular
           </span>
@@ -49,7 +55,7 @@ export default function HomePricing() {
           >
             Get Started Free
           </Link>
-        </div>
+        </div> */}
       </div>
     </section>
   );
