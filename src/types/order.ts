@@ -79,6 +79,15 @@ export interface OrderPricingLean {
   fulfillingShopGetsCents: number;
 }
 
+export interface OrderReviewsLean {
+  reviewerShop: string;
+  reviewedShop: string;
+  reviewerRole: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 export type OrderLean = {
   _id: string;
 
@@ -108,6 +117,8 @@ export type OrderLean = {
   declineHistory?: OrderDeclineHistoryLean[];
 
   activityLog?: OrderActivityLean[];
+
+  reviews?: OrderReviewsLean[];
 
   paymentMarkedPaidAt?: string;
   acceptedAt?: string;

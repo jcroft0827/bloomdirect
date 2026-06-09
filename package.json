@@ -29,8 +29,7 @@
     "react-hot-toast": "^2.6.0",
     "react-spinners": "^0.17.0",
     "resend": "^6.5.2",
-    "stripe": "^20.0.0",
-    "tailwind": "^4.0.0"
+    "stripe": "^20.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

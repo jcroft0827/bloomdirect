@@ -413,15 +413,52 @@ const shopSchema = new mongoose.Schema(
 
     reviews: [
       {
-        shopName: String,
+        order: {
+          type: Schema.Types.ObjectId,
+          ref: "Order",
+          default: null,
+          index: true,
+        },
+
+        reviewerShop: {
+          type: Schema.Types.ObjectId,
+          ref: "Shop",
+          required: true,
+          index: true,
+        },
+
+        reviewerShopName: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+
+        reviewedShopRole: {
+          type: String,
+          enum: ["originating", "fulfilling", "profile"],
+          required: true,
+        },
+
+        source: {
+          type: String,
+          enum: ["order", "profile"],
+          required: true,
+          default: "profile",
+        },
 
         rating: {
           type: Number,
+          required: true,
           min: 1,
           max: 5,
         },
 
-        comment: String,
+        comment: {
+          type: String,
+          trim: true,
+          default: "",
+          maxlength: 1000,
+        },
 
         date: {
           type: Date,

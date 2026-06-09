@@ -199,7 +199,7 @@ export default function ShopClient({ shop }: { shop: any }) {
             </section>
 
             {/* Review Section */}
-            {/* <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
+            <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
               <div className="w-full flex items-start justify-between pr-5">
                 <h3 className="text-sm uppercase tracking-widest font-bold text-slate-400 mb-4">
                   Customer Reviews
@@ -274,7 +274,7 @@ export default function ShopClient({ shop }: { shop: any }) {
                   Write a Review
                 </button>
               </div>
-            </section> */}
+            </section>
           </div>
 
           {/* Right Side: Delivery & Logistics (Everything the user needs) */}

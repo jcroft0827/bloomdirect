@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import BloomSpinner from "@/components/BloomSpinner";
 import Shop from "@/models/Shop";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
+import StarRating from "@/components/ui/StarRating";
 
 interface OrderClientProps {
   order: OrderLean;
@@ -41,6 +42,10 @@ export default function OrderClient({
   const [availableShops, setAvailableShops] = useState<Shop[]>([]);
   const [reassignShop, setReassignShop] = useState("");
   const [understand, setUnderstand] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("Order was fulfilled correctly and on time.");
+  const [reviewSet, setReviewSet] = useState(false);
+  const [leavingReview, setLeavingReview] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -209,6 +214,37 @@ export default function OrderClient({
     }
   };
 
+  async function handleSubmitReview() {
+    if (!order?._id) return;
+
+    try {
+      const res = await fetch(`/api/orders/${order._id}/reviews/post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          rating,
+          comment: reviewComment,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to submit review");
+      }
+
+      setReviewSet(true);
+      setRating(0);
+      setReviewComment("");
+
+    } catch (error) {
+      toast.error("Error submitting review!")
+      console.error("Error submitting review: ", error);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-6 px-4">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -276,7 +312,7 @@ export default function OrderClient({
           {[
             { label: "Sent", done: true },
             { label: "Accepted", done: !!order.acceptedAt },
-            { label: "Paid", done: !!order.paymentMarkedPaidAt },
+            { label: "Paid", done: !!order.paidAt },
             { label: "Delivered", done: !!order.completedAt },
           ].map((step, i) => (
             <div key={i} className="flex-1 text-center">
@@ -809,6 +845,41 @@ export default function OrderClient({
               </>
             )}
 
+            {/* LEAVE REVIEW */}
+            {isOriginating && order.status === OrderStatus.COMPLETED && !reviewSet && (
+              <div>
+                <p className="font-semibold mb-4">
+                  Leave a review to let other shops know how {order.fulfillingShopName} did.
+                </p>
+                <div>
+                  <StarRating value={rating} onChange={setRating} />
+                  <textarea 
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    className="w-full mt-2 p-2 border border-slate-300 rounded-md"
+                  />
+                  <p className="text-sm text-gray-500 ml-2">
+                    Pre-filled review can be edited.
+                  </p>
+                </div>
+
+
+                <div>
+                  <button
+                    className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-bold transition-colors"
+                    onClick={handleSubmitReview}
+                  >
+                    Submit Review
+                    {leavingReview && (
+                      <span className="ml-2">
+                        <BloomSpinner />
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* FALLBACK */}
             {!(
               (isFulfilling &&
@@ -817,7 +888,8 @@ export default function OrderClient({
                 order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) ||
               (isFulfilling &&
                 order.status === OrderStatus.PAID_AWAITING_FULFILLMENT) ||
-              (isOriginating && order.status === OrderStatus.DECLINED)
+              (isOriginating && order.status === OrderStatus.DECLINED) ||
+              (isOriginating && reviewSet === false)
             ) && (
               <div className="text-center text-gray-500 text-sm pt-4">
                 No actions available for this status

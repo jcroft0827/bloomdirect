@@ -218,6 +218,45 @@ const activityLogSchema = new Schema(
   { _id: false },
 );
 
+const reviewSchema = new Schema(
+  {
+    reviewerShop: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+      required: true,
+      index: true,
+    },
+    reviewedShop: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+      required: true,
+      index: true,
+    },
+    reviewerRole: {
+      type: String,
+      enum: ["originating", "fulfilling"],
+      required: true,
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5,
+    },
+    comment: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 1000,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true },
+);
+
 const orderSchema = new Schema(
   {
     orderNumber: {
@@ -288,6 +327,10 @@ const orderSchema = new Schema(
 
     declineHistory: { type: [declineHistorySchema], default: [] },
     activityLog: { type: [activityLogSchema], default: [] },
+    reviews: {
+      type: [reviewSchema],
+      default: [],
+    },
 
     acceptedAt: { type: Date, default: null },
     declinedAt: { type: Date, default: null },
