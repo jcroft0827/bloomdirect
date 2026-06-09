@@ -13,6 +13,7 @@ import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
 import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
+import Notifications from "@/models/Notifications";
 
 export async function POST(req: Request) {
   try {
@@ -141,6 +142,37 @@ export async function POST(req: Request) {
       actorShopId: session?.user?.id,
     });
 
+    // Mark Current Notification As READ
+    await Notifications.updateMany(
+      {
+        order: order._id,
+        receivingShop: session.user.id,
+        read: false,
+        type: "OrderDeclined",
+      },
+      {
+        $set: {
+          read: true,
+          readAt: new Date(),
+        },
+      },
+    );
+
+    const notificationMessage = "You have a new order!";
+
+    // Add to notification queue
+    const newNotification = new Notifications({
+      type: "NewOrder",
+      receivingShop: newShop._id,
+      sendingShop: session.user.id,
+      order: order._id,
+      message: notificationMessage,
+      read: false,
+      readAt: null,
+    });
+
+    await newNotification.save();
+
     /**
      * EMAIL NEW SHOP
      */
@@ -150,7 +182,10 @@ export async function POST(req: Request) {
       await resend.emails.send({
         from: "GetBloomDirect <new-orders@getbloomdirect.com>",
         to: newShop.email,
-        subject: getOrderEmailSubject(updatedOrder.orderNumber, updatedOrder.status),
+        subject: getOrderEmailSubject(
+          updatedOrder.orderNumber,
+          updatedOrder.status,
+        ),
         html: `
           <p>You have received a new order on <strong>GetBloomDirect</strong>.</p>
           <p><strong>Order #:</strong> ${updatedOrder.orderNumber}</p>

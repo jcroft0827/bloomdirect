@@ -13,6 +13,7 @@ import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
 import { PAYMENT_METHODS, PaymentMethod } from "@/lib/order-payment-methods";
+import Notifications from "@/models/Notifications";
 
 export async function POST(req: Request) {
   try {
@@ -49,7 +50,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
-    const paymentValue = order.paymentMethods?.[paymentMethodUsed as PaymentMethod];
+    const paymentValue =
+      order.paymentMethods?.[paymentMethodUsed as PaymentMethod];
 
     if (typeof paymentValue !== "string" || paymentValue.trim() === "") {
       return NextResponse.json(
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    
+
     // ─────────────────────────────────────────────
     // STATUS TRANSITION GUARD
     // ─────────────────────────────────────────────
@@ -89,18 +91,19 @@ export async function POST(req: Request) {
           paidAt: now,
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedOrder) {
       return NextResponse.json(
         {
-          error: "Order could not be marked as paid. It may have already been updated.",
+          error:
+            "Order could not be marked as paid. It may have already been updated.",
         },
         { status: 409 },
       );
     }
-    
+
     // Activity Log
     await addOrderActivity({
       orderId: order._id,
@@ -108,18 +111,46 @@ export async function POST(req: Request) {
       actorShopId: session.user.id,
       message: `Payment marked as received via ${paymentMethodUsed.toUpperCase()}`,
     });
-    
+
     await sendOrderEvent({
       event: "order.paid",
       order,
       actorShopId: session?.user?.id,
     });
 
-
     const originShop = await Shop.findById(order.originatingShop);
     const fulfillShop = await Shop.findById(order.fulfillingShop);
-    
-    
+
+    // Mark Current Notification As READ
+    await Notifications.updateMany(
+      {
+        order: order._id,
+        receivingShop: session.user.id,
+        read: false,
+        type: "OrderAccepted",
+      },
+      {
+        $set: {
+          read: true,
+          readAt: new Date(),
+        },
+      },
+    );
+    const notificationMessage = "You've been paid! Time to start designing!";
+
+    // Add to notification queue
+    const newNotification = new Notifications({
+      type: "OrderPaid",
+      receivingShop: order.fulfillingShop,
+      sendingShop: order.originatingShop,
+      order: order._id,
+      message: notificationMessage,
+      read: false,
+      readAt: null,
+    });
+
+    await newNotification.save();
+
     if (originShop?.email && fulfillShop?.email) {
       const resend = getResend();
       await resend.emails.send({

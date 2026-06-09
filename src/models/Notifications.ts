@@ -3,7 +3,7 @@ import { model, models, Schema } from "mongoose";
 const NotificationsSchema = new Schema({
     type: {
         type: String,
-        enum: ["NewMessage", "OrderUpdate", "Other"], // Extendable for future notification types
+        enum: ["NewMessage", "NewOrder", "OrderAccepted", "OrderDeclined", "OrderPaid", "OrderComplete", "Rated", "Other"], // Extendable for future notification types
     },
 
     receivingShop: {

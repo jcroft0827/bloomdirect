@@ -8,8 +8,12 @@ import Order from "@/models/Order";
 import Shop from "@/models/Shop";
 import { Resend } from "resend";
 import { sendOrderEvent } from "@/lib/send-order-event";
-import { calculateOrderSettlement, centsToDollars } from "@/lib/order-settlement";
+import {
+  calculateOrderSettlement,
+  centsToDollars,
+} from "@/lib/order-settlement";
 import { OrderActivityActions } from "@/lib/order-activity";
+import Notifications from "@/models/Notifications";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -38,7 +42,10 @@ export async function POST(req: Request) {
     } = body;
 
     if (!fulfillingShopId) {
-      return NextResponse.json({ error: "Fulfilling shop is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Fulfilling shop is required" },
+        { status: 400 },
+      );
     }
 
     const [originShop, fulfillShop] = await Promise.all([
@@ -50,7 +57,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
-    const deliveryFeeCents = Math.round(Number(fulfillShop.delivery?.fallbackFee || 0) * 100);
+    const deliveryFeeCents = Math.round(
+      Number(fulfillShop.delivery?.fallbackFee || 0) * 100,
+    );
 
     const feeSnapshot = {
       feeType: originShop.financials?.feeType || "flat",
@@ -128,8 +137,12 @@ export async function POST(req: Request) {
     });
 
     await Promise.all([
-      Shop.findByIdAndUpdate(originShop._id, { $inc: { "stats.ordersSent": 1 } }),
-      Shop.findByIdAndUpdate(fulfillShop._id, { $inc: { "stats.ordersReceived": 1 } }),
+      Shop.findByIdAndUpdate(originShop._id, {
+        $inc: { "stats.ordersSent": 1 },
+      }),
+      Shop.findByIdAndUpdate(fulfillShop._id, {
+        $inc: { "stats.ordersReceived": 1 },
+      }),
     ]);
 
     await sendOrderEvent({
@@ -137,6 +150,23 @@ export async function POST(req: Request) {
       order,
       actorShopId: session.user.id,
     });
+
+    const notificationMessage = "You have a new order!";
+
+    // Add to notification queue
+    const newNotification = new Notifications({
+      type: "NewOrder",
+      receivingShop: fulfillShop._id,
+      sendingShop: originShop._id,
+      order: order._id,
+      message: notificationMessage,
+      read: false,
+      readAt: null,
+    });
+
+    console.log("Creating notification:", newNotification);
+
+    await newNotification.save();
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -324,13 +354,10 @@ export async function POST(req: Request) {
     console.error("ORDER CREATE ERROR:", error);
     return NextResponse.json(
       { error: error.message || "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-
-
-
 
 // // app/api/orders/create/route.ts
 
@@ -435,7 +462,7 @@ export async function POST(req: Request) {
 //           <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#faf8f5;">
 //             <tr>
 //               <td align="center" style="padding: 40px 10px;">
-                
+
 //                 <div style="max-width: 640px; width: 100%; background: white; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px rgba(147,51,234,0.1); text-align: left;">
 
 //                   <!-- Header Gradient -->
@@ -450,7 +477,7 @@ export async function POST(req: Request) {
 
 //                   <!-- Content Wrapper -->
 //                   <div style="padding: 40px 30px;">
-                    
+
 //                     <!-- From & Delivery -->
 //                     <div style="margin-bottom: 35px; border-bottom: 1px dashed #e5e7eb; padding-bottom: 25px;">
 //                       <p style="margin:0; color:#9333ea; font-weight:700; font-size:14px; text-transform: uppercase; letter-spacing: 1px;">From Shop</p>
@@ -460,7 +487,7 @@ export async function POST(req: Request) {
 //                       <p style="margin:4px 0 0; font-size:16px; color:#666;">
 //                         ${originShop.address.city}, ${originShop.address.state}
 //                       </p>
-                      
+
 //                       <div style="margin-top: 25px;">
 //                         <p style="margin:0; color:#9333ea; font-weight:700; font-size:14px; text-transform: uppercase; letter-spacing: 1px;">Deliver By</p>
 //                         <p style="margin:10px 0 0; font-size:26px; font-weight:800; color:#2d1b3d;">
@@ -516,7 +543,7 @@ export async function POST(req: Request) {
 //                     <!-- Order Items -->
 //                     <div style="margin-bottom: 10px;">
 //                       <h2 style="margin:0 0 20px; color:#9333ea; font-size:22px; font-weight: 800;">Order Items</h2>
-                      
+
 //                       ${order.products
 //                         .map(
 //                           (product: any) => `

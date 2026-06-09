@@ -56,6 +56,34 @@ const shopSchema = new mongoose.Schema(
       default: false,
     },
 
+    emailVerificationCodeHash: { type: String, select: false },
+    emailVerificationExpires: { type: Date, select: false },
+
+    websiteVerifications: {
+      status: {
+        type: String,
+        enum: ["not_started", "verified", "needs_review", "failed"],
+        default: "not_started",
+      },
+      checkedAt: Date,
+      failureReasons: String,
+      matchedSignals: [String],
+      riskSignals: [String],
+    },
+
+    verification: {
+      emailVerified: { type: Boolean, default: false },
+      emailVerifiedAt: { type: Date },
+
+      phoneVerified: { type: Boolean, default: false },
+      phoneVerifiedAt: { type: Date },
+
+      websiteVerified: { type: Boolean, default: false },
+      websiteVerifiedAt: { type: Date },
+
+      verifiedAt: { type: Date },
+    },
+
     isSuspended: {
       type: Boolean,
       default: false,

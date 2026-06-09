@@ -1,8 +1,12 @@
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import Notifications from "@/models/Notifications";
+import "@/models/Order";
+import "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+
+
 
 export async function GET(
     req: Request,

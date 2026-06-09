@@ -12,6 +12,7 @@ import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
 import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
+import Notifications from "@/models/Notifications";
 
 export async function POST(req: Request) {
   try {
@@ -108,6 +109,36 @@ export async function POST(req: Request) {
         order,
         actorShopId: session?.user?.id,
       });
+
+      // Mark Current Notification As READ
+      await Notifications.updateMany(
+        {
+          order: order._id,
+          receivingShop: session.user.id,
+          read: false,
+          type: {
+            $in: ["NewOrder", "OrderPaid"],
+          },
+        },
+        {
+          $set: {
+            read: true,
+            readAt: new Date(),
+          },
+        },
+      );
+      // Add New Notification for Declined
+      const notificationMessage = "Order Declined!" 
+      const newNotification = new Notifications({
+        type: "OrderDeclined",
+        receivingShop: order.originatingShop,
+        sendingShop: order.fulfillingShop,
+        order: order._id,
+        message: notificationMessage,
+        read: false,
+        readAt: null,
+      });
+      await newNotification.save();
     }
 
     // ─────────────────────────────────────────────
@@ -143,6 +174,36 @@ export async function POST(req: Request) {
       // Clear any previous decline data
       order.declineReason = undefined;
       order.declineMessage = undefined;
+
+      // Mark Current Notification As READ
+      await Notifications.updateMany(
+        {
+          order: order._id,
+          receivingShop: session.user.id,
+          read: false,
+          type: {
+            $in: ["NewOrder", "OrderPaid"],
+          },
+        },
+        {
+          $set: {
+            read: true,
+            readAt: new Date(),
+          },
+        },
+      );
+      // Add New Notification for Accepted
+      const notificationMessage = "Order Accepted!" 
+      const newNotification = new Notifications({
+        type: "OrderAccepted",
+        receivingShop: order.originatingShop,
+        sendingShop: order.fulfillingShop,
+        order: order._id,
+        message: notificationMessage,
+        read: false,
+        readAt: null,
+      });
+      await newNotification.save();
     }
 
     if (status === OrderStatus.COMPLETED) {
@@ -166,6 +227,36 @@ export async function POST(req: Request) {
         order,
         actorShopId: session?.user?.id,
       });
+
+            // Mark Current Notification As READ
+      await Notifications.updateMany(
+        {
+          order: order._id,
+          receivingShop: session.user.id,
+          read: false,
+          type: {
+            $in: ["NewOrder", "OrderPaid"],
+          },
+        },
+        {
+          $set: {
+            read: true,
+            readAt: new Date(),
+          },
+        },
+      );
+      // Add New Notification for Completed
+      const notificationMessage = "Order Completed, Rate Florist!" 
+      const newNotification = new Notifications({
+        type: "OrderComplete",
+        receivingShop: order.originatingShop,
+        sendingShop: order.fulfillingShop,
+        order: order._id,
+        message: notificationMessage,
+        read: false,
+        readAt: null,
+      });
+      await newNotification.save();
     }
 
     await order.save();

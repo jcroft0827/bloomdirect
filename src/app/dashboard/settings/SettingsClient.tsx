@@ -86,6 +86,28 @@ interface FeaturedBouquetState {
   image: string;
 }
 
+interface Reviews {
+  customerName?: string;
+  rating?: number;
+  comment?: string;
+  date?: Date;
+}
+
+interface Verification {
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  websiteVerified: boolean;
+}
+
+interface Stats {
+  ordersSent: number;
+  ordersCompleted: number;
+  ordersDeclined: number;
+  ordersReceived: number;
+  responseRate?: number;
+  avgResponseTimeMinutes?: number;
+}
+
 interface Shop {
   _id: string;
   businessName: string;
@@ -93,7 +115,10 @@ interface Shop {
   securityCode: string;
   isVerified: boolean;
   verifiedFlorist: boolean;
+  verification: Verification;
   isPublic: boolean;
+  reviews: Reviews[];
+  onboardingComplete: boolean;
   isPro: boolean;
   address: AddressState;
   contact: ContactState;
@@ -103,19 +128,20 @@ interface Shop {
   financials: FinancialsState;
   branding: BrandingState;
   featuredBouquet: FeaturedBouquetState;
+  stats: Stats;
 }
 
 // #endregion
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useRef } from "react";
 import { signOut } from "next-auth/react";
-import { set } from "mongoose";
 import BloomSpinner from "@/components/BloomSpinner";
 import { sign } from "crypto";
+import VerificationProgressBar from "@/components/verification/ProgressBar";
+import { useRouter } from "next/navigation";
 
 // export default function SettingsClient({ initialShop }: { initialShop: any }) {
 type SettingsClientProps = {
@@ -135,6 +161,8 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     gap?: string;
   };
 
+  const router = useRouter();
+
   // #region States
 
   const [zoneErrors, setZoneErrors] = useState<Record<number, ZoneError>>({});
@@ -146,7 +174,14 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     securityCode: "",
     isVerified: false,
     verifiedFlorist: false,
+    verification: {
+      emailVerified: false,
+      phoneVerified: false,
+      websiteVerified: false,
+    },
     isPublic: false,
+    reviews: [],
+    onboardingComplete: false,
     isPro: false,
     contact: {
       phone: "",
@@ -209,6 +244,14 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
       price: 0.0,
       description: "",
       image: "",
+    },
+    stats: {
+      ordersSent: 0,
+      ordersCompleted: 0,
+      ordersDeclined: 0,
+      ordersReceived: 0,
+      responseRate: 0,
+      avgResponseTimeMinutes: 0,
     },
   });
   const [loading, setLoading] = useState(true);
@@ -946,7 +989,63 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
       .replace(/^-+|-+$/g, ""); // 5. Remove extra hyphens from ends
   };
 
+  // Make Profile Public
+  async function handleMakeProfilePublic() {
+    try {
+      const res = await fetch("/api/shops/me/public", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isPublic: true }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update profile visibility");
+      }
+
+      setShop((prev) => ({ ...prev, isPublic: data?.shop?.isPublic ?? prev.isPublic }));
+      toast.success("Your profile is now public!");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      router.refresh();
+    }
+  }
+
   // #endregion
+
+  // ------------------------------
+  // VERIFICATION PROGRESS
+  // ------------------------------
+  const verificationSteps = [
+    {
+      label: "Verified Email",
+      completed: !!shop?.verification?.emailVerified,
+    },
+    {
+      label: "Onboarding Finished",
+      completed: !!shop?.onboardingComplete,
+    },
+    {
+      label: "Website Verified",
+      completed: !!shop?.verification?.websiteVerified,
+    },
+    {
+      label: "Profile Public",
+      completed: !!shop?.isPublic,
+    },
+    {
+      label: "Completed 2 Successful Orders",
+      completed: (shop?.stats?.ordersCompleted ?? 0) >= 2,
+    },
+    {
+      label: "Received 2 Reviews",
+      completed: (shop?.reviews?.length ?? 0) >= 2,
+    },
+  ];
 
   // Label + Input
   const normalLabel = "text-black opacity-75 xl:text-lg";
@@ -960,8 +1059,8 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     "px-6 py-3 text-xl rounded-xl bg-white/20 placeholder-white/60 text-white text-center sm:px-4 sm:text-lg";
 
   const isPaused =
-    !!shop.delivery.noMoreOrdersTodayUntil &&
-    new Date(shop.delivery.noMoreOrdersTodayUntil) > new Date();
+    !!shop?.delivery?.noMoreOrdersTodayUntil &&
+    new Date(shop?.delivery?.noMoreOrdersTodayUntil) > new Date();
 
   return (
     <>
@@ -974,32 +1073,11 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
           </h2>
         </div>
 
-        {/* Verified */}
-        {shop.verifiedFlorist ? (
-          <div className="text-emerald-600 flex gap-1 items-center font-semibold justify-center lg:justify-start">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="size-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z"
-              />
-            </svg>
-            <p className="">Verified Florist</p>
-          </div>
-        ) : (
-          <div>
-            <button className="px-2 py-1 bg-emerald-600 text-white rounded-lg w-full hover:bg-emerald-700">
-              Get Verified Today!
-            </button>
-          </div>
-        )}
+        {/* Verification Status */}
+        <VerificationProgressBar
+          steps={verificationSteps}
+          isVerified={shop?.isVerified ?? false}
+        />
 
         {/* Main Content */}
         <div className="grid grid-cols-1 gap-4 text-center lg:grid-cols-2">
@@ -1238,21 +1316,21 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     <label className="text-white opacity-75">
                       Venmo Handle
                     </label>
-                    {shop.paymentMethods.defaultPaymentMethod === "venmo" && (
+                    {shop?.paymentMethods?.defaultPaymentMethod === "venmo" && (
                       <p className="font-semibold text-emerald-500">
                         - Default
                       </p>
                     )}
                   </div>
-                  {shop.paymentMethods.venmoHandle ? (
+                  {shop?.paymentMethods?.venmoHandle ? (
                     <p
                       className={
-                        (shop.paymentMethods.defaultPaymentMethod === "venmo"
+                        (shop?.paymentMethods?.defaultPaymentMethod === "venmo"
                           ? "text-emerald-500"
                           : "text-white") + " text-xl font-semibold capitalize"
                       }
                     >
-                      {shop.paymentMethods.venmoHandle}
+                      {shop?.paymentMethods?.venmoHandle}
                     </p>
                   ) : (
                     <p>No Venmo Handle set up yet!</p>
@@ -1264,21 +1342,21 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     <label className="text-white opacity-75">
                       Zelle (Phone/Email)
                     </label>
-                    {shop.paymentMethods.defaultPaymentMethod === "zelle" && (
+                    {shop?.paymentMethods?.defaultPaymentMethod === "zelle" && (
                       <p className="font-semibold text-emerald-500">
                         - Default
                       </p>
                     )}
                   </div>
-                  {shop.paymentMethods.zellePhoneOrEmail ? (
+                  {shop?.paymentMethods?.zellePhoneOrEmail ? (
                     <p
                       className={
-                        (shop.paymentMethods.defaultPaymentMethod === "zelle"
+                        (shop?.paymentMethods?.defaultPaymentMethod === "zelle"
                           ? "text-emerald-500"
                           : "text-white") + " text-xl font-semibold capitalize"
                       }
                     >
-                      {shop.paymentMethods.zellePhoneOrEmail}
+                      {shop?.paymentMethods?.zellePhoneOrEmail}
                     </p>
                   ) : (
                     <p>No Zelle Phone/Email set up yet!</p>
@@ -1290,21 +1368,21 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     <label className="text-white opacity-75">
                       Cash App Tag
                     </label>
-                    {shop.paymentMethods.defaultPaymentMethod === "cashapp" && (
+                    {shop?.paymentMethods?.defaultPaymentMethod === "cashapp" && (
                       <p className="font-semibold text-emerald-500">
                         - Default
                       </p>
                     )}
                   </div>
-                  {shop.paymentMethods.cashAppTag ? (
+                  {shop?.paymentMethods?.cashAppTag ? (
                     <p
                       className={
-                        (shop.paymentMethods.defaultPaymentMethod === "cashapp"
+                        (shop?.paymentMethods?.defaultPaymentMethod === "cashapp"
                           ? "text-emerald-500"
                           : "text-white") + " text-xl font-semibold capitalize"
                       }
                     >
-                      {shop.paymentMethods.cashAppTag}
+                      {shop?.paymentMethods?.cashAppTag}
                     </p>
                   ) : (
                     <p>No Cash App Tag set up yet!</p>
@@ -1316,21 +1394,21 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     <label className="text-white opacity-75">
                       PayPal Email
                     </label>
-                    {shop.paymentMethods.defaultPaymentMethod === "paypal" && (
+                    {shop?.paymentMethods?.defaultPaymentMethod === "paypal" && (
                       <p className="font-semibold text-emerald-500">
                         - Default
                       </p>
                     )}
                   </div>
-                  {shop.paymentMethods.paypalEmail ? (
+                  {shop?.paymentMethods?.paypalEmail ? (
                     <p
                       className={
-                        (shop.paymentMethods.defaultPaymentMethod === "paypal"
+                        (shop?.paymentMethods?.defaultPaymentMethod === "paypal"
                           ? "text-emerald-500"
                           : "text-white") + " text-xl font-semibold capitalize"
                       }
                     >
-                      {shop.paymentMethods.paypalEmail}
+                      {shop?.paymentMethods?.paypalEmail}
                     </p>
                   ) : (
                     <p>No PayPal Email set up yet!</p>
@@ -1376,7 +1454,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <label className={normalLabel}>Shop Name</label>
                   <input
                     type="text"
-                    value={shop.businessName}
+                    value={shop?.businessName}
                     onChange={(e) => {
                       const newName = e.target.value;
                       const newSlug = updateSlug(newName);
@@ -1397,7 +1475,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     type="phone"
                     placeholder="888-888-8888"
                     maxLength={12}
-                    value={shop.contact.phone}
+                    value={shop?.contact?.phone}
                     onChange={(e) =>
                       updateContact("phone", formatDynamicPhone(e.target.value))
                     }
@@ -1410,7 +1488,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <input
                     type="text"
                     placeholder="123 Flower Lane"
-                    value={shop.address.street}
+                    value={shop?.address?.street}
                     onChange={(e) => updateAddress("street", e.target.value)}
                     className={normalInput}
                   />
@@ -1421,7 +1499,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <input
                     type="text"
                     placeholder="Flower City"
-                    value={shop.address.city}
+                    value={shop?.address?.city}
                     onChange={(e) => updateAddress("city", e.target.value)}
                     className={normalInput}
                   />
@@ -1432,7 +1510,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <input
                     type="text"
                     placeholder="NY"
-                    value={shop.address.state}
+                    value={shop?.address?.state}
                     onChange={(e) => {
                       updateAddress("state", e.target.value);
                     }}
@@ -1445,7 +1523,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <input
                     type="text"
                     placeholder="14036"
-                    value={shop.address.zip}
+                    value={shop?.address?.zip}
                     maxLength={5}
                     onChange={(e) => {
                       updateAddress("zip", e.target.value);
@@ -1458,7 +1536,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <label className={normalLabel}>Shop Country</label>
                   <select
                     name="country"
-                    value={shop.address.country}
+                    value={shop?.address?.country}
                     onChange={(e) => updateAddress("country", e.target.value)}
                     className={normalInput}
                   >
@@ -1492,39 +1570,39 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 {/* Shop Name */}
                 <div className="lg:col-span-2">
                   <label className={normalLabel}>Name</label>
-                  <p className={previewP}>{shop.businessName}</p>
+                  <p className={previewP}>{shop?.businessName}</p>
                 </div>
                 {/* Shop Phone */}
                 <div className="lg:col-span-2">
                   <label className={normalLabel}>Phone</label>
-                  <p className={previewP}>{shop.contact.phone}</p>
+                  <p className={previewP}>{shop?.contact?.phone}</p>
                 </div>
                 {/* Shop Address */}
                 <div className="lg:col-span-2">
                   <label className={normalLabel}>Address</label>
-                  <p className={previewP}>{shop.address.street}</p>
+                  <p className={previewP}>{shop?.address?.street}</p>
                 </div>
                 <div className="flex gap-4 justify-center lg:col-span-2">
                   {/* Shop City */}
                   <div>
                     <label className={normalLabel}>City</label>
-                    <p className={previewP}>{shop.address.city}</p>
+                    <p className={previewP}>{shop?.address?.city}</p>
                   </div>
                   {/* Shop State */}
                   <div>
                     <label className={normalLabel}>State</label>
-                    <p className={previewP}>{shop.address.state}</p>
+                    <p className={previewP}>{shop?.address?.state}</p>
                   </div>
                   {/* Shop Zip */}
                   <div>
                     <label className={normalLabel}>Zip</label>
-                    <p className={previewP}>{shop.address.zip}</p>
+                    <p className={previewP}>{shop?.address?.zip}</p>
                   </div>
                 </div>
                 {/* Country */}
                 <div className="sm:col-span-2">
                   <label className={normalLabel}>Country</label>
-                  <p className={previewP}>{shop.address.country}</p>
+                  <p className={previewP}>{shop?.address?.country}</p>
                 </div>
               </div>
             )}
@@ -1582,7 +1660,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         name="method"
                         value="zip"
                         tabIndex={-1}
-                        checked={shop.delivery.method === "zip"}
+                        checked={shop?.delivery?.method === "zip"}
                         onChange={(e) => updateDelivery("method", "zip")}
                       />{" "}
                       Zip
@@ -1594,7 +1672,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         name="method"
                         value="distance"
                         tabIndex={-1}
-                        checked={shop.delivery.method === "distance"}
+                        checked={shop?.delivery?.method === "distance"}
                         onChange={(e) => updateDelivery("method", "distance")}
                       />{" "}
                       Distance
@@ -1606,7 +1684,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 <div className="border p-4 rounded-lg bg-gray-50">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-medium capitalize">
-                      {shop.delivery.method} Zones
+                      {shop?.delivery?.method} Zones
                     </h3>
                     <button
                       type="button"
@@ -1614,15 +1692,15 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       className="text-xs bg-emerald-600 text-white px-2 py-1 rounded"
                     >
                       + Add{" "}
-                      {shop.delivery.method === "zip" ? "Zip" : "Distance"}{" "}
+                      {shop?.delivery?.method === "zip" ? "Zip" : "Distance"}{" "}
                       Option
                     </button>
                   </div>
 
-                  {shop.delivery.method === "zip" ? (
+                  {shop?.delivery?.method === "zip" ? (
                     // Zip
                     <div className="space-y-2">
-                      {shop.delivery.zipZones.map((zone, index) => (
+                      {shop?.delivery?.zipZones.map((zone, index) => (
                         <div
                           key={index}
                           className="space-y-1 border-b pb-4 mb-4"
@@ -1703,7 +1781,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   ) : (
                     // Distance
                     <div className="space-y-2">
-                      {shop.delivery.distanceZones.map((zone, index) => (
+                      {shop?.delivery?.distanceZones.map((zone, index) => (
                         <React.Fragment key={index}>
                           <div
                             className={`p-3 rounded-lg border ${zoneErrors[index]?.gap ? "bg-amber-50 border-amber-200" : "bg-white"}`}
@@ -1789,7 +1867,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       type="number"
                       step="0.01"
                       placeholder="$0.00"
-                      value={shop.delivery.fallbackFee}
+                      value={shop?.delivery?.fallbackFee}
                       onChange={(e) =>
                         updateDelivery("fallbackFee", e.target.value)
                       }
@@ -1804,7 +1882,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       name="maxRadius"
                       type="number"
                       placeholder="0"
-                      value={shop.delivery.maxRadius}
+                      value={shop?.delivery?.maxRadius}
                       onChange={(e) =>
                         updateDelivery("maxRadius", e.target.value)
                       }
@@ -1821,7 +1899,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         type="checkbox"
                         id="delivery"
                         name="allowSameDay"
-                        checked={shop.delivery.allowSameDay}
+                        checked={shop?.delivery?.allowSameDay}
                         onChange={handleCBChange}
                         className="hidden" // Hide the default box
                       />
@@ -1832,23 +1910,23 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         className={`
                         px-6 py-2 rounded-lg font-bold transition-all duration-200 uppercase tracking-wider text-center
                         ${
-                          shop.delivery.allowSameDay
+                          shop?.delivery?.allowSameDay
                             ? "bg-green-500 text-white shadow-[0_4px_0_0_#15803d] active:shadow-none active:translate-y-1"
                             : "bg-red-500 text-white shadow-inner translate-y-1 opacity-80 ring-2 ring-red-700/20"
                         }
                       `}
                       >
-                        {shop.delivery.allowSameDay ? "Allow" : "Don't Allow"}
+                        {shop?.delivery?.allowSameDay ? "Allow" : "Don't Allow"}
                       </div>
                     </label>
                   </div>
-                  {shop.delivery.allowSameDay && (
+                  {shop?.delivery?.allowSameDay && (
                     <div>
                       <label className={normalLabel}>Same Day Cutoff</label>
                       <input
                         type="time"
                         name="sameDayCutoff"
-                        value={shop.delivery.sameDayCutoff}
+                        value={shop?.delivery?.sameDayCutoff}
                         onChange={(e) =>
                           updateDelivery("sameDayCutoff", e.target.value)
                         }
@@ -1880,11 +1958,11 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 {/* Delivery Method */}
                 <div>
                   <label className={normalLabel}>Delivery Method</label>
-                  <p className={previewP}>{shop.delivery.method} Zones</p>
+                  <p className={previewP}>{shop?.delivery?.method} Zones</p>
                 </div>
-                {shop.delivery.method === "distance" ? (
+                {shop?.delivery?.method === "distance" ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                    {shop.delivery.distanceZones.map((zone, index) => (
+                    {shop?.delivery?.distanceZones.map((zone, index) => (
                       <React.Fragment key={index}>
                         <div className="p-3 rounded-lg border bg-white">
                           <div className="grid grid-cols-3 gap-10">
@@ -1908,7 +1986,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 ) : (
                   // Zip Zones
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-y-10 lg:grid-cols-1 lg:gap-y-4">
-                    {shop.delivery.zipZones.map((zone, index) => (
+                    {shop?.delivery?.zipZones.map((zone, index) => (
                       <div
                         key={index}
                         className="border-b pb-4 sm:border-0 sm:pb-0"
@@ -1938,23 +2016,23 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 <div className="flex justify-evenly items-center w-full">
                   <div>
                     <label className={normalLabel}>Fallback Fee</label>
-                    <p className={previewP}>${shop.delivery.fallbackFee}</p>
+                    <p className={previewP}>${shop?.delivery?.fallbackFee}</p>
                   </div>
                   <div>
                     <label className={normalLabel}>Max Radius</label>
-                    <p className={previewP}>{shop.delivery.maxRadius} mi.</p>
+                    <p className={previewP}>{shop?.delivery?.maxRadius} mi.</p>
                   </div>
                 </div>
 
                 {/* Allow Same Day Delivery + Same Day Cutoff */}
-                {shop.delivery.allowSameDay ? (
+                {shop?.delivery?.allowSameDay ? (
                   <div>
                     <p className={previewP + " text-emerald-500"}>
                       Allow Same Day Delivery
                     </p>
                     <p className={previewP}>
                       {new Date(
-                        `1970-01-01T${shop.delivery.sameDayCutoff}:00`,
+                        `1970-01-01T${shop?.delivery?.sameDayCutoff}:00`,
                       ).toLocaleTimeString([], {
                         hour: "numeric",
                         minute: "2-digit",
@@ -2013,7 +2091,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     type="number"
                     step={0.001}
                     placeholder="8.250%"
-                    value={shop.financials.taxPercentage}
+                    value={shop?.financials?.taxPercentage}
                     onChange={(e) =>
                       updateFinancials(
                         "taxPercentage",
@@ -2032,7 +2110,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       type="number"
                       step={0.01}
                       placeholder="0.00"
-                      value={shop.financials.feeValue}
+                      value={shop?.financials?.feeValue}
                       onChange={(e) =>
                         updateFinancials(
                           "feeValue",
@@ -2049,7 +2127,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         title="Flat Fee ($)"
                         onClick={() => updateFinancials("feeType", "flat")}
                         className={`px-3 py-1 text-xs font-bold rounded transition-all ${
-                          shop.financials.feeType === "flat"
+                          shop?.financials?.feeType === "flat"
                             ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5"
                             : "text-gray-500 hover:text-gray-700"
                         }`}
@@ -2061,7 +2139,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         title="Percentage Fee (%)"
                         onClick={() => updateFinancials("feeType", "%")}
                         className={`px-3 py-1 text-xs font-bold rounded transition-all ${
-                          shop.financials.feeType === "%"
+                          shop?.financials?.feeType === "%"
                             ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5"
                             : "text-gray-500 hover:text-gray-700"
                         }`}
@@ -2079,7 +2157,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       <input
                         type="checkbox"
                         name="deliveryTaxed"
-                        checked={shop.financials.deliveryTaxed}
+                        checked={shop?.financials?.deliveryTaxed}
                         onChange={handleCBChange}
                         className="hidden" // Hide the default box
                       />
@@ -2090,13 +2168,13 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         className={`
                         px-6 py-2 rounded-lg font-bold transition-all duration-200 uppercase tracking-wider text-center
                         ${
-                          shop.financials.deliveryTaxed
+                          shop?.financials?.deliveryTaxed
                             ? "bg-green-500 text-white shadow-[0_4px_0_0_#15803d] active:shadow-none active:translate-y-1"
                             : "bg-red-500 text-white shadow-inner translate-y-1 opacity-80 ring-2 ring-red-700/20"
                         }
                       `}
                       >
-                        {shop.financials.deliveryTaxed
+                        {shop?.financials?.deliveryTaxed
                           ? "Tax Enabled"
                           : "Tax Disabled"}
                       </div>
@@ -2108,7 +2186,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       <input
                         type="checkbox"
                         name="feeTaxed"
-                        checked={shop.financials.feeTaxed}
+                        checked={shop?.financials?.feeTaxed}
                         onChange={handleCBChange}
                         className="hidden" // Hide the default box
                       />
@@ -2117,13 +2195,13 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         className={`
                         px-6 py-2 rounded-lg font-bold transition-all duration-200 uppercase tracking-wider text-center
                         ${
-                          shop.financials.feeTaxed
+                          shop?.financials?.feeTaxed
                             ? "bg-green-500 text-white shadow-[0_4px_0_0_#15803d] active:shadow-none active:translate-y-1"
                             : "bg-red-500 text-white shadow-inner translate-y-1 opacity-80 ring-2 ring-red-700/20"
                         }
                       `}
                       >
-                        {shop.financials.feeTaxed
+                        {shop?.financials?.feeTaxed
                           ? "Tax Enabled"
                           : "Tax Disabled"}
                       </div>
@@ -2152,22 +2230,22 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 {/* Tax Percentage */}
                 <div>
                   <label className={normalLabel}>Tax Percentage</label>
-                  <p className={previewP}>{shop.financials.taxPercentage}</p>
+                  <p className={previewP}>{shop?.financials?.taxPercentage}</p>
                 </div>
                 {/* Service Fee */}
                 <div>
                   <label className={normalLabel}>Service Fee</label>
-                  {shop.financials.feeType === "flat" ? (
-                    <p className={previewP}>${shop.financials.feeValue}</p>
+                  {shop?.financials?.feeType === "flat" ? (
+                    <p className={previewP}>${shop?.financials?.feeValue}</p>
                   ) : (
-                    <p className={previewP}>{shop.financials.feeValue}%</p>
+                    <p className={previewP}>{shop?.financials?.feeValue}%</p>
                   )}
                 </div>
                 {/* Taxed Services */}
                 <div className="grid grid-cols-2 gap-10 sm:col-span-2 lg:col-span-1">
                   {/* Delivery Taxed */}
                   <div>
-                    {shop.financials.deliveryTaxed ? (
+                    {shop?.financials?.deliveryTaxed ? (
                       <label className="text-emerald-600 text-xl">
                         Delivery
                         <br /> Taxed
@@ -2181,7 +2259,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   </div>
                   {/* Fee Taxed */}
                   <div>
-                    {shop.financials.feeTaxed ? (
+                    {shop?.financials?.feeTaxed ? (
                       <label className="text-emerald-600 text-xl">
                         Fee
                         <br /> Taxed
@@ -2203,6 +2281,18 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
             {/* Header */}
             <div>
               <h2 className={normalH2}>Public Profile</h2>
+
+              {!shop?.isPublic ? (
+                <button
+                  className="text-red-500 hover:text-red-700 transition-all font-bold"
+                  onClick={() => handleMakeProfilePublic()}
+                >
+                  Make Profile Public
+                </button>
+              ) : (
+                <p className="text-green-500 font-bold">Publicly Visible</p>
+              )}
+
               <button
                 onClick={() => handleEditClick("branding")}
                 className={
@@ -2226,18 +2316,20 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 </svg>
               </button>
             </div>
+
             {activeSection === "branding" ? (
               <div className="grid grid-cols-1 gap-4 text-center md:grid-cols-2 lg:grid-cols-1">
                 {/* Shop Logo / Photo */}
                 <div>
                   <label className={normalLabel}>Shop Logo / Photo</label>
+
                   <div
                     onClick={() => logoInputRef.current?.click()}
                     className="border-4 border-dashed border-purple-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-purple-500 transition"
                   >
-                    {shop.branding.logo ? (
+                    {shop?.branding?.logo ? (
                       <img
-                        src={shop.branding.logo}
+                        src={shop?.branding?.logo}
                         alt="Logo"
                         className="max-h-full rounded-2xl"
                       />
@@ -2267,6 +2359,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       </>
                     )}
                   </div>
+
                   <input
                     ref={logoInputRef}
                     type="file"
@@ -2280,19 +2373,22 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     }}
                   />
                 </div>
+
                 {/* Shop Bio */}
                 <div>
                   <label className={normalLabel}>
                     Shop Bio (2-3 sentences)
                   </label>
+
                   <textarea
                     name="bio"
                     placeholder="Add your bio here..."
-                    value={shop.branding.bio}
+                    value={shop?.branding?.bio}
                     onChange={(e) => updateBranding("bio", e.target.value)}
                     className="w-full border-4 rounded-md px-2 py-1 h-24 md:h-40"
                   ></textarea>
                 </div>
+
                 {/* Social Links */}
                 <div className="flex flex-col gap-4 items-start sm:gap-2 pb-4 md:pb-0 lg:pb-4 xl:pb-0">
                   {/* Facebook */}
@@ -2318,7 +2414,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             type="text"
                             name="facebook"
                             placeholder="https://www.facebook.com/flower-shop"
-                            value={shop.branding.socialLinks.facebook}
+                            value={shop?.branding?.socialLinks?.facebook}
                             onChange={(e) =>
                               updateSocials("facebook", e.target.value)
                             }
@@ -2393,9 +2489,8 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.facebook
-                              ? shop.branding.socialLinks.facebook
-                              : "Add Your Facebook Profile!"}
+                            {shop?.branding?.socialLinks?.facebook ||
+                              "Add Your Facebook Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2404,7 +2499,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowFB(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.facebook
+                            {shop?.branding?.socialLinks?.facebook
                               ? "Edit"
                               : "Add"}
                           </button>
@@ -2412,6 +2507,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       </div>
                     )}
                   </div>
+
                   {/* Instagram */}
                   <div className="w-full">
                     {showInsta ? (
@@ -2458,7 +2554,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             type="text"
                             name="instagram"
                             placeholder="https://www.instagram.com/flower-shop"
-                            value={shop.branding.socialLinks.instagram}
+                            value={shop?.branding?.socialLinks?.instagram}
                             onChange={(e) =>
                               updateSocials("instagram", e.target.value)
                             }
@@ -2556,9 +2652,8 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.instagram
-                              ? shop.branding.socialLinks.instagram
-                              : "Add Your Instagram Profile!"}
+                            {shop?.branding?.socialLinks?.instagram ||
+                              "Add Your Instagram Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2567,7 +2662,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowInsta(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.instagram
+                            {shop?.branding?.socialLinks?.instagram
                               ? "Edit"
                               : "Add"}
                           </button>
@@ -2575,6 +2670,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       </div>
                     )}
                   </div>
+
                   {/* Pinterest */}
                   <div className="w-full">
                     {showPin ? (
@@ -2598,7 +2694,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             type="text"
                             name="pinterest"
                             placeholder="https://www.pinterest.com/flower-shop"
-                            value={shop.branding.socialLinks.pinterest}
+                            value={shop?.branding?.socialLinks?.pinterest}
                             onChange={(e) =>
                               updateSocials("pinterest", e.target.value)
                             }
@@ -2673,9 +2769,8 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.pinterest
-                              ? shop.branding.socialLinks.pinterest
-                              : "Add Your Pinterest Profile!"}
+                            {shop?.branding?.socialLinks?.pinterest ||
+                              "Add Your Pinterest Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2684,7 +2779,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowPin(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.pinterest
+                            {shop?.branding?.socialLinks?.pinterest
                               ? "Edit"
                               : "Add"}
                           </button>
@@ -2692,6 +2787,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       </div>
                     )}
                   </div>
+
                   {/* TikTok */}
                   <div className="w-full">
                     {showTik ? (
@@ -2712,7 +2808,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             type="text"
                             name="tiktok"
                             placeholder="https://www.tiktok.com/flower-shop"
-                            value={shop.branding.socialLinks.tiktok}
+                            value={shop?.branding?.socialLinks?.tiktok}
                             onChange={(e) =>
                               updateSocials("tiktok", e.target.value)
                             }
@@ -2784,9 +2880,8 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             </svg>
                           </div>
                           <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop.branding.socialLinks.tiktok
-                              ? shop.branding.socialLinks.tiktok
-                              : "Add Your TikTok Profile!"}
+                            {shop?.branding?.socialLinks?.tiktok ||
+                              "Add Your TikTok Profile!"}
                           </p>
                         </div>
                         <div className="w-full sm:w-auto md:w-full xl:w-auto">
@@ -2795,13 +2890,16 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                             onClick={() => setShowTik(true)}
                             className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
                           >
-                            {shop.branding.socialLinks.tiktok ? "Edit" : "Add"}
+                            {shop?.branding?.socialLinks?.tiktok
+                              ? "Edit"
+                              : "Add"}
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
+
                 {/* Buttons */}
                 <div className="flex flex-col gap-4 md:self-end lg:flex-row lg:justify-center">
                   <button
@@ -2822,7 +2920,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
             ) : (
               <div className="grid grid-cols-1 gap-6 text-center">
                 {/* SHop Logo / photo */}
-                {shop.branding?.logo ? (
+                {shop?.branding?.logo ? (
                   <div className="mx-auto">
                     <label className={normalLabel}>Shop Logo / Photo</label>
                     <div className="w-72 h-72 border-4 border-purple-400 rounded-xl p-2 flex justify-center bg-white">
@@ -2837,20 +2935,20 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <p>No Logo or Shop photo added yet!</p>
                 )}
                 {/* Shop Bio */}
-                {shop.branding?.bio ? (
+                {shop?.branding?.bio ? (
                   <div className="pb-4 border-b border-opacity-75">
                     <label className={normalLabel}>Shop Bio</label>
                     <p className="font-semibold sm:text-lg sm:max-w-lg">
-                      {shop.branding.bio}
+                      {shop?.branding?.bio}
                     </p>
                   </div>
                 ) : (
                   <p>No Bio set yet!</p>
                 )}
                 {/* Socials */}
-                {shop.branding?.socialLinks ? (
+                {shop?.branding?.socialLinks ? (
                   <div className="grid grid-cols-1 gap-4">
-                    {shop.branding.socialLinks.facebook ? (
+                    {shop?.branding?.socialLinks?.facebook ? (
                       <div className="flex items-center justify-center gap-4 pb-4 border-b-2 border-opacity-75">
                         <div>
                           <svg
@@ -2867,11 +2965,11 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                           </svg>
                         </div>
                         <a
-                          href={shop.branding.socialLinks.facebook}
+                          href={shop?.branding?.socialLinks?.facebook}
                           target="_blank"
                           className="font-medium"
                         >
-                          {shop.branding.socialLinks.facebook}
+                          {shop?.branding?.socialLinks?.facebook}
                         </a>
                       </div>
                     ) : (
@@ -2879,7 +2977,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         No Facebook link set up yet!
                       </p>
                     )}
-                    {shop.branding.socialLinks.instagram ? (
+                    {shop?.branding?.socialLinks?.instagram ? (
                       <div className="flex items-center justify-center gap-4 pb-4 border-b-2 border-opacity-75">
                         <div>
                           <svg
@@ -2919,11 +3017,11 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                           </svg>
                         </div>
                         <a
-                          href={shop.branding.socialLinks.instagram}
+                          href={shop?.branding?.socialLinks?.instagram}
                           target="_blank"
                           className="font-medium"
                         >
-                          {shop.branding.socialLinks.instagram}
+                          {shop?.branding?.socialLinks?.instagram}
                         </a>
                       </div>
                     ) : (
@@ -2931,7 +3029,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         No Instagram link set up yet!
                       </p>
                     )}
-                    {shop.branding.socialLinks.pinterest ? (
+                    {shop?.branding?.socialLinks?.pinterest ? (
                       <div className="flex items-center justify-center gap-4 pb-4 border-b-2 border-opacity-75">
                         <div>
                           <svg
@@ -2948,11 +3046,11 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                           </svg>
                         </div>
                         <a
-                          href={shop.branding.socialLinks.pinterest}
+                          href={shop?.branding?.socialLinks?.pinterest}
                           target="_blank"
                           className="font-medium"
                         >
-                          {shop.branding.socialLinks.pinterest}
+                          {shop?.branding?.socialLinks?.pinterest}
                         </a>
                       </div>
                     ) : (
@@ -2960,7 +3058,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                         No Pinterest link set up yet!
                       </p>
                     )}
-                    {shop.branding.socialLinks.tiktok ? (
+                    {shop?.branding?.socialLinks?.tiktok ? (
                       <div className="flex items-center justify-center gap-4">
                         <div>
                           <svg
@@ -2973,11 +3071,11 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                           </svg>
                         </div>
                         <a
-                          href={shop.branding.socialLinks.tiktok}
+                          href={shop?.branding?.socialLinks?.tiktok}
                           target="_blank"
                           className="font-medium"
                         >
-                          {shop.branding.socialLinks.tiktok}
+                          {shop?.branding?.socialLinks?.tiktok}
                         </a>
                       </div>
                     ) : (
@@ -3028,7 +3126,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <label className={normalLabel}>Bouquet Name</label>
                   <input
                     type="text"
-                    value={shop.featuredBouquet.name}
+                    value={shop?.featuredBouquet?.name}
                     onChange={(e) => updateBouquet("name", e.target.value)}
                     className={normalInput}
                   />
@@ -3040,7 +3138,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     type="number"
                     step="0.01"
                     placeholder="$0.00"
-                    value={shop.featuredBouquet.price}
+                    value={shop?.featuredBouquet?.price}
                     onChange={(e) => updateBouquet("price", e.target.value)}
                     onBlur={handlePriceBlur}
                     className={normalInput}
@@ -3051,7 +3149,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <label className={normalLabel}>Bouquet Description</label>
                   <textarea
                     placeholder="12 Roses vased..."
-                    value={shop.featuredBouquet.description}
+                    value={shop?.featuredBouquet?.description}
                     onChange={(e) =>
                       updateBouquet("description", e.target.value)
                     }
@@ -3065,9 +3163,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     onClick={() => bouquetInputRef.current?.click()}
                     className="border-4 border-dashed border-purple-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-purple-500 transition p-2"
                   >
-                    {shop.featuredBouquet.image ? (
+                    {shop?.featuredBouquet?.image ? (
                       <img
-                        src={shop.featuredBouquet.image}
+                        src={shop?.featuredBouquet?.image}
                         alt="Bouquet Image"
                         className="max-h-full rounded-2xl"
                       />
@@ -3130,25 +3228,25 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 {/* Bouquet Name */}
                 <div>
                   <label className={normalLabel}>Bouquet Name</label>
-                  <p className={previewP}>{shop.featuredBouquet.name}</p>
+                  <p className={previewP}>{shop?.featuredBouquet?.name}</p>
                 </div>
                 {/* Bouquet Price */}
                 <div>
                   <label className={normalLabel}>Bouquet Price</label>
-                  <p className={previewP}>${shop.featuredBouquet.price}</p>
+                  <p className={previewP}>${shop?.featuredBouquet?.price}</p>
                 </div>
                 {/* Bouquet Description */}
                 <div className="sm:col-span-2 lg:col-span-1">
                   <label className={normalLabel}>Bouquet Description</label>
                   <p className="font-semibold">
-                    {shop.featuredBouquet.description}
+                    {shop?.featuredBouquet?.description}
                   </p>
                 </div>
-                {shop.featuredBouquet.image ? (
+                {shop?.featuredBouquet?.image ? (
                   <div className="rounded-xl w-40 h-40 p-1 sm:col-span-2 mx-auto flex justify-center border-4 border-purple-400 bg-white lg:col-span-1">
                     <img
-                      src={shop.featuredBouquet.image}
-                      alt={`${shop.businessName}'s Featured Bouquet`}
+                      src={shop?.featuredBouquet?.image}
+                      alt={`${shop?.businessName}'s Featured Bouquet`}
                       className="max-w-full max-h-full"
                     />
                   </div>
@@ -3259,7 +3357,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   <input
                     type="text"
                     name="securityCode"
-                    value={shop.securityCode ?? ""}
+                    value={shop?.securityCode ?? ""}
                     maxLength={4}
                     onChange={(e) => {
                       setShop({ ...shop, securityCode: e.target.value });
@@ -3321,7 +3419,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     </svg>
                   </button>
                 </div>
-                <p className={previewP}>{shop.securityCode}</p>
+                <p className={previewP}>{shop?.securityCode}</p>
                 {securityCodeInfo && (
                   <p className="max-w-sm text-sm text-red-500">
                     This security code will be used to reset your password on

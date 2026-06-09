@@ -84,10 +84,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         router.push(
           `/dashboard/orders/messages/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
         );
-      } else if (notification.type === "OrderUpdate") {
+      } else if (notification.type === "NewOrder" || notification.type === "OrderAccepted" || notification.type === "OrderDeclined" || notification.type === "OrderPaid" || notification.type === "OrderComplete" || notification.type === "Rated") {
+        // Mark notification as read
+        
         // For order update notifications, navigate to the order details page
         router.push(
-          `/dashboard/orders/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
+          `/orders/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
         );
       } else {
         // For other notification types, just mark as read for now

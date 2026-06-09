@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import BloomSpinner from "@/components/BloomSpinner";
 import { useRouter } from "next/navigation";
 import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
+import VerificationProgressBar from "@/components/verification/ProgressBar";
 
 // #region Shop
 
@@ -108,6 +109,12 @@ interface FeaturedBouquet {
   image?: string;
 }
 
+interface Verification {
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  websiteVerified: boolean;
+}
+
 interface Shop {
   id: string;
   businessName: string;
@@ -115,9 +122,11 @@ interface Shop {
   role: string;
   isVerified: boolean;
   verifiedFlorist: boolean;
+  verification: Verification;
   isSuspended: boolean;
   suspensionReason?: string;
   isPublic: boolean;
+  reviews: Reviews[];
   onboardingComplete: boolean;
   networkJoinDate: Date;
   isPro: boolean;
@@ -221,6 +230,7 @@ export default function DashboardClient() {
     setPersonalMessageVisible(false);
     setInviteFriendsVisible(false);
   };
+
   // ------------------------------
   // SEND INVITE HANDLER
   // ------------------------------
@@ -249,6 +259,7 @@ export default function DashboardClient() {
       );
     }
   };
+
   // ------------------------------
   // SHOW/HIDE PERSONAL MESSAGE
   // ------------------------------
@@ -260,6 +271,36 @@ export default function DashboardClient() {
       setPersonalMessageVisible(true);
     }
   };
+
+  // ------------------------------
+  // VERIFICATION PROGRESS
+  // ------------------------------
+  const verificationSteps = [
+    {
+      label: "Verified Email",
+      completed: !!shop?.verification?.emailVerified,
+    },
+    {
+      label: "Onboarding Finished",
+      completed: !!shop?.onboardingComplete,
+    },
+    {
+      label: "Website Verified",
+      completed: !!shop?.verification?.websiteVerified,
+    },
+    {
+      label: "Profile Public",
+      completed: !!shop?.isPublic,
+    },
+    {
+      label: "Completed 2 Successful Orders",
+      completed: (shop?.stats?.ordersCompleted ?? 0) >= 2,
+    },
+    {
+      label: "Received 2 Reviews",
+      completed: (shop?.reviews?.length ?? 0) >= 2,
+    },
+  ];
 
   if (isLoading) {
     return (
@@ -273,6 +314,13 @@ export default function DashboardClient() {
   return (
     <div className="w-full rounded-2xl shadow-xl bg-gradient-to-br from-blue-50 via-white to-teal-50">
       <div className="mx-auto p-6">
+        {/* Verification Status */}
+        <VerificationProgressBar
+          steps={verificationSteps}
+          isVerified={shop?.isVerified ?? false}
+        />
+
+
         {/* Invite A Shop */}
         <div className="mb-12 bg-gradient-to-br from-emerald-400 to-emerald-700 rounded-3xl p-10 text-center text-white shadow-2xl flex flex-col gap-2">
           <h2 className="text-2xl font-black tracking-wide md:text-3xl">
@@ -321,8 +369,8 @@ export default function DashboardClient() {
                 Pro Coming Soon!
               </h2>
               <p className="text-xl mb-8 opacity-90 md:text-2xl">
-                Pro shops see live profit, gain access to POS Integration, get featured first,
-                and much more!
+                Pro shops see live profit, gain access to POS Integration, get
+                featured first, and much more!
               </p>
               <form action="/api/checkout" method="POST">
                 <input
@@ -372,10 +420,7 @@ export default function DashboardClient() {
               X
             </button>
             <div className="py-12 px-4">
-              <form
-                className="space-y-4"
-                onSubmit={handleSendInvite}
-              >
+              <form className="space-y-4" onSubmit={handleSendInvite}>
                 {/* From Shop */}
                 <p className="text-gray-600 text-lg font-bold">
                   From:{" "}

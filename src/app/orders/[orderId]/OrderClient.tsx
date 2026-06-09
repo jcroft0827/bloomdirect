@@ -53,25 +53,32 @@ export default function OrderClient({
     orderId: string,
     method: "venmo" | "cashapp" | "zelle" | "paypal",
   ) => {
+    if (actionOrderId === orderId) return;
+    
     try {
-      setHandlingStatus(true);
+      setActionOrderId(orderId);
+
       const res = await fetch("/api/orders/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, paymentMethod: method }),
+        body: JSON.stringify({ orderId, paymentMethodUsed: method }),
       });
+
+      const data = await res.json();
+
       if (res.ok) {
         toast.success(`Order marked as paid via ${method.toUpperCase()}!`);
         router.refresh();
+      } else {
+        toast.error(data.error || "Failed to mark order as paid");
       }
     } catch (err) {
-      setHandlingStatus(false);
       console.error("Failed to mark order as paid", err);
       toast.error(
         "Failed to mark order as paid. Please try again. If the problem persists, contact GetBloomDirect support.",
       );
     } finally {
-      setHandlingStatus(false);
+      setActionOrderId(null);
     }
   };
 
