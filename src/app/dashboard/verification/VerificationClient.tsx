@@ -110,6 +110,14 @@ interface Verification {
   websiteVerified: boolean;
 }
 
+interface WebsiteVerification {
+  status: string;
+  checkedAt: Date;
+  failureReasons: string;
+  matchedSignals: [];
+  riskSignals: [];
+}
+
 interface Shop {
   id: string;
   businessName: string;
@@ -117,6 +125,7 @@ interface Shop {
   role: string;
   isVerified: boolean;
   verifiedFlorist: boolean;
+  websiteVerifications: WebsiteVerification;
   verification: Verification;
   isSuspended: boolean;
   suspensionReason?: string;
@@ -414,6 +423,10 @@ export default function VerificationClient() {
     }
   }
 
+  const websiteNeedsReview =
+    shop?.websiteVerifications?.status === "needs_review" &&
+    !shop?.verification?.websiteVerified;
+
   const verificationSteps = [
     {
       label: "Verified Email",
@@ -435,19 +448,31 @@ export default function VerificationClient() {
         <span>No website added yet.</span>
       ),
       customAction: shop?.contact?.website ? (
-        <button
-          type="button"
-          disabled={websiteLoading}
-          onClick={handleVerifyWebsite}
-          className={
-            "rounded-lg px-4 py-2 text-sm font-semibold transition " +
-            (websiteLoading
-              ? "cursor-not-allowed bg-gray-100 text-gray-400"
-              : "bg-purple-600 text-white hover:bg-purple-700")
-          }
-        >
-          {websiteLoading ? "Checking..." : "Verify Website"}
-        </button>
+        <div>
+          <p
+            className={(websiteNeedsReview ? "block" : "hidden") + 
+              " "
+            }
+          >
+            test
+          </p>
+          <button
+            type="button"
+            disabled={websiteLoading}
+            onClick={handleVerifyWebsite}
+            className={
+              "rounded-lg px-4 py-2 text-sm font-semibold transition " +
+                websiteLoading
+                ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                : "bg-purple-600 text-white hover:bg-purple-700"
+            }
+          >
+            {websiteLoading
+                ? "Verifying..."
+                : "Verify Website"}
+          </button>
+
+        </div>
       ) : showWebsiteInput ? (
         <div className="flex flex-col gap-2 sm:flex-row">
           <input

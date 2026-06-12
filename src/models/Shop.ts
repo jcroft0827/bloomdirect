@@ -423,7 +423,7 @@ const shopSchema = new mongoose.Schema(
         reviewerShop: {
           type: Schema.Types.ObjectId,
           ref: "Shop",
-          required: true,
+          default: null,
           index: true,
         },
 
@@ -436,21 +436,20 @@ const shopSchema = new mongoose.Schema(
         reviewedShopRole: {
           type: String,
           enum: ["originating", "fulfilling", "profile"],
-          required: true,
+          default: "profile",
         },
 
         source: {
           type: String,
           enum: ["order", "profile"],
-          required: true,
           default: "profile",
         },
 
         rating: {
           type: Number,
-          required: true,
           min: 1,
           max: 5,
+          default: 5,
         },
 
         comment: {

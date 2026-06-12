@@ -1482,6 +1482,19 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     className={normalInput}
                   />
                 </div>
+                {/* Shop Website */}
+                <div className="col-span-2">
+                  <label className={normalLabel}>Shop Website (Public)</label>
+                  <input 
+                    type="text"
+                    placeholder="getbloomdirect.com"
+                    value={shop?.contact?.website}
+                    onChange={(e) =>
+                      updateContact("website", e.target.value.toLowerCase())
+                    }
+                    className={normalInput}
+                  />
+                </div>
                 {/* Shop Address */}
                 <div className="col-span-2">
                   <label className={normalLabel}>Shop Address</label>
@@ -1576,6 +1589,15 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 <div className="lg:col-span-2">
                   <label className={normalLabel}>Phone</label>
                   <p className={previewP}>{shop?.contact?.phone}</p>
+                </div>
+                {/* Shop Website */}
+                <div>
+                  <label className={normalLabel}>Website</label>
+                  {shop?.contact?.website ? (
+                    <p className={previewP}>{shop.contact.website}</p>
+                  ) : (
+                    <p className={previewP}>No Website Added</p>
+                  )}
                 </div>
                 {/* Shop Address */}
                 <div className="lg:col-span-2">

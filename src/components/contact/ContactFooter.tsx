@@ -1,15 +1,23 @@
+"use client";
+
 import Link from "next/link";
 
-export default function HomeFooter() {
+export default function ContactFooter() {
+
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    };
+
   return (
     <footer className="bg-gray-900 text-gray-300">
       <div className="mx-auto max-w-7xl px-6 py-16">
         <div className="grid gap-12 md:grid-cols-4">
           {/* Brand */}
           <div>
-            <h3 className="text-2xl font-black text-white">
-              GetBloomDirect
-            </h3>
+            <h3 className="text-2xl font-black text-white">GetBloomDirect</h3>
             <p className="mt-4 text-sm leading-relaxed text-gray-400">
               A florist-first network for sending orders directly — no wire
               services, no commissions, no nonsense.
@@ -18,7 +26,6 @@ export default function HomeFooter() {
               Built alongside florists. For florists.
             </p>
           </div>
-
           {/* Product */}
           <div>
             <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-white">
@@ -26,18 +33,8 @@ export default function HomeFooter() {
             </h4>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link href="#how-it-works" className="hover:text-white">
-                  How It Works
-                </Link>
-              </li>
-              <li>
-                <Link href="#features" className="hover:text-white">
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link href="#pricing" className="hover:text-white">
-                  Pricing
+                <Link href="/" className="hover:text-white">
+                  Home
                 </Link>
               </li>
               <li>
@@ -52,7 +49,6 @@ export default function HomeFooter() {
               </li>
             </ul>
           </div>
-
           {/* Company */}
           <div>
             <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-white">
@@ -65,18 +61,12 @@ export default function HomeFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="#faq" className="hover:text-white">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="hover:text-white">
+                <button onClick={scrollToTop} className="hover:text-white">
                   Contact
-                </Link>
+                </button>
               </li>
             </ul>
           </div>
-
           {/* Trust */}
           <div>
             <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-white">

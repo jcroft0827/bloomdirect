@@ -11,6 +11,7 @@ import {
   PencilSquareIcon,
   BuildingStorefrontIcon,
   XMarkIcon,
+  StarIcon,
 } from "@heroicons/react/24/solid";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,7 +50,6 @@ export default function ShopClient({ shop }: { shop: any }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          shopName: loggedInShopName,
           rating,
           comment,
         }),
@@ -205,75 +205,141 @@ export default function ShopClient({ shop }: { shop: any }) {
                   Customer Reviews
                 </h3>
               </div>
-              {shop.reviews.length > 0 ? (
-                <div className="space-y-6">
-                  {shop.reviews.map((r: any) => (
-                    <div
-                      key={r._id}
-                      className="bg-white rounded-xl p-4 shadow-sm border border-slate-100"
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
-                          {r.shopName}
+              {loggedInShop != shop._id ? (
+                <div>
+                  {shop.reviews.length > 0 ? (
+                    <div className="space-y-6">
+                      {shop.reviews.map((r: any) => (
+                        <div
+                          key={r._id}
+                          className="bg-white rounded-xl p-4 shadow-sm border border-slate-100"
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            {/* <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
+                              {r.shopName}
+                            </div> */}
+                            <div>
+                              {r.source === "order" && (
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 mb-2">
+                                  Verified Order
+                                </span>
+                              )}
+                              <p className="font-bold text-slate-900">
+                                {r.reviewerShopName}
+                              </p>
+                              <div className="flex items-center gap-1 text-sm text-yellow-400">
+                                {Array.from({ length: r.rating }).map(
+                                  (_, i) => (
+                                    <StarIcon key={i} className="h-4 w-4" />
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-slate-700">{r.comment}</p>
+                          <p className="text-slate-500 text-sm mt-2">
+                            {new Date(r.date).toLocaleDateString("en-US", {
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 italic">
+                      No reviews yet. Be the first to leave feedback!
+                    </p>
+                  )}
+                  <div className="mt-6 border-t border-slate-100 pt-6">
+                    {isSubmittingReview && (
+                      <div className="text-center text-sm text-slate-500">
+                        <div>
+                          <StarRating value={rating} onChange={setRating} />
+                          <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            className="w-full mt-2 p-2 border border-slate-300 rounded-md"
+                            placeholder="Write your review here..."
+                          />
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900">
-                            {r.shopName}
-                          </p>
-                          <div className="flex items-center gap-1 text-sm text-emerald-600">
-                            {Array.from({ length: r.rating }).map((_, i) => (
-                              <CheckBadgeIcon key={i} className="h-4 w-4" />
-                            ))}
-                          </div>
+                          <button
+                            className="mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-bold transition-colors"
+                            onClick={async () => {
+                              saveReview();
+                            }}
+                          >
+                            Submit Review
+                          </button>
+                          <button
+                            className="mt-2 ml-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold transition-colors"
+                            onClick={() => setIsSubmittingReview(false)}
+                          >
+                            Cancel
+                          </button>
                         </div>
                       </div>
-                      <p className="text-slate-700">{r.comment}</p>
-                    </div>
-                  ))}
+                    )}
+                    <button
+                      className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition-colors"
+                      onClick={() => setIsSubmittingReview(true)}
+                    >
+                      Write a Review
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <p className="text-slate-500 italic">
-                  No reviews yet. Be the first to leave feedback!
-                </p>
+                <div>
+                  {shop.reviews.length > 0 ? (
+                    <div className="space-y-6">
+                                        {shop.reviews.map((r: any) => (
+                        <div
+                          key={r._id}
+                          className="bg-white rounded-xl p-4 shadow-sm border border-slate-100"
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            {/* <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
+                              {r.shopName}
+                            </div> */}
+                            <div>
+                              {r.source === "order" && (
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 mb-2">
+                                  Verified Order
+                                </span>
+                              )}
+                              <p className="font-bold text-slate-900">
+                                {r.reviewerShopName}
+                              </p>
+                              <div className="flex items-center gap-1 text-sm text-yellow-400">
+                                {Array.from({ length: r.rating }).map(
+                                  (_, i) => (
+                                    <StarIcon key={i} className="h-4 w-4" />
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-slate-700">{r.comment}</p>
+                          <p className="text-slate-500 text-sm mt-2">
+                            {new Date(r.date).toLocaleDateString("en-US", {
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 italic">
+                      No reviews yet. Complete orders to receive reviews from
+                      other florists!
+                    </p>
+                  )}
+                </div>
               )}
-
-              <div className="mt-6 border-t border-slate-100 pt-6">
-                {isSubmittingReview && (
-                  <div className="text-center text-sm text-slate-500">
-                    <div>
-                      <StarRating value={rating} onChange={setRating} />
-                      <textarea
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        className="w-full mt-2 p-2 border border-slate-300 rounded-md"
-                        placeholder="Write your review here..."
-                      />
-                    </div>
-                    <div>
-                      <button
-                        className="mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-bold transition-colors"
-                        onClick={async () => {
-                          saveReview();
-                        }}
-                      >
-                        Submit Review
-                      </button>
-                      <button
-                        className="mt-2 ml-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-bold transition-colors"
-                        onClick={() => setIsSubmittingReview(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <button
-                  className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition-colors"
-                  onClick={() => setIsSubmittingReview(true)}
-                >
-                  Write a Review
-                </button>
-              </div>
             </section>
           </div>
 

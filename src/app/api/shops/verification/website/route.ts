@@ -277,12 +277,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Shop not found." }, { status: 404 });
     }
 
+    if (
+      shop.websiteVerifications?.status === "needs_review" &&
+      !shop.verification?.websiteVerified
+    ) {
+      return NextResponse.json({
+        success: true,
+        needsReview: true,
+        message:
+          "Your website is currently under manual review by a GetBloomDirect admin. You do not need to submit it again.",
+        website: shop.contact?.website,
+        websiteVerifications: shop.websiteVerifications,
+      });
+    }
+
     const result = await inspectWebsite(normalizedWebsite, shop);
     const now = new Date();
 
     shop.contact.website = normalizedWebsite;
 
-    shop.websiteVerification = {
+    shop.websiteVerifications = {
       status: result.status,
       checkedAt: now,
       failureReason: result.failureReason,
@@ -320,12 +334,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      needsReview: result.status === "needs_review",
       message:
         result.status === "verified"
           ? "Website verified successfully."
-          : "Website saved, but it needs manual review before it can be verified.",
+          : "Your website has been submitted for manual review. A GetBloomDirect admin will review it soon.",
       website: normalizedWebsite,
-      websiteVerification: shop.websiteVerification,
+      websiteVerifications: shop.websiteVerifications,
       verification: {
         websiteVerified: shop.verification.websiteVerified,
         websiteVerifiedAt: shop.verification.websiteVerifiedAt,
