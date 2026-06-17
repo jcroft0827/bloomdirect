@@ -1,3 +1,5 @@
+// api/orders/outside-network/create/route.ts
+
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import { OrderActivityActions } from "@/lib/order-activity";
@@ -6,11 +8,16 @@ import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import OutsideNetworkFlorists from "@/models/OutsideNetworkFlorists";
+import { OrderStatus } from "@/lib/order-status";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
   const random = Math.floor(1000 + Math.random() * 9000);
   return `GBD${date}-${random}`;
+}
+
+function dollarsToCents(value: unknown) {
+  return Math.round((Number(value) || 0) * 100);
 }
 
 export async function POST(req: Request) {
@@ -30,8 +37,8 @@ export async function POST(req: Request) {
       recipient,
       customer,
       logistics,
-      manualPricing,
-      manualProduct,
+      manualOrder,
+      manualNotes,
     } = body;
 
     const outsideShop = outsideFlorist || googleShop;
@@ -43,40 +50,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const outsideFloristRecord = await OutsideNetworkFlorists.findOneAndUpdate(
-        {
-            zip: recipient.zip,
-            businessName: outsideFlorist.name.trim(),
-        },
-        {
-            $set: {
-                businessName: outsideFlorist.name.trim(),
-                phone: outsideFlorist.phone || "",
-                email: outsideFlorist.email || "",
-                address: outsideFlorist.address || "",
-                city: recipient.city || "",
-                state: recipient.state || "",
-                zip: recipient.zip || "",
-                googlePlaceId: outsideFlorist.googlePlaceId || "",
-                source: outsideFlorist.googlePlaceId ? "google" : "manual",
-                lastUsedAt: new Date(),
-            },
-            $setOnInsert: {
-                firstUsedAt: new Date(),
-            },
-            $inc: {
-                timesUsed: 1,
-            },
-        },
-        {
-            new: true,
-            upsert: true,
-        },
-    );
-
-    if (!manualPricing) {
+    if (!recipient?.zip) {
       return NextResponse.json(
-        { error: "Manual pricing is required." },
+        { error: "Recipient ZIP is required." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      !manualOrder?.items ||
+      !Array.isArray(manualOrder.items) ||
+      manualOrder.items.length === 0
+    ) {
+      return NextResponse.json(
+        { error: "At least one manual item is required." },
         { status: 400 },
       );
     }
@@ -90,31 +77,67 @@ export async function POST(req: Request) {
       );
     }
 
-    const productTotalCents = Math.round(
-      Number(manualPricing.productTotal || 0) * 100,
+    const outsideFloristRecord = await OutsideNetworkFlorists.findOneAndUpdate(
+      {
+        zip: recipient.zip,
+        businessName: outsideShop.name.trim(),
+      },
+      {
+        $set: {
+          businessName: outsideShop.name.trim(),
+          phone: outsideShop.phone || "",
+          email: outsideShop.email || "",
+          address: outsideShop.address || "",
+          city: recipient.city || "",
+          state: recipient.state || "",
+          zip: recipient.zip || "",
+          googlePlaceId: outsideShop.googlePlaceId || "",
+          source: outsideShop.googlePlaceId ? "google" : "manual",
+          lastUsedAt: new Date(),
+        },
+        $setOnInsert: {
+          firstUsedAt: new Date(),
+        },
+        $inc: {
+          timesUsed: 1,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      },
     );
 
-    const deliveryFeeCents = Math.round(
-      Number(manualPricing.deliveryFee || 0) * 100,
-    );
+    const products = manualOrder.items.map((item: any) => {
+      const qty = Math.max(Number(item.qty) || 1, 1);
+      const priceCents = dollarsToCents(item.price);
 
-    const taxAmountCents = Math.round(
-      Number(manualPricing.taxAmount || 0) * 100,
-    );
+      return {
+        name: item.name || "Outside Network Item",
+        description: item.description || "",
+        photo: "",
+        priceCents,
+        qty,
+        taxable: item.taxable !== false,
+      };
+    });
 
-    const customerPaysCents = Math.round(
-      Number(
-        manualPricing.customerPays ||
-          Number(manualPricing.productTotal || 0) +
-            Number(manualPricing.deliveryFee || 0) +
-            Number(manualPricing.taxAmount || 0),
-      ) * 100,
-    );
+    const productTotalCents = products.reduce((sum: number, product: any) => {
+      return sum + product.priceCents * product.qty;
+    }, 0);
+
+    const deliveryFeeCents = dollarsToCents(manualOrder.deliveryFee);
+
+    const taxAmountCents = dollarsToCents(manualOrder.taxAmount);
+
+    const customerPaysCents =
+      dollarsToCents(manualOrder.orderTotal) ||
+      productTotalCents + deliveryFeeCents + taxAmountCents;
 
     const order = await Order.create({
       orderNumber: generateOrderNumber(),
       fulfillmentType: "outside_network",
-      status: "OUTSIDE_NETWORK",
+      status: OrderStatus.OUTSIDE_NETWORK,
 
       originatingShop: originShop._id,
       originatingShopName: originShop.businessName,
@@ -124,43 +147,38 @@ export async function POST(req: Request) {
 
       outsideFlorist: {
         outsideNetworkFlorist: outsideFloristRecord._id,
-        name: outsideFlorist.name || "",
-        phone: outsideFlorist.phone || "",
-        email: outsideFlorist.email || "",
-        address: outsideFlorist.address || "",
-        googlePlaceId: outsideFlorist.googlePlaceId || "",
-        contactPerson: outsideFlorist.contactPerson || "",
-        notes: outsideFlorist.notes || "",
-        },
+        name: outsideShop.name || "",
+        phone: outsideShop.phone || "",
+        email: outsideShop.email || "",
+        address: outsideShop.address || "",
+        googlePlaceId: outsideShop.googlePlaceId || "",
+        contactPerson: manualOrder.contactPerson || "",
+        notes: manualNotes || manualOrder.notes || "",
+      },
 
       recipient,
       customer,
       logistics,
 
-      products: [
-        {
-          name: manualProduct?.name || "Outside Network Order",
-          description: manualProduct?.description || "",
-          photo: "",
-          priceCents: productTotalCents,
-          qty: 1,
-          taxable: manualProduct?.taxable !== false,
-        },
-      ],
+      products,
+
+      originatingShopFee: {
+        feeType: "flat",
+        feeValue: 0,
+      },
 
       pricing: {
         taxableSubtotalCents: productTotalCents,
         productsTotalCents: productTotalCents,
         deliveryFeeCents,
-        taxPercentage: Number(manualPricing.taxPercentage || 0),
+        taxPercentage: 0,
         deliveryTaxed: false,
         feeTaxed: false,
         taxAmountCents,
         originatingShopFeeCents: 0,
         customerPaysCents,
         orderTotalCents: customerPaysCents,
-        fulfillingShopGetsCents:
-          productTotalCents + deliveryFeeCents + taxAmountCents,
+        fulfillingShopGetsCents: productTotalCents + deliveryFeeCents,
         originatingShopKeepsCents: 0,
       },
 
@@ -169,7 +187,7 @@ export async function POST(req: Request) {
         cashapp: "",
         zelle: "",
         paypal: "",
-        default: "",
+        default: "venmo",
       },
 
       activityLog: [
@@ -185,12 +203,12 @@ export async function POST(req: Request) {
       $inc: { "stats.ordersSent": 1 },
     });
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json({ success: true, orderId: order._id }, { status: 201 });
   } catch (error: any) {
     console.error("OUTSIDE NETWORK ORDER CREATE ERROR: ", error);
     return NextResponse.json(
-        { error: error.message || "Internal Server Error" },
-        { status: 500 },
+      { error: error.message || "Internal Server Error" },
+      { status: 500 },
     );
   }
 }

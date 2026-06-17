@@ -1006,6 +1006,14 @@ export default function NewOrderClient() {
         toast.error("No Google florist results found. You can enter the florist manually.");
         setOutsideFloristFormOpen(true);
       }
+
+      if (result.source === "cache") {
+        toast.success("Loaded cached Google florist results.");
+      }
+
+      if (result.source === "stale_cache") {
+        toast.error(result.warning || "Showing cached results.");
+      }
     } catch (error) {
       console.error("Google florist search failed:", error);
       setGoogleResults([]);
