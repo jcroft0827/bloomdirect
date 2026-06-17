@@ -24,6 +24,8 @@ interface GoogleShop {
   name: string;
   phone?: string;
   address: string;
+  email?: string;
+  googlePlaceId?: string;
 }
 
 interface RecipientData {
@@ -628,7 +630,9 @@ export default function NewOrderClient() {
             outsideFlorist: {
               name: googleShop.name,
               phone: googleShop.phone || "",
+              email: googleShop.email || "",
               address: googleShop.address || "",
+              googlePlaceId: googleShop.googlePlaceId || "",
             },
             recipient: {
               firstName: recipient.firstName,
@@ -847,10 +851,24 @@ export default function NewOrderClient() {
   }
 
   // Select Google Shop
-  function selectGoogleShop(name: any, phone: any, address: any) {
+  function selectGoogleShop(
+    name: string,
+    phone?: string,
+    address?: string,
+    email?: string,
+    googlePlaceId?: string,
+  ) {
     try {
       setShopChosen(false);
       if (!name) return;
+      
+      setGoogleShop({
+        name,
+        phone: phone || "",
+        address: address || "",
+        email: email || "",
+        googlePlaceId: googlePlaceId || "",
+      });
 
       setSelectedShop(null);
       setFulfillingShop(null);
@@ -858,22 +876,17 @@ export default function NewOrderClient() {
       setOfferings([]);
       setSelectedProducts([]);
 
-      setGoogleShop({
-        ...googleShop,
-        name: name,
-        phone: phone || "",
-        address: address || "",
-      });
 
-      setPricing((prev) => ({
-        ...prev,
-        productsTotal: 0.0,
-        deliveryFee: 0.0,
-        taxAmount: 0.0,
-        customerPays: 0.0,
-        orderTotal: 0.0,
-        fulfillingShopGets: 0.0,
-      }));
+
+      // setPricing((prev) => ({
+      //   ...prev,
+      //   productsTotal: 0.0,
+      //   deliveryFee: 0.0,
+      //   taxAmount: 0.0,
+      //   customerPays: 0.0,
+      //   orderTotal: 0.0,
+      //   fulfillingShopGets: 0.0,
+      // }));
 
       setShopChosen(true);
     } catch (error: any) {
@@ -940,6 +953,8 @@ export default function NewOrderClient() {
       name: manualOutsideFlorist.name,
       phone: manualOutsideFlorist.phone,
       address: manualOutsideFlorist.address,
+      email: manualOutsideFlorist.email,
+      googlePlaceId: "",
     });
 
     setShopChosen(true);
@@ -1544,6 +1559,7 @@ export default function NewOrderClient() {
                                         shop.displayName.text,
                                         shop.nationalPhoneNumber,
                                         shop.formattedAddress,
+                                        shop.id,
                                       )
                                     }
                                   >
@@ -2481,8 +2497,49 @@ export default function NewOrderClient() {
               >
                 <div className="p-4 rounded-2xl shadow-lg bg-white">
                   {/* Order Overview */}
-                  {/* Mobile */}
                   <div className="flex flex-col gap-4">
+                    {/* Outside Network Warning Card */}
+                    {usingGoogleShop && (
+                      <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900">
+                        <h3 className="font-bold text-lg">Outside-Network Reference Order</h3>
+
+                        <p className="text-sm">
+                          This florist is not part of GetBloomDirect. This order will be saved for your records only. No notification, payment workflow, messaging, POS webhook, or review request will be sent.
+                        </p>
+
+                        <div className="mt-4 rounded-xl bg-white/70 p-3 border border-amber-200">
+                          <p>
+                            Want to invite {googleShop.name || "this florist"} to GetBloomDirect?
+                          </p>
+
+                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                            <input 
+                              type="email"
+                              value={toEmail}
+                              onChange={(e) => setToEmail(e.target.value)}
+                              placeholder="Florist email address"
+                              className="rounded-lg border px-3 py-2 text-black w-full"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRequestFlorist(true);
+                                toast.success("Invite email ready to send.");
+                              }}
+                              className="rounded-lg bg-purple-600 px-4 py-2 font-bold text-white hover:bg-purple-700"
+                            >
+                              Invite Florist
+                            </button>
+                          </div>
+
+                          <p className="mt-2 text-xs text-amber-800">
+                            Inviting them helps bring more florists into the network and makes future orders easier.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Send Button */}
                     <div className="border-b pb-4">
                       <button
@@ -2496,9 +2553,10 @@ export default function NewOrderClient() {
                         className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
                         title="Send Order"
                       >
-                        Send Order & Keep ${pricing.feeCharge} →
+                        {usingGoogleShop ? "Save Outside-Network Order" : `Send Order & Keep $${pricing.feeCharge} →`}
                       </button>
                     </div>
+
                     {/* Card Message */}
                     <div className="border-b pb-4 flex flex-col gap-2">
                       <button
@@ -2540,6 +2598,7 @@ export default function NewOrderClient() {
                         ></textarea>
                       </label>
                     </div>
+
                     {/* Totals */}
                     <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-6 text-center flex flex-col justify-evenly">
                       <h2 className="text-4xl md:text-3xl 2xl:text-4xl font-black mb-4">
@@ -2737,6 +2796,7 @@ export default function NewOrderClient() {
                         </p>
                       </div>
                     </div>
+
                     {/* Products */}
                     <div>
                       <h2 className="text-xl font-semi-bold mb-4">Products</h2>
@@ -2808,9 +2868,6 @@ export default function NewOrderClient() {
                       ))}
                     </div>
                   </div>
-
-                  {/* Desktop */}
-                  <div></div>
                 </div>
               </div>
             </div>

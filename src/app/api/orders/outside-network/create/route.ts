@@ -5,6 +5,7 @@ import Order from "@/models/Order";
 import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+import OutsideNetworkFlorists from "@/models/OutsideNetworkFlorists";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -41,6 +42,37 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    const outsideFloristRecord = await OutsideNetworkFlorists.findOneAndUpdate(
+        {
+            zip: recipient.zip,
+            businessName: outsideFlorist.name.trim(),
+        },
+        {
+            $set: {
+                businessName: outsideFlorist.name.trim(),
+                phone: outsideFlorist.phone || "",
+                email: outsideFlorist.email || "",
+                address: outsideFlorist.address || "",
+                city: recipient.city || "",
+                state: recipient.state || "",
+                zip: recipient.zip || "",
+                googlePlaceId: outsideFlorist.googlePlaceId || "",
+                source: outsideFlorist.googlePlaceId ? "google" : "manual",
+                lastUsedAt: new Date(),
+            },
+            $setOnInsert: {
+                firstUsedAt: new Date(),
+            },
+            $inc: {
+                timesUsed: 1,
+            },
+        },
+        {
+            new: true,
+            upsert: true,
+        },
+    );
 
     if (!manualPricing) {
       return NextResponse.json(
@@ -91,12 +123,15 @@ export async function POST(req: Request) {
       fulfillingShopName: outsideShop.name,
 
       outsideFlorist: {
-        name: outsideShop.name,
-        phone: outsideShop.phone || "",
-        address: outsideShop.address || "",
-        contactPerson: outsideShop.contactPerson || "",
-        notes: outsideShop.notes || "",
-      },
+        outsideNetworkFlorist: outsideFloristRecord._id,
+        name: outsideFlorist.name || "",
+        phone: outsideFlorist.phone || "",
+        email: outsideFlorist.email || "",
+        address: outsideFlorist.address || "",
+        googlePlaceId: outsideFlorist.googlePlaceId || "",
+        contactPerson: outsideFlorist.contactPerson || "",
+        notes: outsideFlorist.notes || "",
+        },
 
       recipient,
       customer,
