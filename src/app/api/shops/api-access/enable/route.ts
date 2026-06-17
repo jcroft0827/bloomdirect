@@ -1,6 +1,7 @@
 // app/api/shops/api-access/enable/route.ts
 import { NextResponse } from "next/server";
 import { getCurrentShop } from "@/lib/get-current-shop";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST() {
   try {
@@ -24,6 +25,8 @@ export async function POST() {
     shop.apiAccess.keyDisabledAt = null;
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       success: true,

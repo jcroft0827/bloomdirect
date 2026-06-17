@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function GET() {
   try {
@@ -13,7 +14,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const shop = await Shop.findById(session.user.shopId).lean();
+    const shop = await Shop.findById(session?.user?.shopId).lean();
+
+    await ensureDefaultDesignerChoice(session?.user?.shopId.toString());
 
     return NextResponse.json({ shop });
   } catch (error) {

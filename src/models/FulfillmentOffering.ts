@@ -6,13 +6,21 @@ const pricingTierSchema = new Schema(
   {
     label: {
       type: String,
-      enum: ["Standard", "Premium", "Luxury"],
       required: true,
+      trim: true,
+      maxlength: 40,
     },
     price: {
       type: Number,
       required: true,
       min: 0,
+    },
+
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: "",
     },
   },
   { _id: false },
@@ -93,6 +101,11 @@ const fulfillmentOfferingSchema = new Schema(
         { label: "Premium", price: 100 },
         { label: "Luxury", price: 150 },
       ],
+    },
+
+    taxable: {
+      type: Boolean,
+      default: true,
     },
 
     allowsSubstitutions: {

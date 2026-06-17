@@ -3,6 +3,7 @@ import Shop from "@/models/Shop";
 import { connectToDB } from "@/lib/mongoose";
 import { apiError } from "./api-response";
 import { hashApiKey } from "./api-key";
+import { ensureDefaultDesignerChoice } from "./offerings/ensureDefaultOfferings";
 
 export async function getShopFromApiKey(req: Request) {
   await connectToDB();
@@ -72,6 +73,8 @@ export async function getShopFromApiKey(req: Request) {
     shop.apiAccess.lastUsedUserAgent = req.headers.get("user-agent") || null;
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
   } catch (err) {
     console.error("Failed to update API usage metadata", err);
   }

@@ -6,10 +6,9 @@ import { useSession } from "next-auth/react";
 import toast, { Toaster } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import "react-datepicker/dist/react-datepicker.css";
-import ToolTip from "@/components/ToolTip";
 import { searchGoogleFlorists } from "@/app/actions";
+import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import BloomSpinner from "@/components/BloomSpinner";
-import Link from "next/link";
 
 // #region Interfaces
 
@@ -202,7 +201,13 @@ export default function NewOrderClient() {
     }
   }, [status, router]);
 
-  // #region STATES
+  // #region STATES & VARIABLES
+
+  // Shop Chosen - Boolean
+  const [shopChosen, setShopChosen] = useState(false);
+
+  // Loading Status
+  const [loading, setLoading] = useState(false);
 
   // Users Info
   const [sendingShop, setSendingShop] = useState<SendingShop>({
@@ -215,20 +220,44 @@ export default function NewOrderClient() {
     feeValue: 0.0,
   });
 
-  //Fulfilling Shop
+  //Fulfilling Shop Data
   const [fulfillingShop, setFulfillingShop] = useState<FulfillingShop | null>(
     null,
   );
   const [fulfillShopId, setFulfillShopId] = useState("");
 
-  // Google Shop
+  // Outside Network Shop Data
   const [googleResults, setGoogleResults] = useState<GoogleFlorist[]>([]);
   const [googleShop, setGoogleShop] = useState<GoogleShop>({
     name: "",
     phone: "",
     address: "",
   });
+  const [outsideNetwork, setOutsideNetwork] = useState({
+    contactPerson: "",
+    items: [
+      {
+        name: "",
+        description: "",
+        qty: 1,
+        price: 0,
+      },
+    ],
+    deliveryFee: 0,
+    taxAmount: 0,
+    orderTotal: 0,
+    notes: "",
+  });
   const [googleSearch, setGoogleSearch] = useState(false);
+  const [outsideFloristFormOpen, setOutsideFloristFormOpen] = useState(false);
+  const [googleApiFailed, setGoogleApiFailed] = useState(false);
+  const [manualOutsideFlorist, setManualOutsideFlorist] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    email: "",
+  });
+
   const [lastZip, setLastZip] = useState("");
 
   // Recipient
@@ -253,22 +282,13 @@ export default function NewOrderClient() {
     phone: "",
   });
 
+  // Card Message
   const [addCard, setAddCard] = useState(false);
   const [cardMessage, setCardMessage] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  // Products
-  const [products, setProducts] = useState([
-    {
-      name: "Designer's Choice",
-      price: "100.00",
-      description: "",
-      photo: "",
-      taxable: true,
-      qty: 1,
-      file: null as File | null, // Store the actual File object here
-    },
-  ]);
+  // Offerings
+  const [offerings, setOfferings] = useState<any[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   // Delivery
@@ -290,6 +310,7 @@ export default function NewOrderClient() {
     fulfillingShopGets: 0.0,
     feeCharge: 0.0,
   });
+
   const [editDeliveryFee, setEditDeliveryFee] = useState(false);
   const [editOriginatingFee, setEditOriginatingFee] = useState(false);
   const [originatingFeeValue, setOriginatingFeeValue] = useState<number>(0);
@@ -309,6 +330,13 @@ export default function NewOrderClient() {
   const [orderPageOption, setOrderPageOption] = useState("recipient");
 
   const [sendingOrder, setSendingOrder] = useState(false);
+
+  // Variables
+  const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+    `florist flower shop near ${recipient.city} ${recipient.state} ${recipient.zip}`,
+  )}`;
+  const usingGoogleShop = !!googleShop?.name && !selectedShop?._id;
+  const usingNetworkShop = !!selectedShop?._id;
 
   // #endregion
 
@@ -345,68 +373,11 @@ export default function NewOrderClient() {
     loadShop();
   }, []);
 
-  // Calculate Totals
-  // useEffect(() => {
-  //   const { deliveryFee } = pricing;
-  //   const { taxPercentage, feeType, feeValue, deliveryTaxed, feeTaxed } =
-  //     sendingShop;
-
-  //   // 1. Calculate Product Totals
-  //   const { taxableSubtotal, nonTaxableSubtotal } = products.reduce(
-  //     (acc, p) => {
-  //       const price = parseFloat(p.price as string) || 0;
-  //       p.taxable
-  //         ? (acc.taxableSubtotal += price)
-  //         : (acc.nonTaxableSubtotal += price);
-  //       return acc;
-  //     },
-  //     { taxableSubtotal: 0, nonTaxableSubtotal: 0 },
-  //   );
-
-  //   const productTotal = taxableSubtotal + nonTaxableSubtotal;
-
-  //   // 2. Calculate the actual Fee Charge (The dollar amount)
-  //   // If feeType is %, it calculates 35% of $111.16 = $38.91
-  //   const feeCharge =
-  //     feeType === "%" ? productTotal * (feeValue / 100) : feeValue;
-
-  //   // 3. Determine the Taxable Basis
-  //   let taxableBasis = taxableSubtotal;
-  //   if (taxPercentage > 0) {
-  //     if (deliveryTaxed) taxableBasis += deliveryFee;
-  //     if (feeTaxed) taxableBasis += feeCharge;
-  //   }
-  //   const taxAmount = taxableBasis * (taxPercentage / 100);
-
-  //   // 4. Final Totals
-  //   const finalTotal = productTotal + deliveryFee + feeCharge + taxAmount;
-  //   const fulfillingShopGets = productTotal + deliveryFee;
-
-  //   // 5. Update State
-  //   setPricing((prev) => ({
-  //     ...prev,
-  //     productsTotal: productTotal,
-  //     // Store the calculated dollar amount separately from the database feeValue
-  //     feeCharge: parseFloat(roundToHundredth(feeCharge)),
-  //     taxAmount: parseFloat(roundToHundredth(taxAmount)),
-  //     customerPays: parseFloat(roundToHundredth(finalTotal)),
-  //     orderTotal: parseFloat(roundToHundredth(finalTotal)),
-  //     fulfillingShopGets: parseFloat(roundToHundredth(fulfillingShopGets)),
-  //   }));
-  // }, [
-  //   products,
-  //   pricing.deliveryFee,
-  //   sendingShop.taxPercentage,
-  //   sendingShop.feeType,
-  //   sendingShop.feeValue,
-  //   sendingShop.deliveryTaxed,
-  //   sendingShop.feeTaxed,
-  // ]);
   useEffect(() => {
     const deliveryFee = Number(pricing.deliveryFee) || 0;
     const taxPercentage = Number(sendingShop.taxPercentage) || 0;
 
-    const { taxableSubtotal, nonTaxableSubtotal } = products.reduce(
+    const { taxableSubtotal, nonTaxableSubtotal } = selectedProducts.reduce(
       (acc, p) => {
         const price = parseFloat(p.price as string) || 0;
         if (p.taxable) {
@@ -447,7 +418,7 @@ export default function NewOrderClient() {
       ),
     }));
   }, [
-    products,
+    selectedProducts,
     pricing.deliveryFee,
     sendingShop.taxPercentage,
     sendingShop.deliveryTaxed,
@@ -513,44 +484,6 @@ export default function NewOrderClient() {
     return rounded.toFixed(2);
   };
 
-  const handlePriceBlur = (index: number) => {
-    const currentPrice = products[index].price;
-    const numValue = parseFloat(currentPrice);
-
-    // If the input is empty or invalid, don't format it
-    if (isNaN(numValue)) return;
-
-    // Use your existing rounding function
-    const roundedValue = roundToHundredth(numValue);
-
-    // Update only the specific product in the array
-    const updatedProducts = products.map((product, i) =>
-      i === index ? { ...product, price: roundedValue } : product,
-    );
-
-    setProducts(updatedProducts);
-  };
-
-  const handlePricingBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numValue = parseFloat(value);
-
-    // If it's not a number (empty string), don't do anything
-    if (isNaN(numValue)) return;
-
-    const roundedValue = roundToHundredth(numValue);
-
-    const custPays =
-      pricing.deliveryFee + pricing.productsTotal + pricing.taxAmount;
-    const newCustPays = roundToHundredth(custPays);
-    setPricing({ ...pricing, customerPays: Number(newCustPays) });
-
-    setPricing((prev) => ({
-      ...prev,
-      [name]: roundedValue,
-    }));
-  };
-
   // Search shops
   const searchShops = async () => {
     if (
@@ -564,7 +497,11 @@ export default function NewOrderClient() {
     }
 
     setGoogleSearch(false);
-    setSearching(true);
+    setGoogleApiFailed(false);
+    setGoogleResults([]);
+    setOutsideFloristFormOpen(false);
+    setGoogleShop({ name: "", phone: "", address: "" });
+    setShopChosen(false);
     setNoShopsInArea(false);
 
     try {
@@ -611,13 +548,6 @@ export default function NewOrderClient() {
         toast.error("No GetBloomDirect shops in that area yet — invite them!");
         setNoShopsInArea(true);
       }
-
-      // Add ZIP demand for future expansion
-      // await fetch("/api/zipDemand", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ zip: recipient.zip }),
-      // });
     } catch (err) {
       console.error("Error finding shops", err);
       toast.error(
@@ -628,146 +558,6 @@ export default function NewOrderClient() {
     }
   };
 
-  // Send Order
-  // const sendOrder = async () => {
-  //   try {
-  //     setSendingOrder(true);
-  //     // Validations
-  //     if (!selectedShop && !googleShop) {
-  //       setSendingOrder(false);
-  //       return toast.error("Select a fulfilling shop!");
-  //     }
-  //     if (!logistics.deliveryDate) {
-  //       setSendingOrder(false);
-  //       return toast.error("Select delivery date!");
-  //     }
-  //     if (
-  //       !recipient.firstName ||
-  //       !recipient.lastName ||
-  //       !recipient.phone ||
-  //       !recipient.address ||
-  //       !recipient.zip ||
-  //       !recipient.city ||
-  //       !recipient.state
-  //     ) {
-  //       setSendingOrder(false);
-  //       return toast.error("Enter all recipient information!");
-  //     }
-
-  //     // Upload images to s3 and get the CloudFront URLs
-  //     const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
-
-  //     // Use Promise.all to upload all product images at once (concurrently)
-  //     const updatedProducts = await Promise.all(
-  //       products.map(async (p) => {
-  //         // If there's no file object, return the product as is (or with existing photo string)
-  //         if (!p.file) return { ...p, photo: p.photo || "" };
-
-  //         // Get signed URL from your existing API
-  //         const uploadRes = await fetch("/api/s3/upload-url", {
-  //           method: "POST",
-  //           headers: { "Content-Type": "application/json" },
-  //           body: JSON.stringify({
-  //             fileName: p.file.name,
-  //             fileType: p.file.type,
-  //           }),
-  //         });
-
-  //         if (!uploadRes.ok) throw new Error("Failed to get upload URL");
-  //         const { uploadUrl, fileKey } = await uploadRes.json();
-
-  //         // Upload the actual file to s3
-  //         await fetch(uploadUrl, {
-  //           method: "PUT",
-  //           headers: { "Content-Type": p.file.type },
-  //           body: p.file,
-  //         });
-
-  //         // Return the product with the CloudFront URL
-  //         return {
-  //           ...p,
-  //           photo: `${cfBase}/${fileKey}`,
-  //         };
-  //       }),
-  //     );
-
-  //     const payload = {
-  //       fulfillingShopId: fulfillShopId,
-  //       recipient: {
-  //         firstName: recipient.firstName,
-  //         lastName: recipient.lastName,
-  //         fullName: `${recipient.firstName} ${recipient.lastName}`,
-  //         address: recipient.address,
-  //         apt: recipient.apt || "",
-  //         city: recipient.city,
-  //         state: recipient.state,
-  //         zip: recipient.zip,
-  //         phone: recipient.phone,
-  //         email: recipient.email || null,
-  //         company: recipient.company || "",
-  //         message: cardMessage || "",
-  //       },
-  //       customer: {
-  //         firstName: customer.firstName || "",
-  //         lastName: customer.lastName || "",
-  //         fullName: `${customer.firstName} ${customer.lastName}`,
-  //         email: customer.email || "",
-  //         phone: customer.phone || "",
-  //       },
-  //       logistics: {
-  //         deliveryDate: logistics.deliveryDate.toISOString(),
-  //         deliveryTimeOption: logistics.timeOption,
-  //         deliveryTimeFrom:
-  //           logistics.timeOption === "specific" ? logistics.timeFrom : null,
-  //         deliveryTimeTo:
-  //           logistics.timeOption === "specific" ? logistics.timeTo : null,
-  //         specialInstructions: logistics.specialInstructions || "",
-  //       },
-  //       pricing: {
-  //         productsTotal: pricing.productsTotal,
-  //         deliveryFee: pricing.deliveryFee,
-  //         taxAmount: pricing.taxAmount,
-  //         customerPays: pricing.customerPays,
-  //         orderTotal: pricing.orderTotal,
-  //         fulfillingShopGets: pricing.fulfillingShopGets,
-  //         feeCharge: pricing.feeCharge,
-  //       },
-  //       products: updatedProducts.map((p) => ({
-  //         name: p.name,
-  //         price: parseFloat(p.price),
-  //         description: p.description,
-  //         qty: p.qty,
-  //         taxable: p.taxable,
-  //         photo: p.photo,
-  //       })),
-  //       paymentMethods: {
-  //         venmo: fulfillingShop?.paymentMethods?.venmoHandle,
-  //         cashapp: fulfillingShop?.paymentMethods?.cashAppTag,
-  //         zelle: fulfillingShop?.paymentMethods?.zellePhoneOrEmail,
-  //         paypal: fulfillingShop?.paymentMethods?.paypalEmail,
-  //         default: fulfillingShop?.paymentMethods?.defaultPaymentMethod,
-  //       },
-  //     };
-
-  //     const res = await fetch("/api/orders/create", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     });
-
-  //     if (!res.ok) throw new Error("Failed to create order");
-
-  //     toast.success("Order sent successfully!");
-
-  //     router.push("/dashboard");
-  //   } catch (error) {
-  //     setSendingOrder(false);
-  //     console.error("Failed to send order", error);
-  //     toast.error("Failed to send order. Please try again.");
-  //   } finally {
-  //     setSendingOrder(false);
-  //   }
-  // };
   const sendOrder = async () => {
     try {
       setSendingOrder(true);
@@ -796,99 +586,160 @@ export default function NewOrderClient() {
 
       const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
 
-      const updatedProducts = await Promise.all(
-        products.map(async (p) => {
-          if (!p.file) return { ...p, photo: p.photo || "" };
+      const roundMoney = (value: number) => {
+        return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+      };
 
-          const uploadRes = await fetch("/api/s3/upload-url", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileName: p.file.name,
-              fileType: p.file.type,
+      const updatedProducts = usingNetworkShop
+        ? await Promise.all(
+            selectedProducts.map(async (p) => {
+              if (!p.file) return { ...p, photo: p.photo || "" };
+
+              const uploadRes = await fetch("/api/s3/upload-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  fileName: p.file.name,
+                  fileType: p.file.type,
+                }),
+              });
+
+              if (!uploadRes.ok) throw new Error("Failed to get upload URL");
+
+              const { uploadUrl, fileKey } = await uploadRes.json();
+
+              await fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": p.file.type },
+                body: p.file,
+              });
+
+              return {
+                ...p,
+                photo: `${cfBase}/${fileKey}`,
+              };
             }),
-          });
+          )
+        : [];
 
-          if (!uploadRes.ok) throw new Error("Failed to get upload URL");
-
-          const { uploadUrl, fileKey } = await uploadRes.json();
-
-          await fetch(uploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": p.file.type },
-            body: p.file,
-          });
-
-          return {
-            ...p,
-            photo: `${cfBase}/${fileKey}`,
-          };
-        }),
-      );
-
-      const payload = {
-        fulfillingShopId: selectedShop?._id || "",
-        recipient: {
-          firstName: recipient.firstName,
-          lastName: recipient.lastName,
-          fullName: `${recipient.firstName} ${recipient.lastName}`,
-          address: recipient.address,
-          apt: recipient.apt || "",
-          city: recipient.city,
-          state: recipient.state,
-          zip: recipient.zip,
-          phone: recipient.phone,
-          email: recipient.email || null,
-          company: recipient.company || "",
-          message: cardMessage || "",
-        },
-        customer: {
-          firstName: customer.firstName || "",
-          lastName: customer.lastName || "",
-          fullName: `${customer.firstName} ${customer.lastName}`,
-          email: customer.email || "",
-          phone: customer.phone || "",
-        },
-        logistics: {
-          deliveryDate: logistics.deliveryDate.toISOString(),
-          deliveryTimeOption: logistics.timeOption,
-          deliveryTimeFrom:
-            logistics.timeOption === "specific" ? logistics.timeFrom : null,
-          deliveryTimeTo:
-            logistics.timeOption === "specific" ? logistics.timeTo : null,
-          specialInstructions: logistics.specialInstructions || "",
-        },
-        products: updatedProducts.map((p) => ({
-          name: p.name,
-          price: parseFloat(p.price),
-          description: p.description,
-          qty: p.qty,
-          taxable: p.taxable,
-          photo: p.photo,
-        })),
-        paymentMethods: {
-          venmo: fulfillingShop?.paymentMethods?.venmoHandle,
-          cashapp: fulfillingShop?.paymentMethods?.cashAppTag,
-          zelle: fulfillingShop?.paymentMethods?.zellePhoneOrEmail,
-          paypal: fulfillingShop?.paymentMethods?.paypalEmail,
-          default: fulfillingShop?.paymentMethods?.defaultPaymentMethod,
-        },
-        deliveryFeeOverride: Number(pricing.deliveryFee) || 0,
-        originatingShopFeeOverride: {
-          feeType: sendingShop.feeType || "flat",
-          feeValue: Number(originatingFeeValue) || 0,
-        },
-        usingGoogleShop,
-        googleShop: usingGoogleShop
-          ? {
+      const payload = usingGoogleShop
+        ? {
+            fulfillmentType: "outside_network",
+            outsideFlorist: {
               name: googleShop.name,
               phone: googleShop.phone || "",
               address: googleShop.address || "",
-            }
-          : null,
-      };
+            },
+            recipient: {
+              firstName: recipient.firstName,
+              lastName: recipient.lastName,
+              fullName: `${recipient.firstName} ${recipient.lastName}`,
+              address: recipient.address,
+              apt: recipient.apt || "",
+              city: recipient.city,
+              state: recipient.state,
+              zip: recipient.zip,
+              phone: recipient.phone,
+              email: recipient.email || null,
+              company: recipient.company || "",
+              message: cardMessage || "",
+            },
+            customer: {
+              firstName: customer.firstName || "",
+              lastName: customer.lastName || "",
+              fullName: `${customer.firstName} ${customer.lastName}`,
+              email: customer.email || "",
+              phone: customer.phone || "",
+            },
+            logistics: {
+              deliveryDate: logistics.deliveryDate.toISOString(),
+              deliveryTimeOption: logistics.timeOption,
+              deliveryTimeFrom:
+                logistics.timeOption === "specific" ? logistics.timeFrom : null,
+              deliveryTimeTo:
+                logistics.timeOption === "specific" ? logistics.timeTo : null,
+              specialInstructions: logistics.specialInstructions || "",
+            },
+            manualOrder: {
+              contactPerson: outsideNetwork.contactPerson || "",
+              items: outsideNetwork.items.map((item) => ({
+                name: item.name,
+                description: item.description || "",
+                qty: Number(item.qty) || 1,
+                price: roundMoney(item.price),
+                lineTotal: roundMoney((Number(item.qty) || 1) * (Number(item.price) || 0)),
+              })),
+              productTotal: roundMoney(
+                outsideNetwork.items.reduce((sum, item) => {
+                  return sum + (Number(item.qty) || 1) * (Number(item.price) || 0);
+                }, 0),
+              ),
+              deliveryFee: roundMoney(outsideNetwork.deliveryFee),
+              taxAmount: roundMoney(outsideNetwork.taxAmount),
+              orderTotal: roundMoney(outsideNetwork.orderTotal),
+            },
+            manualNotes: outsideNetwork.notes || "",
+          }
+        : {
+            recipient: {
+              firstName: recipient.firstName,
+              lastName: recipient.lastName,
+              fullName: `${recipient.firstName} ${recipient.lastName}`,
+              address: recipient.address,
+              apt: recipient.apt || "",
+              city: recipient.city,
+              state: recipient.state,
+              zip: recipient.zip,
+              phone: recipient.phone,
+              email: recipient.email || null,
+              company: recipient.company || "",
+              message: cardMessage || "",
+            },
+            customer: {
+              firstName: customer.firstName || "",
+              lastName: customer.lastName || "",
+              fullName: `${customer.firstName} ${customer.lastName}`,
+              email: customer.email || "",
+              phone: customer.phone || "",
+            },
+            logistics: {
+              deliveryDate: logistics.deliveryDate.toISOString(),
+              deliveryTimeOption: logistics.timeOption,
+              deliveryTimeFrom:
+                logistics.timeOption === "specific" ? logistics.timeFrom : null,
+              deliveryTimeTo:
+                logistics.timeOption === "specific" ? logistics.timeTo : null,
+              specialInstructions: logistics.specialInstructions || "",
+            },
+            products: updatedProducts.map((p) => ({
+              name: p.name,
+              price: parseFloat(p.price),
+              description: p.description,
+              qty: p.qty,
+              taxable: p.taxable,
+              photo: p.photo,
+            })),
+            paymentMethods: {
+              venmo: fulfillingShop?.paymentMethods?.venmoHandle,
+              cashapp: fulfillingShop?.paymentMethods?.cashAppTag,
+              zelle: fulfillingShop?.paymentMethods?.zellePhoneOrEmail,
+              paypal: fulfillingShop?.paymentMethods?.paypalEmail,
+              default: fulfillingShop?.paymentMethods?.defaultPaymentMethod,
+            },
+            deliveryFeeOverride: Number(pricing.deliveryFee) || 0,
+            originatingShopFeeOverride: {
+              feeType: sendingShop.feeType || "flat",
+              feeValue: Number(originatingFeeValue) || 0,
+            },
+            fulfillmentType: "network",
+            fulfillingShopId: selectedShop._id,
+          };
 
-      const res = await fetch("/api/orders/create", {
+      const endpoint = usingGoogleShop
+        ? "/api/orders/outside-network/create"
+        : "/api/orders/create";
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -912,105 +763,252 @@ export default function NewOrderClient() {
     }
   };
 
-  // Add Product
-  function addProduct() {
-    setProducts([
-      ...products,
+  // Load Offerings
+  async function loadOfferings(shopId: string) {
+    const res = await fetch(`/api/shops/${shopId}/offerings`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to load offerings.");
+    }
+
+    setOfferings(data.offerings || []);
+    setSelectedProducts([]);
+  }
+
+  // Offerings Toggle Function
+  function toggleOffering(offering: any, tier?: any) {
+    const tierToUse = tier || offering.pricingTiers?.[0];
+
+    if (!tierToUse) {
+      toast.error("This offering does not have pricing set.");
+      return;
+    }
+
+    const productKey = `${offering._id}-${tierToUse.label}`;
+
+    const alreadySelected = selectedProducts.some(
+      (p) => p.productKey === productKey,
+    );
+
+    if (alreadySelected) {
+      setSelectedProducts((prev) =>
+        prev.filter((p) => p.productKey !== productKey),
+      );
+      return;
+    }
+
+    setSelectedProducts((prev) => [
+      ...prev,
       {
-        name: "",
-        price: "",
-        description: "",
-        photo: "",
-        taxable: true,
+        productKey,
+        offeringId: offering._id,
+        name: offering.name,
+        price: String(tierToUse.price),
+        description: offering.description || "",
+        photo: offering.image || "",
+        taxable: offering.taxable ?? true,
         qty: 1,
-        file: null as File | null,
+        pricingTierLabel: tierToUse.label,
+        pricingTierDescription: tierToUse.description || "",
+        offeringType: offering.type,
       },
     ]);
   }
 
-  // Select Shop in Network
-  function selectShop(state: any, setter: Function) {
+  // Select Shop In Network
+  async function selectShop(shop: any, setter: Function) {
     try {
-      setter(state);
+      setShopChosen(false);
+      setter(shop);
 
-      if (!state) return;
+      if (!shop?._id) return;
 
-      loadFulfillingShop(state._id);
+      setOfferings([]);
+      setSelectedProducts([]);
 
-      setPricing({
-        ...pricing,
-        deliveryFee: state.deliveryCharge || 0,
-      });
+      await loadFulfillingShop(shop._id);
+      await loadOfferings(shop._id);
 
-      // const newPhoto = state.featuredBouquet?.image
-      //   ? `${cfBase}/${state.featuredBouquet.image}`
-      //   : "";
+      setPricing((prev) => ({
+        ...prev,
+        deliveryFee: shop.deliveryCharge || 0,
+      }));
 
-      setProducts([
-        {
-          name: state.featuredBouquet?.name || "",
-          price: state.featuredBouquet?.price || "",
-          description: state.featuredBouquet?.description || "",
-          photo: state.featuredBouquet?.image,
-          taxable: true,
-          qty: 1,
-          file: null,
-        },
-      ]);
-    } catch (error) {
-      console.error("Error selecting shop: ", Error);
+      setShopChosen(true);
+    } catch (error: any) {
+      console.error("Error selecting shop: ", error);
+
       toast.error(
-        "There was an error when selecting shop, please try again! If it persists, contact GetBloomDirect support.",
+        error?.message ||
+          "There was an error when selecting shop, please try again!",
       );
     }
   }
 
-  // Helper to extract zip code from addressComponents
-  const getZipFromComponents = (components: any[]) => {
-    const zipObj = components?.find((c) => c.types.includes("postal_code"));
-    return zipObj?.longText || "";
-  };
+  // Select Google Shop
+  function selectGoogleShop(name: any, phone: any, address: any) {
+    try {
+      setShopChosen(false);
+      if (!name) return;
+
+      setSelectedShop(null);
+      setFulfillingShop(null);
+      setFulfillShopId("");
+      setOfferings([]);
+      setSelectedProducts([]);
+
+      setGoogleShop({
+        ...googleShop,
+        name: name,
+        phone: phone || "",
+        address: address || "",
+      });
+
+      setPricing((prev) => ({
+        ...prev,
+        productsTotal: 0.0,
+        deliveryFee: 0.0,
+        taxAmount: 0.0,
+        customerPays: 0.0,
+        orderTotal: 0.0,
+        fulfillingShopGets: 0.0,
+      }));
+
+      setShopChosen(true);
+    } catch (error: any) {
+      console.error("Error selecting Google shop: ", error);
+
+      toast.error(
+        error?.message ||
+          "There was an error when selecting Google shop, please try again!",
+      );
+    }
+  }
+
+  // Select Manual Outside Florist
+  function selectManualOutsideFlorist() {
+    try {
+      setShopChosen(false);
+
+      setSelectedShop(null);
+      setFulfillingShop(null);
+      setFulfillShopId("");
+      setOfferings([]);
+      setSelectedProducts([]);
+
+      setGoogleShop({
+        name: "Manual Outside Florist",
+        phone: "",
+        address: "",
+      });
+
+      setPricing((prev) => ({
+        ...prev,
+        productsTotal: 0,
+        deliveryFee: 0,
+        taxAmount: 0,
+        customerPays: 0,
+        orderTotal: 0,
+        fulfillingShopGets: 0,
+        feeCharge: 0,
+      }));
+
+      setShopChosen(true);
+      setOrderPage("order-form");
+      setOrderPageOption("products");
+    } catch (error: any) {
+      console.error("Error selecting manual outside florist:", error);
+      toast.error("Could not start manual outside florist order.");
+    }
+  }
+
+  // Confirm Manual Outside Florist
+  function confirmManualOutsideFlorist() {
+    if (!manualOutsideFlorist.name.trim()) {
+      toast.error("Enter the florist name.");
+      return;
+    }
+
+    setSelectedShop(null);
+    setFulfillingShop(null);
+    setFulfillShopId("");
+    setOfferings([]);
+    setSelectedProducts([]);
+
+    setGoogleShop({
+      name: manualOutsideFlorist.name,
+      phone: manualOutsideFlorist.phone,
+      address: manualOutsideFlorist.address,
+    });
+
+    setShopChosen(true);
+    setOrderPage("order-form");
+    setOrderPageOption("recipient");
+  }
 
   // Google Search Function
   const handleGoogleSearch = async () => {
-    if (!recipient.zip) return alert("Please enter a zip code first");
-    setLastZip(recipient.zip);
+    const zip = recipient.zip.trim();
+
+    if (!zip || zip.length !== 5) {
+      toast.error("Please enter a valid 5-digit ZIP code first.");
+      return;
+    }
+
     setGoogleSearch(true);
     setLoading(true);
+    setGoogleApiFailed(false);
+
     try {
-      if (lastZip === recipient.zip) {
-        setGoogleSearch(true);
-      } else {
-        const data = await searchGoogleFlorists(recipient.zip);
+      const result = await searchGoogleFlorists(zip);
 
-        // Custom sorting logic
-        const sortedData = [...data].sort((a, b) => {
-          const zipA = getZipFromComponents(a.addressComponents);
-          const zipB = getZipFromComponents(b.addressComponents);
+      if (!result.ok) {
+        setGoogleResults([]);
+        setGoogleApiFailed(true);
+        setOutsideFloristFormOpen(true);
+        toast.error(result.error || "Google florist search is unavailable. You can search Google manually or enter the florist below.");
+        return;
+      }
 
-          const isAMatch = zipA === recipient.zip;
-          const isBMatch = zipB === recipient.zip;
+      const sortedData = [...(result.places || [])].sort((a, b) => {
+        const zipA = getZipFromComponents(a.addressComponents);
+        const zipB = getZipFromComponents(b.addressComponents);
 
-          // Sort by Zip Code Match (Matching zip goes to the top)
-          if (isAMatch && !isBMatch) return -1;
-          if (!isAMatch && isBMatch) return 1;
+        const isAMatch = zipA === zip;
+        const isBMatch = zipB === zip;
 
-          // Secondary Sort: Rating (Higher ratings first)
-          const ratingA = a.rating || 0;
-          const ratingB = b.rating || 0;
-          return ratingB - ratingA;
-        });
+        if (isAMatch && !isBMatch) return -1;
+        if (!isAMatch && isBMatch) return 1;
 
-        setGoogleResults(sortedData);
+        return (b.rating || 0) - (a.rating || 0);
+      });
+
+      setGoogleResults(sortedData);
+      setLastZip(zip);
+
+      if (sortedData.length === 0) {
+        toast.error("No Google florist results found. You can enter the florist manually.");
+        setOutsideFloristFormOpen(true);
       }
     } catch (error) {
-      setGoogleSearch(false);
-      setLoading(false);
-      console.error("Search failed:", error);
-      alert("Could not fetch florists from Google.");
+      console.error("Google florist search failed:", error);
+      setGoogleResults([]);
+      setGoogleApiFailed(true);
+      setOutsideFloristFormOpen(true);
+      toast.error("Google florist search is unavailable. You can enter the florist manually.");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper to extract zip code from addressComponents
+  const getZipFromComponents = (components?: any[]) => {
+    if (!Array.isArray(components)) return "";
+
+    const zipObj = components.find((c) => c.types?.includes("postal_code"));
+
+    return zipObj?.longText || zipObj?.long_name || "";
   };
 
   // Phone Formatting
@@ -1044,7 +1042,29 @@ export default function NewOrderClient() {
     });
   };
 
-  const chooseGoogleShop = (name: string, phone: any, address: string) => {};
+  // Outside Network Helper Functions
+  const addOutsideItem = () => {
+    setOutsideNetwork((prev) => ({
+      ...prev,
+      items: [...prev.items, { name: "", description: "", qty: 1, price: 0 }],
+    }));
+  };
+
+  const updateOutsideItem = (index: number, field: string, value: any) => {
+    setOutsideNetwork((prev) => ({
+      ...prev,
+      items: prev.items.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      ),
+    }));
+  };
+
+  const removeOutsideItem = (index: number) => {
+    setOutsideNetwork((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
 
   // #endregion
 
@@ -1069,6 +1089,7 @@ export default function NewOrderClient() {
 
               <button
                 onClick={() => setOrderPage("order-form")}
+                disabled={!shopChosen}
                 className={
                   (orderPage === "order-form"
                     ? "text-white bg-purple-400 border-0"
@@ -1080,6 +1101,7 @@ export default function NewOrderClient() {
 
               <button
                 onClick={() => setOrderPage("send-order")}
+                disabled={!shopChosen}
                 className={
                   (orderPage === "send-order"
                     ? "text-emerald-50 bg-purple-400 border-0"
@@ -1108,6 +1130,7 @@ export default function NewOrderClient() {
                     >
                       We're not in this area yet.
                     </p>
+
                     <div
                       className={
                         (noShopsInArea ? "2xl:flex" : "hidden") + " flex-col"
@@ -1121,10 +1144,12 @@ export default function NewOrderClient() {
                       </p>
                     </div>
                   </div>
+
                   {/* Address Search */}
-                  <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 2xl:grid-cols-[minmax(420px,520px)_1fr] gap-6 items-start">
+                    {/* LEFT: Address Lookup */}
                     <div
-                      className="grid grid-cols-1 gap-4 pt-4 border-4 border-purple-600 rounded-lg overflow-hidden max-w-xl 2xl:max-h-96"
+                      className="grid grid-cols-1 gap-4 pt-4 border-4 border-purple-600 rounded-2xl overflow-hidden bg-white/10 shadow-xl"
                       onKeyDown={handleKeyDown}
                     >
                       {/* Header */}
@@ -1133,6 +1158,7 @@ export default function NewOrderClient() {
                           <h2 className="block text-xl font-bold text-white">
                             Address Lookup
                           </h2>
+                          
                           <p
                             className={
                               googleShop && shops.length < 1
@@ -1143,7 +1169,9 @@ export default function NewOrderClient() {
                             Chosen Shop: <b>{googleShop.name}</b>
                           </p>
                         </div>
+
                         <div>
+                          {/* Delivery Date + Times */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-2">
                             {/* Del Date */}
                             <div className="col-span-1">
@@ -1170,6 +1198,7 @@ export default function NewOrderClient() {
                                 className="order-input"
                               />
                             </div>
+
                             {/* Del Time */}
                             <div className="col-span-1">
                               <label className="order-input-label">
@@ -1191,6 +1220,7 @@ export default function NewOrderClient() {
                                 <option value="specific">Specific Time</option>
                               </select>
                             </div>
+
                             {logistics.timeOption === "specific" && (
                               <div className="grid grid-cols-2 col-span-1 sm:grid sm:grid-cols-2 sm:col-span-2 sm:gap-x-2">
                                 {/* From Time */}
@@ -1210,6 +1240,7 @@ export default function NewOrderClient() {
                                     className="order-input"
                                   />
                                 </div>
+
                                 {/* To Time */}
                                 <div>
                                   <label className="block text-lg font-bold ml-2">
@@ -1232,7 +1263,10 @@ export default function NewOrderClient() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Recipient Data */}
                       <div className="px-4 grid gap-x-4 gap-y-1 grid-cols-1 md:grid-cols-3">
+                        {/* Street Address */}
                         <div className="md:col-span-3">
                           <label className="order-input-label">
                             Recipient Street Address
@@ -1250,6 +1284,7 @@ export default function NewOrderClient() {
                             }
                           />
                         </div>
+                        {/* Zip */}
                         <div>
                           <label className="order-input-label">
                             Recipient Zip
@@ -1268,6 +1303,7 @@ export default function NewOrderClient() {
                             }
                           />
                         </div>
+                        {/* City */}
                         <div>
                           <label className="order-input-label">
                             Recipient City
@@ -1285,6 +1321,7 @@ export default function NewOrderClient() {
                             }
                           />
                         </div>
+                        {/* State */}
                         <div>
                           <label className="order-input-label">
                             Recipient State
@@ -1303,6 +1340,8 @@ export default function NewOrderClient() {
                           />
                         </div>
                       </div>
+                      
+                      {/* Search Button */}
                       <button
                         onClick={searchShops}
                         disabled={searching}
@@ -1311,333 +1350,317 @@ export default function NewOrderClient() {
                         {searching ? "Searching..." : "Find Shops"}
                       </button>
                     </div>
-                    {/* Didn't find shop in network */}
-                    {/* Search Google + screen is greater or equal to 1536px */}
-                    {googleSearch && window.innerWidth >= 1536 ? (
-                      <div className="gap-4 w-full max-w-2xl hidden 2xl:grid max-h-96 overflow-scroll">
-                        {googleResults.map((shop) => (
-                          <div
-                            key={shop.id}
-                            className={
-                              (googleShop.name === shop.displayName.text
-                                ? "bg-purple-300"
-                                : "bg-white") +
-                              " p-4 border rounded-xl shadow-sm flex justify-between"
-                            }
-                          >
-                            <div>
-                              <h3 className="font-bold text-lg text-emerald-900">
-                                {shop.displayName.text}
-                              </h3>
-                              <p className="text-gray-600">
-                                {shop.nationalPhoneNumber || "No phone listed"}
-                              </p>
-                              <p className="text-gray-600">
-                                {shop.formattedAddress || "No Address listed"}
-                              </p>
-                              {shop.rating && (
-                                <div className="text-yellow-500 font-medium">
-                                  ★ {shop.rating}{" "}
-                                  <span className="text-gray-400 text-sm">
-                                    (Google Rating)
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <button
-                                className="rounded-lg px-4 py-1 shadow-lg bg-emerald-600 text-white font-semibold transition-all hover:shadow-none hover:bg-emerald-700"
-                                onClick={() => {
-                                  setGoogleShop({
-                                    ...googleShop,
-                                    name: shop.displayName.text,
-                                    phone: shop.nationalPhoneNumber,
-                                    address: shop.formattedAddress,
-                                  });
-                                }}
-                              >
-                                Select
-                              </button>
-                            </div>
+
+                    {/* RIGHT: Results Panel */}
+                    <div className="rounded-2xl bg-white p-5 shadow-2xl border border-purple-200 min-h-[24rem] max-h-[38rem] overflow-y-auto">
+                      {!findShopSuccess && !noShopsInArea && !searching && (
+                        <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 py-16">
+                          <h2 className="text-2xl font-bold text-purple-700">
+                            Find a florist
+                          </h2>
+
+                          <p className="mt-2 max-w-md">
+                            Enter the recipient address and delivery details, then search for available florists.
+                          </p>
+                        </div>
+                      )}
+
+                      {searching && (
+                        <div className="h-full flex flex-col items-center justify-center text-center py-16">
+                          <BloomSpinner size={64} />
+
+                          <h2 className="text-2xl font-bol text-purple-700">
+                            Searching available florists...
+                          </h2>
+
+                          <p className="mt-2 text-gray-500">
+                            Checking delivery availability for this address.
+                          </p>
+                        </div>
+                      )}
+
+                      {findShopSuccess && shops.length > 0 && (
+                        <div className="space-y-4">
+                          <div>
+                            <h2 className="text-2xl font-bold text-purple-700">
+                              Available Network Florists
+                            </h2>
+
+                            <p className="text-gray-600">
+                              These GetBloomDirect florists can serve this delivery area.
+                            </p>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div></div>
-                    )}
-                  </div>
-                  {/* Found shop in network */}
-                  {findShopSuccess && (
-                    <div className="text-center sm:text-start">
-                      <p className="my-6 text-2xl font-bold text-white">
-                        Shops found! Please select below. <br />
-                      </p>
-                    </div>
-                  )}
-                  {/* No Shops Found */}
-                  {noShopsInArea && (
-                    <div className="space-y-4">
-                      <p className="text-lg mt-4 text-center sm:text-start md:max-w-lg">
-                        GetBloomDirect is expanding quickly. We don't currently
-                        have a partner florist this ZIP code - but we'd love to
-                        change that!
-                      </p>
-                      <div className="flex flex-col space-y-4">
-                        <div className="grid grid-cols-1 gap-4 w-full sm:max-w-md md:max-w-lg lg:max-w-xl">
-                          <div
-                            className={
-                              (requestFlorist ? "border-4" : "border-none") +
-                              " border-purple-600"
-                            }
-                          >
+
+                          {shops.map((shop) => (
+                            <label
+                              key={shop._id}
+                              className={`block p-5 border-2 rounded-2xl cursor-pointer transition-all ${
+                                  selectedShop?._id === shop._id
+                                    ? "border-emerald-600 bg-emerald-50 shadow-xl"
+                                    : "border-gray-200 hover:border-purple-500 hover:shadow-lg"
+                                }`}
+                            >
+                              <div className="flex justify-between gap-4">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                      {shop.businessName}
+                                    </h3>
+
+                                    {shop.verifiedFlorist && (
+                                      <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
+                                        Verified
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="text-gray-600">{shop.contact?.phone}</p>
+                                  <p>
+                                    {shop.address?.street} • {shop.address?.city}, {shop.address?.state}
+                                  </p>
+
+                                  <p className="mt-2 font-semibold text-gray-800">
+                                    Delivery Charge: ${shop.deliveryCharge}
+                                  </p>
+                                </div>
+
+                                <input 
+                                  type="radio"
+                                  name="shop"
+                                  checked={selectedShop?._id === shop._id}
+                                  onChange={() => selectShop(shop, setSelectedShop)}
+                                  className="mt-2 h-7 w-7"
+                                />
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {noShopsInArea && (
+                        <div className="space-y-5">
+                          <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
+                            <h2 className="text-2xl font-bold text-red-700">
+                              No network florist found
+                            </h2>
+
+                            <p className="mt-1 text-gray-700">
+                              GetBloomDirect does not currently have a partner florist who serves this address.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-3">
                             <button
                               onClick={() => {
-                                if (requestFlorist) {
-                                  setRequestFlorist(false);
-                                } else {
-                                  setRequestFlorist(true);
-                                }
+                                setRequestFlorist((prev) => !prev);
+                                setOutsideFloristFormOpen(true);
                               }}
-                              className={
-                                (requestFlorist
-                                  ? "rounded-none"
-                                  : "rounded-2xl") +
-                                " bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 font-bold text-xl shadow-xl w-full transition-all"
-                              }
+                              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-2xl font-bold shadow-lg transition-all"
                             >
-                              Request a florist in this area
+                              Request a Florist in This Area
                             </button>
-                            {requestFlorist ? (
-                              <form className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end my-4 px-2 transition-all">
-                                <label className="flex flex-col font-semibold">
-                                  From
-                                  <input
-                                    type="text"
-                                    name="shopName"
-                                    value={sendingShop.shopName}
-                                    readOnly
-                                    className="text-lg px-4 py-1 rounded-lg shadow-md"
-                                  />
-                                </label>
-                                <label
-                                  htmlFor="to"
-                                  className="flex flex-col font-semibold"
-                                >
-                                  To (Email Address)
-                                  <input
-                                    type="email"
-                                    name="to"
-                                    id="to"
-                                    value={toEmail}
-                                    onChange={(e) => setToEmail(e.target.value)}
-                                    className="text-lg px-4 py-1 rounded-lg shadow-md"
-                                  />
-                                </label>
-                                {/* Need to set this up to send email */}
-                                <button className="bg-emerald-600 text-white rounded-lg py-1 border-2 border-emerald-600 transition-all hover:bg-emerald-700 hover:border-emerald-700">
-                                  Send Request
-                                </button>
-                              </form>
-                            ) : (
-                              <div></div>
-                            )}
-                          </div>
-                          {/* Search for florists in zip that aren't part of GetBloomDirect */}
-                          <button
-                            onClick={handleGoogleSearch}
-                            disabled={googleSearch}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-2xl font-bold text-xl shadow-xl w-full transition-all"
-                          >
-                            Show More Shops Outside Our Network
-                          </button>
-                        </div>
 
-                        {googleSearch ? (
-                          <div className="grid gap-4 mt-8 w-full max-w-2xl 2xl:hidden">
-                            <h2 className="text-xl font-semibold -mb-4">
-                              Shops pulled from Google Search
-                            </h2>
-                            <p className="text-gray-600">
-                              Shops not part of <b>GetBloomDirect</b> network
-                              yet.
-                            </p>
-                            {googleResults.map((shop) => (
-                              <div
-                                key={shop.id}
-                                className={
-                                  (googleShop.name === shop.displayName.text
-                                    ? "bg-purple-300"
-                                    : "bg-white") +
-                                  " p-4 border rounded-xl shadow-sm flex justify-between"
-                                }
+                            <button
+                              onClick={handleGoogleSearch}
+                              disabled={loading}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-2xl font-bold shadow-lg transition-all"
+                            >
+                              {loading ? "Searching Google..." : "Show More Shops Outside Our Network"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setOutsideFloristFormOpen(true)}
+                              className="bg-white hover:bg-gray-100 text-purple-700 px-4 py-3 rounded-2xl font-bold shadow-lg transition-all border-2 border-purple-700"
+                            >
+                              Enter Outside Florist Manually
+                            </button>
+                          </div>
+
+                          {googleApiFailed && (
+                            <div className="rounded-xl border-2 border-red-500 bg-red-50 p-4">
+                              <p className="text-red-700 font-bold mb-3">
+                                Google search failed. You can still search manually and enter the florist below.
+                              </p>
+
+                              <a
+                                href={googleSearchUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold shadow transition-all"
                               >
-                                <div>
-                                  <h3 className="font-bold text-lg text-emerald-900">
-                                    {shop.displayName.text}
-                                  </h3>
-                                  <p className="text-gray-600">
-                                    {shop.nationalPhoneNumber ||
-                                      "No phone listed"}
-                                  </p>
-                                  <p className="text-gray-600">
-                                    {shop.formattedAddress ||
-                                      "No Address listed"}
-                                  </p>
-                                  {shop.rating && (
-                                    <div className="text-yellow-500 font-medium">
-                                      ★ {shop.rating}{" "}
-                                      <span className="text-gray-400 text-sm">
-                                        (Google Rating)
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div>
+                                Open Google Search
+                              </a>
+                            </div>
+                          )}
+
+                          {googleSearch && !googleApiFailed && googleResults.length > 0 && (
+                            <div className="space-y-4">
+                              <div>
+                                <h2 className="text-xl font-bold text-purple-700">
+                                  Shops pulled from Google Search
+                                </h2>
+
+                                <p className="text-sm text-gray-600">
+                                  These shops are not part of GetBloomDirect yet.
+                                </p>
+                              </div>
+
+                              {googleResults.map((shop) => (
+                                <div
+                                  key={shop.id}
+                                  className={
+                                    (googleShop.name === shop.displayName.text
+                                      ? "border-purple-600 bg-purple-50"
+                                      : "border-gray-200 bg-white") +
+                                    " p-4 border-2 rounded-xl shadow-sm flex justify-between gap-4"
+                                  }
+                                >
+                                  <div>
+                                    <h3 className="font-bold text-lg text-emerald-900">
+                                      {shop.displayName.text}
+                                    </h3>
+
+                                    <p className="text-gray-600">
+                                      {shop.nationalPhoneNumber || "No phone listed"}
+                                    </p>
+
+                                    <p className="text-gray-600">
+                                      {shop.formattedAddress || "No address listed"}
+                                    </p>
+
+                                    {shop.rating && (
+                                      <div className="text-yellow-500 font-medium">
+                                        ★ {shop.rating}
+                                        <span className="text-gray-400 text-sm"> Google Rating</span>
+                                      </div>
+                                    )}
+                                  </div>
+
                                   <button
-                                    className="rounded-lg px-4 py-1 shadow-lg bg-emerald-600 text-white font-semibold transition-all hover:shadow-none hover:bg-emerald-700"
-                                    onClick={() => {
-                                      setGoogleShop({
-                                        ...googleShop,
-                                        name: shop.displayName.text,
-                                        phone: shop.nationalPhoneNumber,
-                                        address: shop.formattedAddress,
-                                      });
-                                    }}
+                                    className="self-start rounded-lg px-4 py-2 bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+                                    onClick={() =>
+                                      selectGoogleShop(
+                                        shop.displayName.text,
+                                        shop.nationalPhoneNumber,
+                                        shop.formattedAddress,
+                                      )
+                                    }
                                   >
                                     Select
                                   </button>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {/* Shop Picker */}
-                  {shops.length > 0 && (
-                    <div className="max-h-90 overflow-scroll">
-                      <div className="space-y-6">
-                        {shops.map((shop) => (
-                          <label
-                            key={shop._id}
-                            className={`flex flex-col sm:flex-row gap-4 sm:gap-0 items-center justify-between p-6 border-4 rounded-3xl cursor-pointer transition-all relative ${
-                              selectedShop?._id === shop._id
-                                ? "border-emerald-600 bg-emerald-50 shadow-2xl text-black"
-                                : "border-gray-300 hover:border-purple-700 text-gray-800"
-                            }`}
-                          >
-                            <div
-                              className={
-                                (shop.verifiedFlorist ? "flex" : "hidden") +
-                                " sm:absolute top-2 left-2 gap-1"
-                              }
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth="1.5"
-                                stroke="currentColor"
-                                className={
-                                  (selectedShop?._id === shop._id
-                                    ? "text-purple-600"
-                                    : "text-white") + " size-6"
-                                }
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z"
-                                />
-                              </svg>
-                              <p
-                                className={
-                                  selectedShop?._id === shop._id
-                                    ? "text-purple-600"
-                                    : "text-white"
-                                }
-                              >
-                                Verified Florist
+                              ))}
+                            </div>
+                          )}
+
+                          {outsideFloristFormOpen && (
+                            <div className="mt-6 rounded-2xl bg-white p-4 shadow-xl border-2 border-purple-600 max-w-2xl">
+                              <h3 className="text-xl font-bold text-purple-700 mb-2">
+                                Outside Florist Information
+                              </h3>
+
+                              <p className="text-sm text-gray-600 mb-4">
+                                Enter the florist you contacted. Once saved, you can continue building the order.
                               </p>
-                            </div>
-                            <div className="text-center sm:text-start sm:mt-2">
-                              {/* View Account */}
-                              <Link
-                                href={`/dashboard/shops/${shop.slug}`}
-                                className="uppercase mb-2 cursor-pointer transition-all hover:text-purple-600 flex hover:gap-1 items-center"
-                              >
-                                View Account
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  strokeWidth="1.5"
-                                  stroke="currentColor"
-                                  className="size-5"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="m8.25 4.5 7.5 7.5-7.5 7.5"
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="sm:col-span-2">
+                                  <label className="text-xs uppercase text-gray-600 ml-2">
+                                    Florist Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={manualOutsideFlorist.name}
+                                    onChange={(e) =>
+                                      setManualOutsideFlorist({
+                                        ...manualOutsideFlorist,
+                                        name: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Florist name"
+                                    className="order-input"
                                   />
-                                </svg>
-                              </Link>
-                              {/* Shop Name & Phone Number */}
-                              <div className="flex flex-col sm:flex-row items-center sm:gap-2 text-xl font-bold">
-                                <h3 className="sm:flex">
-                                  {shop.businessName}{" "}
-                                  <span className="hidden ml-2 sm:block">
-                                    •
-                                  </span>{" "}
-                                </h3>
-                                <p>{shop.contact?.phone}</p>
+                                </div>
+
+                                <div>
+                                  <label className="text-xs uppercase text-gray-600 ml-2">
+                                    Phone
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={manualOutsideFlorist.phone}
+                                    onChange={(e) =>
+                                      setManualOutsideFlorist({
+                                        ...manualOutsideFlorist,
+                                        phone: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Phone number"
+                                    className="order-input"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-xs uppercase text-gray-600 ml-2">
+                                    Email optional
+                                  </label>
+                                  <input
+                                    type="email"
+                                    value={manualOutsideFlorist.email}
+                                    onChange={(e) =>
+                                      setManualOutsideFlorist({
+                                        ...manualOutsideFlorist,
+                                        email: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Email address"
+                                    className="order-input"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="text-xs uppercase text-gray-600 ml-2">
+                                    Address
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={manualOutsideFlorist.address}
+                                    onChange={(e) =>
+                                      setManualOutsideFlorist({
+                                        ...manualOutsideFlorist,
+                                        address: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Florist address"
+                                    className="order-input"
+                                  />
+                                </div>
                               </div>
-                              {/* Address */}
-                              <div>
-                                <p className="text-sm capitalize">
-                                  {shop.address?.street} • {shop.address?.city},{" "}
-                                  {shop.address?.state}
-                                </p>
-                              </div>
-                              {/* Delivery Charge & Holiday Surcharge */}
-                              <div className="flex flex-col sm:flex-row sm:gap-2 text-lg">
-                                <p>
-                                  <span className="font-semibold mr-1">
-                                    Delivery Charge:
-                                  </span>
-                                  ${shop.deliveryCharge}
-                                </p>
-                                <p
-                                  className={
-                                    shop.holidaySurcharge ? "block" : "hidden"
-                                  }
+
+                              <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                                <button
+                                  type="button"
+                                  onClick={confirmManualOutsideFlorist}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold w-full"
                                 >
-                                  •
-                                  <span className="font-semibold">
-                                    Holiday Surharge:
-                                  </span>
-                                  {shop.holidaySurcharge}
-                                </p>
+                                  Use This Florist
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setRequestFlorist(true)}
+                                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-4 py-2 rounded-xl font-semibold w-full"
+                                >
+                                  Also Invite This Florist
+                                </button>
                               </div>
-                              {/* Rating & Stats --> ADD LATER */}
                             </div>
-                            <input
-                              type="radio"
-                              name="shop"
-                              checked={selectedShop?._id === shop._id}
-                              onChange={(e) =>
-                                selectShop(shop, setSelectedShop)
-                              }
-                              className="w-8 h-8 text-emerald-600"
-                            />
-                          </label>
-                        ))}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
@@ -1837,322 +1860,353 @@ export default function NewOrderClient() {
                         </div>
                       </div>
                     </div>
+
                     {/* Product */}
-                    <div
-                      className={`
-                        ${orderPageOption === "products" ? "block" : "hidden xl:block"} 
-                      order-page-option
-                      `}
-                    >
-                      <h2 className="order-header">Products</h2>
-                      {products.map((product, index) => (
-                        <div
-                          key={index}
-                          className="border border-gray-100 rounded-2xl px-4 pb-4 shadow-sm mb-4"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            {/* Photo Preview: Only shows if a photo exists */}
-                            <div className="flex items-center gap-3">
-                              <h3 className="font-bold text-gray-700">
-                                Product #{index + 1}
-                              </h3>
-                              {/* Taxable */}
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={(e) => {
-                                    const newProducts = [...products];
-                                    if (newProducts[index].taxable === true) {
-                                      newProducts[index].taxable = false;
-                                    } else {
-                                      newProducts[index].taxable = true;
-                                    }
-                                    setProducts(newProducts);
-                                  }}
-                                >
-                                  {products[index].taxable === true ? (
-                                    <svg
-                                      width="30"
-                                      height="20"
-                                      viewBox="0 0 50 30"
-                                      fill="none"
-                                      xmlns="http://www.w3.org"
-                                    >
-                                      <rect
-                                        width="50"
-                                        height="30"
-                                        rx="15"
-                                        fill="#4ADE80"
-                                      />
-                                      <circle
-                                        cx="35"
-                                        cy="15"
-                                        r="11"
-                                        fill="white"
-                                      />
-                                    </svg>
-                                  ) : (
-                                    <svg
-                                      width="30"
-                                      height="20"
-                                      viewBox="0 0 50 30"
-                                      fill="none"
-                                      xmlns="http://www.w3.org"
-                                    >
-                                      <rect
-                                        width="50"
-                                        height="30"
-                                        rx="15"
-                                        fill="#F87171"
-                                      />
+                    {usingGoogleShop ? (
+                      <div
+                        className={`
+                          ${orderPageOption === "products" ? "block" : "hidden xl:block"} 
+                          order-page-option
+                          `}
+                      >
+                        <h2 className="order-header">Outside Network Order</h2>
 
-                                      <circle
-                                        cx="15"
-                                        cy="15"
-                                        r="11"
-                                        fill="white"
-                                      />
-                                    </svg>
-                                  )}
-                                </button>
-                                <label>Taxable</label>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {/* Add Photo */}
-                              <ToolTip text="Add Product Photo">
-                                <label
-                                  htmlFor={`photo-upload-${index}`}
-                                  className="cursor-pointer p-2 text-purple-600 rounded-xl transition"
-                                >
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    id={`photo-upload-${index}`}
-                                    className="hidden"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        // Create a temporary local URL for the preview
-                                        const localPreviewUrl =
-                                          URL.createObjectURL(file);
-
-                                        const newProducts = [...products];
-                                        newProducts[index].photo =
-                                          localPreviewUrl;
-                                        // Store the actual file object somewhere so you can upload it later
-                                        newProducts[index].file = file;
-
-                                        setProducts(newProducts);
-                                      }
-                                    }}
-                                  />
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="1.5"
-                                    stroke="currentColor"
-                                    className="w-6 h-6"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375 0 1 1-.75 0 .375 .375 0 0 1 .75 0Z"
-                                    />
-                                  </svg>
-                                </label>
-                              </ToolTip>
-                            </div>
-                          </div>
-
-                          {/* Text Inputs */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Product Name */}
-                            <div>
-                              <label className="order-input-label">
-                                Product Name
-                              </label>
-                              <input
-                                placeholder="Product Name"
-                                value={product.name}
-                                onChange={(e) => {
-                                  const newProducts = [...products];
-                                  newProducts[index].name = e.target.value;
-                                  setProducts(newProducts);
-                                }}
-                                className="order-input"
-                              />
-                            </div>
-                            {/* Price */}
-                            <div>
-                              <label className="order-input-label">Price</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                placeholder="$0.00"
-                                value={product.price}
-                                onChange={(e) => {
-                                  const newProducts = [...products];
-                                  newProducts[index].price = e.target.value;
-                                  setProducts(newProducts);
-                                }}
-                                onBlur={() => handlePriceBlur(index)}
-                                className="order-input"
-                              />
-                            </div>
-                            {/* Description */}
-                            <div>
-                              <label className="order-input-label">
-                                Description
-                              </label>
-                              <textarea
-                                placeholder="Description"
-                                value={product.description}
-                                onChange={(e) => {
-                                  const newProducts = [...products];
-                                  newProducts[index].description =
-                                    e.target.value;
-                                  setProducts(newProducts);
-                                }}
-                                rows={2}
-                                className="order-input"
-                              />
-                            </div>
-                            <div className="flex justify-between">
-                              {product.photo && (
-                                <div className="relative group self-end mb-1">
-                                  <img
-                                    src={product.photo}
-                                    alt={product.name}
-                                    className="w-24 h-24 p-1 rounded-lg object-cover border border-purple-200 cursor-zoom-in hover:opacity-80 transition"
-                                    onClick={() =>
-                                      setZoomedImage(product.photo)
-                                    }
-                                  />
-                                  {/* Optional: Clear photo button */}
-                                  <button
-                                    onClick={() => {
-                                      const newProducts = [...products];
-
-                                      if (
-                                        newProducts[index].photo.startsWith(
-                                          "blob:",
-                                        )
-                                      ) {
-                                        URL.revokeObjectURL(
-                                          newProducts[index].photo,
-                                        );
-                                      }
-
-                                      newProducts[index].photo = "";
-                                      newProducts[index].file = null;
-                                      setProducts(newProducts);
-                                    }}
-                                    className="absolute -top-2 -right-2 bg-white rounded-full shadow-md text-red-500 hover:text-red-700 p-0.5 opacity-0 group-hover:opacity-100 transition"
-                                  >
-                                    <svg
-                                      xmlns="http://www.w3.org"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      strokeWidth={2}
-                                      stroke="currentColor"
-                                      className="w-4 h-4"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-                                      />
-                                    </svg>
-                                  </button>
-                                </div>
-                              )}
-                              {/* Remove Product */}
-                              <button
-                                disabled={products.length <= 1} // Logic check
-                                onClick={() => {
-                                  const newProducts = products.filter(
-                                    (_, i) => i !== index,
-                                  );
-                                  setProducts(newProducts);
-                                }}
-                                className="p-2 text-red-500"
-                                title="Remove Product"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  strokeWidth={1.5}
-                                  stroke="currentColor"
-                                  className="w-6 h-6"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                  />
-                                </svg>
-                              </button>
-
-                              {/* THIS IS FOR QTY --> ADD LATER */}
-                              {/* <div className="rounded-full border shadow-md flex justify-evenly items-center gap-2 px-2">
-                                <p className="font-semibold text-xl hidden">
-                                  {product.qty}
-                                </p>
-                                <button
-                                  className="p-2 text-emerald-600 hidden"
-                                  onChange={() => {}}
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="1.5"
-                                    stroke="currentColor"
-                                    className="size-6"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M12 4.5v15m7.5-7.5h-15"
-                                    />
-                                  </svg>
-                                </button>
-                              </div> */}
-                            </div>
-                          </div>
+                        <div className="rounded-2xl bg-white p-4 mb-4 border">
+                          <p className="font-bold text-lg">{googleShop.name}</p>
+                          <p>{googleShop.phone || "No phone listed"}</p>
+                          <p>{googleShop.address}</p>
+                          <p className="mt-2 text-sm text-red-600 font-semibold">
+                            This florist is not in GetBloomDirect. This order
+                            will be saved as a manual reference order only.
+                          </p>
                         </div>
-                      ))}
-                      {/* Image Modal / Lightbox */}
-                      {zoomedImage && (
-                        <div
-                          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 cursor-zoom-out"
-                          onClick={() => setZoomedImage(null)} // Click background to close
+
+                        <div 
+                          className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-2"
                         >
-                          <div className="relative max-w-4xl max-h-[90vh]">
-                            <button
-                              className="absolute -top-12 right-0 text-white hover:text-gray-300 text-xl font-bold"
-                              onClick={() => setZoomedImage(null)}
-                            >
-                              Close [X]
-                            </button>
-                            <img
-                              src={zoomedImage}
-                              alt="Enlarged view"
-                              className="rounded-2xl max-w-full max-h-[85vh] object-contain shadow-2xl"
+                          <div className="sm:col-span-2 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-bold text-lg">Manual Items</h3>
+
+                              <button
+                                type="button"
+                                onClick={addOutsideItem}
+                                className="rounded-lg bg-purple-600 px-3 py-1 text-white font-semibold hover:bg-purple-700"
+                              >
+                                + Add Item
+                              </button>
+                            </div>
+
+                            {outsideNetwork.items.map((item, index) => (
+                              <div
+                                key={index}
+                                className="rounded-xl border bg-white p-3 grid grid-cols-1 sm:grid-cols-4 gap-2"
+                              >
+                                <div className="sm:col-span-2">
+                                  <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                                    Item Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="Designer's Choice, balloon, chocolates..."
+                                    value={item.name}
+                                    onChange={(e) =>
+                                      updateOutsideItem(index, "name", e.target.value)
+                                    }
+                                    className="order-input"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                                    Qty
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={item.qty}
+                                    onChange={(e) =>
+                                      updateOutsideItem(index, "qty", Number(e.target.value))
+                                    }
+                                    className="order-input"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                                    Price
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={item.price}
+                                    onChange={(e) =>
+                                      updateOutsideItem(index, "price", Number(e.target.value))
+                                    }
+                                    className="order-input"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-4">
+                                  <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                                    Description
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="Optional item details"
+                                    value={item.description}
+                                    onChange={(e) =>
+                                      updateOutsideItem(index, "description", e.target.value)
+                                    }
+                                    className="order-input"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-4 flex justify-between items-center text-sm">
+                                  <p>
+                                    Line Total:{" "}
+                                    <b>${roundToHundredth((Number(item.qty) || 1) * (Number(item.price) || 0))}</b>
+                                  </p>
+
+                                  {outsideNetwork.items.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeOutsideItem(index)}
+                                      className="text-red-600 font-semibold hover:text-red-700"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Delivery Fee */}
+                          <div>
+                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                              Delivery Fee ($)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="Delivery fee"
+                              value={outsideNetwork.deliveryFee}
+                              onChange={(e) =>
+                                setOutsideNetwork({
+                                  ...outsideNetwork,
+                                  deliveryFee: Number(e.target.value),
+                                })
+                              }
+                              className="order-input"
+                            />
+                          </div>
+                          {/* Tax Amount */}
+                          <div>
+                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                              Tax Amount ($)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="Tax amount"
+                              value={outsideNetwork.taxAmount}
+                              onChange={(e) =>
+                                setOutsideNetwork({
+                                  ...outsideNetwork,
+                                  taxAmount: Number(e.target.value),
+                                })
+                              }
+                              className="order-input"
+                            />
+                          </div>
+                          {/* Order Total */}
+                          <div>
+                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                              Order Total ($)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="Order total"
+                              value={outsideNetwork.orderTotal}
+                              onChange={(e) =>
+                                setOutsideNetwork({
+                                  ...outsideNetwork,
+                                  orderTotal: Number(e.target.value),
+                                })
+                              }
+                              className="order-input"
+                            />
+                          </div>
+                          {/* Contact Person */}
+                          <div className="sm:col-span-2">
+                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                              Contact Person
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Contact person at florist"
+                                value={outsideNetwork.contactPerson}
+                                onChange={(e) =>
+                                  setOutsideNetwork({
+                                    ...outsideNetwork,
+                                    contactPerson: e.target.value,
+                                  })
+                                }
+                                className="order-input"
+                              />
+                          </div>
+                          {/* Notes */}
+                          <div className="sm:col-span-2">
+                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
+                              Notes
+                            </label>
+                            <textarea
+                              placeholder="Manual order notes — product details, delivery info, confirmation number, etc."
+                              value={outsideNetwork.notes}
+                              onChange={(e) =>
+                                setOutsideNetwork({
+                                  ...outsideNetwork,
+                                  notes: e.target.value,
+                                })
+                              }
+                              className="order-input"
+                              rows={4}
                             />
                           </div>
                         </div>
-                      )}
-                      <button
-                        onClick={addProduct}
-                        className="bg-purple-600 text-white py-2 px-4 rounded-xl hover:bg-purple-700 transition-colors"
+                      </div>
+                    ) : (
+                      <div
+                        className={`
+                          ${orderPageOption === "products" ? "block" : "hidden xl:block"} 
+                        order-page-option
+                        `}
                       >
-                        Add Product
-                      </button>
-                    </div>
+                        <h2 className="order-header">Products</h2>
+                        {offerings.map((offering) => {
+                          const isTierSelected = (offering: any, tier: any) =>
+                            selectedProducts.some(
+                              (p) =>
+                                p.productKey ===
+                                `${offering._id}-${tier.label}`,
+                            );
+                          const isSelected = selectedProducts.some(
+                            (p) => p.offeringId === offering._id,
+                          );
+                          return (
+                            <div
+                              key={offering._id}
+                              className="relative p-4 border border-gray-300 rounded-2xl"
+                            >
+                              {isSelected && (
+                                <CheckBadgeIcon className="h-6 w-6 text-green-500 absolute top-4 right-4" />
+                              )}
+                              <p className="font-bold">{offering.name}</p>
+                              <p>{offering.description}</p>
+
+                              <div className="flex flex-wrap gap-2">
+                                {offering.pricingTiers?.map((tier: any) => (
+                                  <button
+                                    key={tier.label}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleOffering(offering, tier)
+                                    }
+                                    className="mt-2 rounded-lg bg-purple-500 px-4 py-2 text-white"
+                                  >
+                                    {isTierSelected(offering, tier) && (
+                                      <CheckBadgeIcon className="h-6 w-6 text-green-300" />
+                                    )}
+                                    Select {tier.label} - ${tier.price}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                          // <div
+                          //   key={index}
+                          //   className="p-4 border border-gray-300 rounded-2xl shadow-2xl flex flex-col gap-2 relative"
+                          // >
+                          //   {/* Chosen */}
+                          //   <div>
+                          //     <CheckBadgeIcon className="h-6 w-6 text-green-500 absolute top-4 right-4" />
+                          //   </div>
+                          //   {/* Taxable or Not */}
+                          //   <div className="font-semibold">
+                          //     {product.taxable ? (
+                          //       <p className="text-green-700">Taxable</p>
+                          //     ) : (
+                          //       <p className="text-red-700">Non-Taxable</p>
+                          //     )}
+                          //   </div>
+
+                          //   <div className="flex flex-col gap-2 sm:flex-row">
+                          //     {/* Product Photo */}
+                          //     {product.photo ? (
+                          //       <div
+                          //         className="w-24 h-24 border border-purple-200 rounded-lg overflow-hidden p-4 cursor-zoom-in transition-all flex items-center hover:p-2 hover:opacity-80"
+                          //       >
+                          //         <img
+                          //           src={product.photo}
+                          //           alt={product.name}
+                          //           onClick={() => setZoomedImage(product.photo)}
+                          //         />
+                          //       </div>
+                          //     ) : (
+                          //       <div className="h-24 w-24 flex items-center justify-center shadow-2xl border border-gray-400 rounded-md">
+                          //         {product.name}
+                          //       </div>
+                          //     )}
+
+                          //     {/* Name, Price */}
+                          //     <div>
+                          //       <p>
+                          //         <b>Name: </b>{product.name}
+                          //       </p>
+                          //       <p>
+                          //         <b>Price: </b>${product.price}
+                          //       </p>
+                          //     </div>
+                          //   </div>
+
+                          //   {/* Description */}
+                          //   <div className="p-2 border border-gray-200 rounded-lg shadow-lg text-sm">
+                          //     {product.description}
+                          //   </div>
+
+                          //   {/* Select Button */}
+                          //   <button
+                          //     className="py-2 rounded-lg shadow-2xl w-full text-white bg-purple-500 hover:bg-purple-600 transition-all"
+
+                          //   >
+                          //     Select
+                          //   </button>
+                          // </div>
+                        })}
+                        {/* Image Modal / Lightbox */}
+                        {zoomedImage && (
+                          <div
+                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 cursor-zoom-out"
+                            onClick={() => setZoomedImage(null)} // Click background to close
+                          >
+                            <div className="relative max-w-4xl max-h-[90vh]">
+                              <button
+                                className="absolute -top-12 right-0 text-white hover:text-gray-300 text-xl font-bold"
+                                onClick={() => setZoomedImage(null)}
+                              >
+                                Close [X]
+                              </button>
+                              <img
+                                src={zoomedImage}
+                                alt="Enlarged view"
+                                className="rounded-2xl max-w-full max-h-[85vh] object-contain shadow-2xl"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
+
                   {/* Delivery + Customer */}
                   <div
                     className={`
@@ -2271,6 +2325,7 @@ export default function NewOrderClient() {
                         />
                       </div>
                     </div>
+
                     {/* Customer */}
                     <div
                       className={`
@@ -2279,6 +2334,9 @@ export default function NewOrderClient() {
                       `}
                     >
                       <h2 className="order-header">Customer (Optional)</h2>
+                      <p className="text-sm -mt-2 text-red-500">
+                        *Adding a customer is recommended
+                      </p>
                       <div className="space-y-2">
                         {/* First Name */}
                         <div>
@@ -2430,10 +2488,10 @@ export default function NewOrderClient() {
                       <button
                         onClick={sendOrder}
                         disabled={
-                          !selectedShop ||
+                          (!usingNetworkShop && !usingGoogleShop) ||
                           !logistics.deliveryDate ||
-                          !googleShop ||
-                          sendingOrder
+                          sendingOrder ||
+                          (usingNetworkShop && selectedProducts.length === 0)
                         }
                         className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
                         title="Send Order"
@@ -2572,6 +2630,7 @@ export default function NewOrderClient() {
                             placeholder="20"
                           />
                         </div>
+
                         {/* Sales Tax */}
                         <div>
                           <div>
@@ -2586,83 +2645,7 @@ export default function NewOrderClient() {
                             {pricing.taxAmount}
                           </p>
                         </div>
-                        {/* Originating Fee */}
-                        {/* <div>
-                          <div className="relative">
-                            <label className="block text-xl opacity-90">
-                              Your profit (fee)
-                            </label>
-                            <div
-                              className={
-                                (shops.length < 1 ? "block" : "block") +
-                                " absolute top-1 right-2"
-                              }
-                            >
-                              {sendingShop.feeType === "flat" && (
-                                <button
-                                  onClick={() => {
-                                    if (editOriginatingFee) {
-                                      setEditOriginatingFee(false);
-                                    } else {
-                                      setEditOriginatingFee(true);
-                                    }
-                                  }}
-                                  title="Edit Originating Fee"
-                                >
-                                  {editOriginatingFee ? (
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      strokeWidth="1.5"
-                                      stroke="currentColor"
-                                      className="size-6 text-emerald-500"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                      />
-                                    </svg>
-                                  ) : (
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      strokeWidth="1.5"
-                                      stroke="currentColor"
-                                      className="size-6"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                      />
-                                    </svg>
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <input
-                            type="number"
-                            value={pricing.feeCharge}
-                            readOnly={!editOriginatingFee}
-                            onChange={(e) =>
-                              setPricing({
-                                ...pricing,
-                                feeCharge: Number(e.target.value),
-                              })
-                            }
-                            className={
-                              (editOriginatingFee
-                                ? "border-2 border-emerald-500"
-                                : "border-none") +
-                              " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
-                            }
-                            placeholder="25"
-                          />
-                        </div> */}
+
                         <div>
                           <div className="relative">
                             <label className="block text-xl opacity-90">
@@ -2757,7 +2740,7 @@ export default function NewOrderClient() {
                     {/* Products */}
                     <div>
                       <h2 className="text-xl font-semi-bold mb-4">Products</h2>
-                      {products.map((product, index) => (
+                      {selectedProducts.map((product, index) => (
                         <div
                           className="flex flex-col gap-4 border-b pb-4 mb-4"
                           key={index}
@@ -2792,12 +2775,12 @@ export default function NewOrderClient() {
                             </div>
                           </div>
                           <button
-                            disabled={products.length <= 1} // Logic check
                             onClick={() => {
-                              const newProducts = products.filter(
-                                (_, i) => i !== index,
+                              setSelectedProducts((prev) =>
+                                prev.filter(
+                                  (p) => p.productKey !== product.productKey,
+                                ),
                               );
-                              setProducts(newProducts);
                             }}
                             className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                             title="Remove Product"
@@ -2837,3 +2820,7 @@ export default function NewOrderClient() {
     </>
   );
 }
+
+
+
+

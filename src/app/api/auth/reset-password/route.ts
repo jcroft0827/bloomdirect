@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST(req: Request) {
   try {
@@ -43,7 +44,9 @@ console.log("Input securityCode:", securityCode);
     // 🚨 DO NOT HASH HERE
     shop.password = tempPassword;
 
-    await shop.save(); // pre-save hook hashes it
+    await shop.save(); 
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@
 
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -321,6 +322,8 @@ export async function POST(req: Request) {
     }
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     if (result.status === "needs_review") {
       await sendNeedsReviewEmail({

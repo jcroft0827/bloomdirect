@@ -332,6 +332,20 @@ const orderSchema = new Schema(
       default: [],
     },
 
+    fulfillmentType: {
+      type: String,
+      enum: ["network", "outside_network"],
+      default: "network",
+    },
+
+    outsideFlorist: {
+      name: String,
+      phone: String,
+      address: String,
+      contactPerson: String,
+      notes: String,
+    },
+
     acceptedAt: { type: Date, default: null },
     declinedAt: { type: Date, default: null },
     paidAt: { type: Date, default: null },

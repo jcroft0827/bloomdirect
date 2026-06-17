@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"; // adjust path if needed
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import bcrypt from "bcryptjs";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST(req: Request) {
   try {
@@ -43,7 +44,9 @@ export async function POST(req: Request) {
     // 🚨 DO NOT HASH HERE
     shop.password = newPassword;
 
-    await shop.save(); // pre-save hook hashes it
+    await shop.save(); 
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({ success: true });
   } catch (error) {

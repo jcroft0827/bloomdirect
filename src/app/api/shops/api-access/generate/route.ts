@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentShop } from "@/lib/get-current-shop";
 import { generateRawApiKey } from "@/lib/api-key";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST() {
   try {
@@ -48,6 +49,8 @@ export async function POST() {
     };
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       success: true,

@@ -4,6 +4,7 @@ import type { NextAuthOptions } from "next-auth";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import bcrypt from "bcryptjs";
+import { ensureDefaultDesignerChoice } from "./offerings/ensureDefaultOfferings";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -33,6 +34,8 @@ export const authOptions: NextAuthOptions = {
         try {
           shop.lastLogin = new Date();
           await shop.save();
+
+          await ensureDefaultDesignerChoice(shop._id.toString());
         } catch (err) {
           console.warn("Failed to update lastLogin", err);
         }

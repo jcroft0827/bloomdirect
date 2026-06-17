@@ -1,29 +1,78 @@
 // app/actions.ts
 "use server";
 
-export async function searchGoogleFlorists(zipCode: string) {
-  const apiKey = process.env.GOOGLE_API;
-  const url = "https://places.googleapis.com/v1/places:searchText";
+export type GoogleFloristResult = {
+  id: string;
+  displayName: { text: string };
+  nationalPhoneNumber?: string;
+  rating?: number;
+  formattedAddress: string;
+  addressComponents?: any[];
+};
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey || "",
-      // Field Mask specifies exactly what to return (Name, Phone, Rating, Photos)
-      "X-Goog-FieldMask":
-        "places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.rating,places.id",
-    },
-    body: JSON.stringify({
-      textQuery: `florists in ${zipCode}`,
-    }),
-  });
+export async function searchGoogleFlorists(zipCode: string): Promise<{
+  ok: boolean;
+  places: GoogleFloristResult[];
+  error?: string;
+}> {
+  try {
+    const apiKey = process.env.GOOGLE_API;
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error?.message || "Google Search Failed");
+    if (!apiKey) {
+      console.error("Google Places search failed: Missing GOOGLE_API env var.");
+      return {
+        ok: false,
+        places: [],
+        error: "Google search is not configured.",
+      };
+    }
+
+    const response = await fetch(
+      "https://places.googleapis.com/v1/places:searchText",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.rating",
+        },
+        body: JSON.stringify({
+          textQuery: `florist flower shop near ${zipCode}`,
+        }),
+      },
+    );
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      console.error("Google Places search failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        message: data?.error?.message,
+        details: data?.error,
+      });
+
+      return {
+        ok: false,
+        places: [],
+        error:
+          "Google florist search is temporarily unavailable. You can still enter the florist manually.",
+      };
+    }
+
+    return {
+      ok: true,
+      places: data?.places || [],
+    };
+  } catch (error) {
+    console.error("Google Places unexpected error:", error);
+
+    return {
+      ok: false,
+      places: [],
+      error:
+        "Google florist search is temporarily unavailable. You can still enter the florist manually.",
+    };
   }
-
-  const data = await response.json();
-  return data.places || [];
 }

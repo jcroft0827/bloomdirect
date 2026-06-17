@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import Shop from "@/models/Shop";
 import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST(req: Request) {
   try {
@@ -39,6 +40,8 @@ export async function POST(req: Request) {
     };
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({ success: true });
   } catch (error) {

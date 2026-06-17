@@ -1,6 +1,7 @@
 import authOptions from "@/lib/auth";
 import { geoCodeAddress } from "@/lib/geocode";
 import { connectToDB } from "@/lib/mongoose";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -91,6 +92,8 @@ export async function PATCH(req: Request) {
 
     // Save Changes
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     // Return a success response
     return NextResponse.json({

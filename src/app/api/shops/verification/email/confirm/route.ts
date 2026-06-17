@@ -5,6 +5,7 @@ import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 function hashCode(code: string) {
   return crypto.createHash("sha256").update(code).digest("hex");
@@ -104,6 +105,8 @@ export async function POST(req: Request) {
     }
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       success: true,

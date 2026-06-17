@@ -5,6 +5,7 @@ import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import { ApiError } from "@/lib/api-error";
 import { geoCodeAddress } from "@/lib/geocode";
+import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST(req: Request) {
   try {
@@ -90,6 +91,8 @@ export async function POST(req: Request) {
     console.log(shop);
 
     await shop.save();
+
+    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       success: true,
