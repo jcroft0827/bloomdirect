@@ -39,6 +39,8 @@ const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   ],
 
   [OrderStatus.COMPLETED]: [],
+
+  [OrderStatus.OUTSIDE_NETWORK]: [],
 };
 
 export function assertOrderTransition({
