@@ -3,17 +3,28 @@
 type SendInviteInput = {
   to: string;
   businessName: string;
-  inviteLink: string;
+  inviteLink?: string;
   personalMessage?: string;
 };
 
-export async function sendInvite(input: SendInviteInput) {
+export async function sendInvite({
+  to,
+  businessName,
+  inviteLink,
+  personalMessage,
+}: SendInviteInput) {
   const res = await fetch('/api/email/invite', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      to,
+      businessName,
+      inviteLink:
+        inviteLink || "https://www.getbloomdirect.com/register",
+      personalMessage,
+    }),
   });
 
   if (!res.ok) {

@@ -10,10 +10,11 @@ interface NavLinksProps {
   pro: boolean;
   pathname: string;
   onClose?: () => void; // Optional: used to close mobile menu on click
+  role: string;
 }
 
 // 2. Create the standalone component
-export const NavLinks = ({ slug, pro, pathname, onClose }: NavLinksProps) => {
+export const NavLinks = ({ slug, pro, pathname, role, onClose }: NavLinksProps) => {
   const isActive = (path: string) =>
     pathname === path
       ? "bg-emerald-100 text-emerald-700"
@@ -74,6 +75,15 @@ export const NavLinks = ({ slug, pro, pathname, onClose }: NavLinksProps) => {
         >
           Settings
         </Link>
+        {role === "admin" && (
+          <Link
+            href="/dashboard/admin"
+            onClick={onClose}
+            className={`block p-3 rounded-lg ${isActive("/dashboard/admin")}`}
+          >
+            Admin Panel
+          </Link>
+        )}
       </nav>
 
       <div className="mt-auto pt-6 border-t space-y-2">

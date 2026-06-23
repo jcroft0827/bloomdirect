@@ -1,3 +1,5 @@
+// src/types/order.ts
+
 import { OrderStatus } from "@/lib/order-status";
 
 export interface OrderActivityLean {
@@ -88,6 +90,17 @@ export interface OrderReviewsLean {
   createdAt: string;
 }
 
+export interface OutsideFlorist {
+  outsideNetworkFlorist: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  googlePlaceId: string;
+  contactPerson: string;
+  notes: string;
+}
+
 export type OrderLean = {
   _id: string;
 
@@ -95,6 +108,9 @@ export type OrderLean = {
 
   originatingShop: string;
   originatingShopName: string;
+
+  fulfillmentType: string;
+
   fulfillingShop: string;
   fulfillingShopName: string;
 
@@ -115,6 +131,8 @@ export type OrderLean = {
   declineReason?: string;
   declineMessage?: string;
   declineHistory?: OrderDeclineHistoryLean[];
+
+  outsideFlorist?: OutsideFlorist;
 
   activityLog?: OrderActivityLean[];
 

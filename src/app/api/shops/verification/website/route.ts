@@ -7,6 +7,7 @@ import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import WebsiteVerificationRequest from "@/models/WebsiteVerificationRequest";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -135,6 +136,45 @@ async function sendNeedsReviewEmail({
         </div>
       </div>
     `,
+  });
+}
+
+async function saveWebsiteNeedsReviewInfo({
+  shop,
+  website,
+  failureReason,
+  matchedSignals,
+  riskSignals,
+}: {
+  shop: any;
+  website: string;
+  failureReason: string;
+  matchedSignals: string[];
+  riskSignals: string[];
+}) {
+  const existingRequest =
+    await WebsiteVerificationRequest.findOne({
+      shop: shop._id,
+      status: "pending",
+    });
+
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  return WebsiteVerificationRequest.create({
+    shop: shop._id,
+    shopName: shop.businessName,
+    shopEmail: shop.email,
+    phone: shop.contact?.phone,
+    city: shop.address?.city,
+    state: shop.address?.state,
+    zip: shop.address?.zip,
+    websiteUrl: website,
+    failureReason,
+    matchedSignals,
+    riskSignals,
+    status: "pending",
   });
 }
 
@@ -327,6 +367,14 @@ export async function POST(req: Request) {
 
     if (result.status === "needs_review") {
       await sendNeedsReviewEmail({
+        shop,
+        website: normalizedWebsite,
+        failureReason: result.failureReason,
+        matchedSignals: result.matchedSignals,
+        riskSignals: result.riskSignals,
+      });
+
+      await saveWebsiteNeedsReviewInfo({
         shop,
         website: normalizedWebsite,
         failureReason: result.failureReason,

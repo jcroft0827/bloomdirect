@@ -9,6 +9,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import OutsideNetworkFlorists from "@/models/OutsideNetworkFlorists";
 import { OrderStatus } from "@/lib/order-status";
+import ZipDemand from "@/models/ZipDemand";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -77,20 +78,25 @@ export async function POST(req: Request) {
       );
     }
 
+    const normalizedName = outsideShop.name.trim();
+
+    const outsideFloristQuery = outsideShop.googlePlaceId
+      ? { googlePlaceId: outsideShop.googlePlaceId }
+      : outsideShop.phone
+        ? { businessName: normalizedName, phone: outsideShop.phone }
+        : { businessName: normalizedName, address: outsideShop.address || "" };
+
     const outsideFloristRecord = await OutsideNetworkFlorists.findOneAndUpdate(
-      {
-        zip: recipient.zip,
-        businessName: outsideShop.name.trim(),
-      },
+      outsideFloristQuery,
       {
         $set: {
-          businessName: outsideShop.name.trim(),
+          businessName: normalizedName,
           phone: outsideShop.phone || "",
           email: outsideShop.email || "",
           address: outsideShop.address || "",
-          city: recipient.city || "",
-          state: recipient.state || "",
-          zip: recipient.zip || "",
+          city: outsideShop.city || recipient.city || "",
+          state: outsideShop.state || recipient.state || "",
+          zip: outsideShop.zip || recipient.zip || "",
           googlePlaceId: outsideShop.googlePlaceId || "",
           source: outsideShop.googlePlaceId ? "google" : "manual",
           lastUsedAt: new Date(),
@@ -105,7 +111,7 @@ export async function POST(req: Request) {
       {
         new: true,
         upsert: true,
-      },
+      }
     );
 
     const products = manualOrder.items.map((item: any) => {
@@ -202,6 +208,23 @@ export async function POST(req: Request) {
     await Shop.findByIdAndUpdate(originShop._id, {
       $inc: { "stats.ordersSent": 1 },
     });
+
+    try {
+      await ZipDemand.findOneAndUpdate(
+        { zip: recipient.zip },
+        {
+          $inc: { demandScore: 1 },
+          $set: { lastUpdated: new Date() },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        }
+      );
+    } catch (error) {
+      console.error("Failed to update ZipDemand:", error);
+    }
 
     return NextResponse.json({ success: true, orderId: order._id }, { status: 201 });
   } catch (error: any) {

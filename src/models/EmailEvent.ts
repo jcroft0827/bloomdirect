@@ -1,3 +1,5 @@
+// src/models/EmailEvent.ts
+
 import { model, models, Schema } from "mongoose";
 
 const EmailEventSchema = new Schema(

@@ -1,5 +1,6 @@
 // src/types/next-auth.d.ts
 import "next-auth";
+import { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   interface Session {
@@ -9,9 +10,10 @@ declare module "next-auth" {
       name?: string | null;
       isPro: boolean;
       proSince?: string | null;
+      role?: string;
       // any additional fields you expose
       [key: string]: any;
-    };
+    } & DefaultSession["user"];
   }
 
   interface User {
@@ -21,6 +23,7 @@ declare module "next-auth" {
     isPro?: boolean;
     proSince?: string | null;
     logo?: string | null;
+    role?: string | null;
   }
 }
 
@@ -32,6 +35,7 @@ declare module "next-auth/jwt" {
     isPro?: boolean;
     proSince?: string | null;
     logo?: string | null;
+    role?: string;
     // `sub` will still be set by NextAuth if present
   }
 }

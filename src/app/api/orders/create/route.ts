@@ -14,6 +14,7 @@ import {
 } from "@/lib/order-settlement";
 import { OrderActivityActions } from "@/lib/order-activity";
 import Notifications from "@/models/Notifications";
+import ZipDemand from "@/models/ZipDemand";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -76,7 +77,8 @@ export async function POST(req: Request) {
     }
 
     const deliveryFeeCents = Math.round(
-      Number(deliveryFeeOverride ?? fulfillShop.delivery?.fallbackFee ?? 0) * 100,
+      Number(deliveryFeeOverride ?? fulfillShop.delivery?.fallbackFee ?? 0) *
+        100,
     );
 
     const feeSnapshot = {
@@ -86,8 +88,8 @@ export async function POST(req: Request) {
         "flat",
       feeValue: Number(
         originatingShopFeeOverride?.feeValue ??
-        originShop.financials?.feeValue ??
-        0,
+          originShop.financials?.feeValue ??
+          0,
       ),
     } as const;
 
@@ -147,7 +149,7 @@ export async function POST(req: Request) {
         originatingShopKeepsCents: settlement.originatingShopKeepsCents,
       },
 
-            paymentMethods: {
+      paymentMethods: {
         venmo: fulfillShop.paymentMethods?.venmoHandle || "",
         cashapp: fulfillShop.paymentMethods?.cashAppTag || "",
         zelle: fulfillShop.paymentMethods?.zellePhoneOrEmail || "",
@@ -190,7 +192,7 @@ export async function POST(req: Request) {
       read: false,
       readAt: null,
     });
-    
+
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     await resend.emails.send({
@@ -371,7 +373,23 @@ export async function POST(req: Request) {
         </html>
       `,
     });
-    
+
+    try {
+      await ZipDemand.findOneAndUpdate(
+        { zip: recipient.zip },
+        {
+          $inc: { demandScore: 1 },
+          $set: { lastUpdated: new Date() },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
+      );
+    } catch (error) {
+      console.error("Failed to update ZipDemand:", error);
+    }
 
     return NextResponse.json({ success: true, order }, { status: 201 });
   } catch (error: any) {

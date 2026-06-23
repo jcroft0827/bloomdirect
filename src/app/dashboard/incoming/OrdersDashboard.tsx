@@ -559,40 +559,6 @@ export default function OrdersDashboard() {
             </div>
           </div>
 
-          {/* Filters */}
-          {/* <div className="hidden mb-8 flex-wrap gap-4 items-center justify-between">
-            <div>
-              <label></label>
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value as any)}
-                className="rounded-xl p-2 border"
-              >
-                <option value="all">All Orders</option>
-                <option value="originating">Sent Orders</option>
-                <option value="fulfilling">Incoming Orders</option>
-              </select>
-            </div>
-            <div>
-              <select
-                multiple
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(
-                    Array.from(e.target.selectedOptions).map((o) => o.value),
-                  )
-                }
-                className="rounded-xl p-2 border"
-              >
-                {Object.entries(statusLabels).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div> */}
-
           {orders.length === 0 ? (
             <div className="text-center py-32">
               <p className="text-3xl text-gray-600">No orders found</p>
@@ -610,6 +576,12 @@ export default function OrdersDashboard() {
                         : "border-yellow-500"
                   }`}
                 >
+                  <div className="flex flex-col w-full p-2 text-gray-700 bg-yellow-200 text-center">
+                    <h2 className="text-lg font-black">Outside Network Order</h2>
+                    <p className="text-sm font-semibold">
+                      This is an outside network order & is stored for your records only.
+                    </p>
+                  </div>
                   <div className="grid lg:grid-cols-2 gap-8 p-4 lg:py-6 2xl:grid-cols-3 2xl:gap-4">
                     {/* LEFT: Order Info + Order Status */}
                     <div className="space-y-4 text-center lg:col-span-1">
@@ -873,12 +845,14 @@ export default function OrdersDashboard() {
                         >
                           View Order
                         </Link>
-                        <Link
-                          href={`/dashboard/orders/messages/${order._id}`}
-                          className="self-center px-8 py-1 rounded-md shadow-md bg-purple-600 border border-purple-600 text-white transition-all hover:text-purple-600 hover:bg-white"
-                        >
-                          Messages
-                        </Link>
+                        {order.status !== OrderStatus.OUTSIDE_NETWORK && (
+                          <Link
+                            href={`/dashboard/orders/messages/${order._id}`}
+                            className="self-center px-8 py-1 rounded-md shadow-md bg-purple-600 border border-purple-600 text-white transition-all hover:text-purple-600 hover:bg-white"
+                          >
+                            Messages
+                          </Link>
+                        )}
                       </div>
                       {/* Products */}
                       <div className="overflow-y-scroll max-h-96">

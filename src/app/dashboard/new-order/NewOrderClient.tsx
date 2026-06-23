@@ -9,6 +9,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { searchGoogleFlorists } from "@/app/actions";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import BloomSpinner from "@/components/BloomSpinner";
+import { sendInvite } from "@/lib/client/sendInvite";
 
 // #region Interfaces
 
@@ -243,13 +244,17 @@ export default function NewOrderClient() {
         description: "",
         qty: 1,
         price: 0,
+        taxable: true,
       },
     ],
     deliveryFee: 0,
+    deliveryTaxed: true,
     taxAmount: 0,
+    taxPercent: 0,
     orderTotal: 0,
     notes: "",
   });
+  const [editOutsideTax, setEditOutsideTax] = useState(false);
   const [googleSearch, setGoogleSearch] = useState(false);
   const [outsideFloristFormOpen, setOutsideFloristFormOpen] = useState(false);
   const [googleApiFailed, setGoogleApiFailed] = useState(false);
@@ -259,6 +264,7 @@ export default function NewOrderClient() {
     address: "",
     email: "",
   });
+  const [outsideNetworkOrderSent, setOutsideNetworkOrderSent] = useState(false);
 
   const [lastZip, setLastZip] = useState("");
 
@@ -332,6 +338,8 @@ export default function NewOrderClient() {
   const [orderPageOption, setOrderPageOption] = useState("recipient");
 
   const [sendingOrder, setSendingOrder] = useState(false);
+
+  const [emailingInvite, setEmailingInvite] = useState(false);
 
   // Variables
   const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(
@@ -624,6 +632,10 @@ export default function NewOrderClient() {
           )
         : [];
 
+      const outsideTotals = usingGoogleShop
+          ? calculateOutsideNetworkTotals()
+          : null;
+
       const payload = usingGoogleShop
         ? {
             fulfillmentType: "outside_network",
@@ -672,15 +684,13 @@ export default function NewOrderClient() {
                 qty: Number(item.qty) || 1,
                 price: roundMoney(item.price),
                 lineTotal: roundMoney((Number(item.qty) || 1) * (Number(item.price) || 0)),
+                taxable: item.taxable !== false,
               })),
-              productTotal: roundMoney(
-                outsideNetwork.items.reduce((sum, item) => {
-                  return sum + (Number(item.qty) || 1) * (Number(item.price) || 0);
-                }, 0),
-              ),
-              deliveryFee: roundMoney(outsideNetwork.deliveryFee),
-              taxAmount: roundMoney(outsideNetwork.taxAmount),
-              orderTotal: roundMoney(outsideNetwork.orderTotal),
+              productTotal: outsideTotals?.productsTotal || 0,
+              deliveryFee: outsideTotals?.deliveryFee || 0,
+              taxAmount: outsideTotals?.taxAmount || 0,
+              taxPercent: outsideTotals?.taxPercent || 0,
+              orderTotal: outsideTotals?.orderTotal || 0,
             },
             manualNotes: outsideNetwork.notes || "",
           }
@@ -957,6 +967,8 @@ export default function NewOrderClient() {
       googlePlaceId: "",
     });
 
+    setToEmail(manualOutsideFlorist.email || "");
+
     setShopChosen(true);
     setOrderPage("order-form");
     setOrderPageOption("recipient");
@@ -1069,7 +1081,7 @@ export default function NewOrderClient() {
   const addOutsideItem = () => {
     setOutsideNetwork((prev) => ({
       ...prev,
-      items: [...prev.items, { name: "", description: "", qty: 1, price: 0 }],
+      items: [...prev.items, { name: "", description: "", qty: 1, price: 0, taxable: true }],
     }));
   };
 
@@ -1087,6 +1099,251 @@ export default function NewOrderClient() {
       ...prev,
       items: prev.items.filter((_, i) => i !== index),
     }));
+  };
+
+  const calculateOutsideNetworkTotals = (overrides?: {
+    deliveryFee?: number;
+    taxPercent?: number;
+    feeValue?: number;
+  }) => {
+    const deliveryFee =
+      overrides?.deliveryFee ?? (Number(outsideNetwork.deliveryFee) || 0);
+
+    const taxPercent =
+      overrides?.taxPercent ?? (Number(outsideNetwork.taxPercent) || 0);
+
+    const feeValue =
+      overrides?.feeValue ?? (Number(originatingFeeValue) || 0);
+
+    const taxableSubtotal = outsideNetwork.items.reduce((sum, item) => {
+      const qty = Number(item.qty) || 1;
+      const price = Number(item.price) || 0;
+
+      return item.taxable !== false ? sum + qty * price : sum;
+    }, 0);
+
+    const productsTotal = outsideNetwork.items.reduce((sum, item) => {
+      const qty = Number(item.qty) || 1;
+      const price = Number(item.price) || 0;
+
+      return sum + qty * price;
+    }, 0);
+
+    const feeCharge =
+      sendingShop.feeType === "%"
+        ? productsTotal * (feeValue / 100)
+        : feeValue;
+
+    const taxableBasis =
+      taxableSubtotal +
+      (outsideNetwork.deliveryTaxed ? deliveryFee : 0) +
+      (sendingShop.feeTaxed ? feeCharge : 0);
+
+    const taxAmount = taxableBasis * (taxPercent / 100);
+
+    const customerPays = productsTotal + deliveryFee + feeCharge + taxAmount;
+
+    const fulfillingShopGets = productsTotal + deliveryFee;
+
+    return {
+      productsTotal: parseFloat(roundToHundredth(productsTotal)),
+      deliveryFee: parseFloat(roundToHundredth(deliveryFee)),
+      taxAmount: parseFloat(roundToHundredth(taxAmount)),
+      taxPercent: parseFloat(roundToHundredth(taxPercent)),
+      feeCharge: parseFloat(roundToHundredth(feeCharge)),
+      customerPays: parseFloat(roundToHundredth(customerPays)),
+      orderTotal: parseFloat(roundToHundredth(customerPays)),
+      fulfillingShopGets: parseFloat(roundToHundredth(fulfillingShopGets)),
+    };
+  };
+
+  const outsideTotals = calculateOutsideNetworkTotals();
+
+  const editOutsideDeliveryFee = () => {
+    setEditDeliveryFee(false);
+  };
+
+  const editOutsideTaxPercentage = () => {
+    setEditOutsideTax(false);
+  };
+
+  const editOutsideOriginatingFee = () => {
+    setEditOriginatingFee(false);
+  };
+
+  const refreshOutsideNetworkTotals = () => {
+    const totals = calculateOutsideNetworkTotals();
+
+    setOutsideNetwork((prev) => ({
+      ...prev,
+      taxAmount: totals.taxAmount,
+      orderTotal: totals.orderTotal,
+    }));
+
+    setPricing((prev) => ({
+      ...prev,
+      productsTotal: totals.productsTotal,
+      deliveryFee: totals.deliveryFee,
+      taxAmount: totals.taxAmount,
+      feeCharge: totals.feeCharge,
+      customerPays: totals.customerPays,
+      orderTotal: totals.orderTotal,
+      fulfillingShopGets: totals.fulfillingShopGets,
+    }));
+  };
+
+  const emailOutsideNetworkOrder = async () => {
+    try {
+      const emailToUse = toEmail || googleShop.email || "";
+
+      if (!emailToUse.trim()) {
+        toast.error("Enter the florist email address first.");
+        return;
+      }
+
+      if (!googleShop?.name) {
+        toast.error("Select or enter an outside florist first.");
+        return;
+      }
+
+      if (!logistics.deliveryDate) {
+        toast.error("Select delivery date.");
+        return;
+      }
+
+      if (
+        !recipient.firstName ||
+        !recipient.lastName ||
+        !recipient.phone ||
+        !recipient.address ||
+        !recipient.zip ||
+        !recipient.city ||
+        !recipient.state
+      ) {
+        toast.error("Enter all recipient information.");
+        return;
+      }
+
+      if (!outsideNetwork.items.length) {
+        toast.error("Add at least one item.");
+        return;
+      }
+
+      const outsideTotals = calculateOutsideNetworkTotals();
+
+      const res = await fetch("/api/orders/outside-network/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          toEmail: emailToUse,
+
+          outsideFlorist: {
+            name: googleShop.name,
+            phone: googleShop.phone || "",
+            email: emailToUse,
+            address: googleShop.address || "",
+            googlePlaceId: googleShop.googlePlaceId || "",
+          },
+
+          recipient: {
+            firstName: recipient.firstName,
+            lastName: recipient.lastName,
+            fullName: `${recipient.firstName} ${recipient.lastName}`,
+            address: recipient.address,
+            apt: recipient.apt || "",
+            city: recipient.city,
+            state: recipient.state,
+            zip: recipient.zip,
+            phone: recipient.phone,
+            email: recipient.email || "",
+            company: recipient.company || "",
+            message: cardMessage || "",
+          },
+
+          customer: {
+            firstName: customer.firstName || "",
+            lastName: customer.lastName || "",
+            fullName: `${customer.firstName} ${customer.lastName}`,
+            email: customer.email || "",
+            phone: customer.phone || "",
+          },
+
+          logistics: {
+            deliveryDate: logistics.deliveryDate.toISOString(),
+            deliveryTimeOption: logistics.timeOption,
+            deliveryTimeFrom:
+              logistics.timeOption === "specific" ? logistics.timeFrom : null,
+            deliveryTimeTo:
+              logistics.timeOption === "specific" ? logistics.timeTo : null,
+            specialInstructions: logistics.specialInstructions || "",
+          },
+
+          manualOrder: {
+            contactPerson: outsideNetwork.contactPerson || "",
+            items: outsideNetwork.items.map((item) => ({
+              name: item.name,
+              description: item.description || "",
+              qty: Number(item.qty) || 1,
+              price: Number(item.price) || 0,
+              lineTotal: (Number(item.qty) || 1) * (Number(item.price) || 0),
+              taxable: item.taxable !== false,
+            })),
+            productTotal: outsideTotals.productsTotal,
+            deliveryFee: outsideTotals.deliveryFee,
+            deliveryTaxed: outsideNetwork.deliveryTaxed,
+            taxAmount: outsideTotals.taxAmount,
+            taxPercent: outsideTotals.taxPercent,
+            orderTotal: outsideTotals.orderTotal,
+            sendingShopFee: outsideTotals.feeCharge,
+            fulfillingShopGets: outsideTotals.fulfillingShopGets,
+          },
+
+          cardMessage,
+          manualNotes: outsideNetwork.notes || "",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to email order.");
+      }
+
+      setOutsideNetworkOrderSent(true);
+      toast.success("Order email sent successfully.");
+    } catch (error: any) {
+      setOutsideNetworkOrderSent(false);
+      console.error("EMAIL OUTSIDE NETWORK ORDER ERROR:", error);
+      toast.error(error.message || "Failed to email order.");
+    }
+  };
+
+    const handleInviteFlorist = async () => {
+    try {
+      if (!manualOutsideFlorist.email) {
+        alert("Please add the florist email first.");
+        return;
+      }
+
+      setEmailingInvite(true);
+
+      await sendInvite({
+        to: manualOutsideFlorist.email,
+        businessName: sendingShop.shopName,
+        personalMessage:
+          "We recently worked with your shop and wanted to invite you to join GetBloomDirect.",
+      });
+
+      setEmailingInvite(false);
+      toast.success("Invitation sent successfully.");
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Failed to send invitation.");
+    } finally {
+      setEmailingInvite(false);
+    }
   };
 
   // #endregion
@@ -1123,7 +1380,13 @@ export default function NewOrderClient() {
               </button>
 
               <button
-                onClick={() => setOrderPage("send-order")}
+                onClick={() => {
+                  if (usingGoogleShop) {
+                    refreshOutsideNetworkTotals();
+                  }
+
+                  setOrderPage("send-order");
+                }}
                 disabled={!shopChosen}
                 className={
                   (orderPage === "send-order"
@@ -1131,7 +1394,7 @@ export default function NewOrderClient() {
                     : "border") + " rounded-t-2xl px-4 py-2"
                 }
               >
-                Send Order
+                {usingGoogleShop ? "Save Order" : "Send Order"}
               </button>
             </div>
 
@@ -1567,6 +1830,7 @@ export default function NewOrderClient() {
                                         shop.displayName.text,
                                         shop.nationalPhoneNumber,
                                         shop.formattedAddress,
+                                        "",
                                         shop.id,
                                       )
                                     }
@@ -1673,10 +1937,10 @@ export default function NewOrderClient() {
 
                                 <button
                                   type="button"
-                                  onClick={() => setRequestFlorist(true)}
+                                  onClick={handleInviteFlorist}
                                   className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-4 py-2 rounded-xl font-semibold w-full"
                                 >
-                                  Also Invite This Florist
+                                  {emailingInvite ? "Sending..." : "Also Invite This Florist"}
                                 </button>
                               </div>
                             </div>
@@ -1926,6 +2190,35 @@ export default function NewOrderClient() {
                                 key={index}
                                 className="rounded-xl border bg-white p-3 grid grid-cols-1 sm:grid-cols-4 gap-2"
                               >
+                                {/* Taxable Switch */}
+                                <div className="sm:col-span-4 flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 border">
+                                  <div>
+                                    <p className="font-semibold text-gray-800">Taxable Item</p>
+                                    <p className="text-xs text-gray-500">
+                                      Turn off if this item should not be included in tax.
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateOutsideItem(index, "taxable", item.taxable === false)
+                                    }
+                                    className={
+                                      "relative inline-flex h-7 w-12 items-center rounded-full transition " +
+                                      (item.taxable !== false ? "bg-emerald-600" : "bg-gray-300")
+                                    }
+                                  >
+                                    <span
+                                      className={
+                                        "inline-block h-5 w-5 transform rounded-full bg-white transition " +
+                                        (item.taxable !== false ? "translate-x-6" : "translate-x-1")
+                                      }
+                                    />
+                                  </button>
+                                </div>
+
+                                {/* Item Name */}
                                 <div className="sm:col-span-2">
                                   <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
                                     Item Name
@@ -1941,10 +2234,12 @@ export default function NewOrderClient() {
                                   />
                                 </div>
 
+                                {/* Item QTY */}
                                 <div>
                                   <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
                                     Qty
                                   </label>
+
                                   <input
                                     type="number"
                                     min={1}
@@ -1956,15 +2251,15 @@ export default function NewOrderClient() {
                                   />
                                 </div>
 
+                                {/* Item Price */}
                                 <div>
                                   <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
                                     Price
                                   </label>
+
                                   <input
                                     type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={item.price}
+                                    value={item.price === 0 ? "" : item.price}
                                     onChange={(e) =>
                                       updateOutsideItem(index, "price", Number(e.target.value))
                                     }
@@ -1972,10 +2267,12 @@ export default function NewOrderClient() {
                                   />
                                 </div>
 
+                                {/* Item Description */}
                                 <div className="sm:col-span-4">
                                   <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
                                     Description
                                   </label>
+
                                   <input
                                     type="text"
                                     placeholder="Optional item details"
@@ -2006,60 +2303,7 @@ export default function NewOrderClient() {
                               </div>
                             ))}
                           </div>
-                          {/* Delivery Fee */}
-                          <div>
-                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
-                              Delivery Fee ($)
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="Delivery fee"
-                              value={outsideNetwork.deliveryFee}
-                              onChange={(e) =>
-                                setOutsideNetwork({
-                                  ...outsideNetwork,
-                                  deliveryFee: Number(e.target.value),
-                                })
-                              }
-                              className="order-input"
-                            />
-                          </div>
-                          {/* Tax Amount */}
-                          <div>
-                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
-                              Tax Amount ($)
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="Tax amount"
-                              value={outsideNetwork.taxAmount}
-                              onChange={(e) =>
-                                setOutsideNetwork({
-                                  ...outsideNetwork,
-                                  taxAmount: Number(e.target.value),
-                                })
-                              }
-                              className="order-input"
-                            />
-                          </div>
-                          {/* Order Total */}
-                          <div>
-                            <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
-                              Order Total ($)
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="Order total"
-                              value={outsideNetwork.orderTotal}
-                              onChange={(e) =>
-                                setOutsideNetwork({
-                                  ...outsideNetwork,
-                                  orderTotal: Number(e.target.value),
-                                })
-                              }
-                              className="order-input"
-                            />
-                          </div>
+
                           {/* Contact Person */}
                           <div className="sm:col-span-2">
                             <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
@@ -2078,6 +2322,7 @@ export default function NewOrderClient() {
                                 className="order-input"
                               />
                           </div>
+
                           {/* Notes */}
                           <div className="sm:col-span-2">
                             <label className="text-xs opacity-75 text-gray-700 uppercase ml-2">
@@ -2503,380 +2748,752 @@ export default function NewOrderClient() {
                   " bg-purple-400 rounded-b-2xl shadow-lg p-4 md:rounded-tr-2xl"
                 }
               >
-                <div className="p-4 rounded-2xl shadow-lg bg-white">
-                  {/* Order Overview */}
-                  <div className="flex flex-col gap-4">
-                    {/* Outside Network Warning Card */}
-                    {usingGoogleShop && (
-                      <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900">
-                        <h3 className="font-bold text-lg">Outside-Network Reference Order</h3>
+                {usingGoogleShop ? (
+                  <div className="p-4 rounded-2xl shadow-lg bg-white">
+                    {/* Order Overview */}
+                    <div className="flex flex-col gap-4">
+                        <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900">
+                          <h3 className="font-bold text-lg">Outside-Network Reference Order</h3>
 
-                        <p className="text-sm">
-                          This florist is not part of GetBloomDirect. This order will be saved for your records only. No notification, payment workflow, messaging, POS webhook, or review request will be sent.
-                        </p>
-
-                        <div className="mt-4 rounded-xl bg-white/70 p-3 border border-amber-200">
-                          <p>
-                            Want to invite {googleShop.name || "this florist"} to GetBloomDirect?
-                          </p>
-
-                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                            <input 
-                              type="email"
-                              value={toEmail}
-                              onChange={(e) => setToEmail(e.target.value)}
-                              placeholder="Florist email address"
-                              className="rounded-lg border px-3 py-2 text-black w-full"
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRequestFlorist(true);
-                                toast.success("Invite email ready to send.");
-                              }}
-                              className="rounded-lg bg-purple-600 px-4 py-2 font-bold text-white hover:bg-purple-700"
-                            >
-                              Invite Florist
-                            </button>
-                          </div>
-
-                          <p className="mt-2 text-xs text-amber-800">
-                            Inviting them helps bring more florists into the network and makes future orders easier.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Send Button */}
-                    <div className="border-b pb-4">
-                      <button
-                        onClick={sendOrder}
-                        disabled={
-                          (!usingNetworkShop && !usingGoogleShop) ||
-                          !logistics.deliveryDate ||
-                          sendingOrder ||
-                          (usingNetworkShop && selectedProducts.length === 0)
-                        }
-                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
-                        title="Send Order"
-                      >
-                        {usingGoogleShop ? "Save Outside-Network Order" : `Send Order & Keep $${pricing.feeCharge} →`}
-                      </button>
-                    </div>
-
-                    {/* Card Message */}
-                    <div className="border-b pb-4 flex flex-col gap-2">
-                      <button
-                        onClick={() => setAddCard(true)}
-                        className={
-                          (addCard ? "hidden" : "block") +
-                          " bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
-                        }
-                        title="Add Card Message"
-                      >
-                        Add Card Message
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAddCard(false);
-                        }}
-                        className={
-                          (addCard ? "block" : "hidden") +
-                          " self-end mr-4 rounded-full bg-red-500 hover:bg-red-600 py-1 px-[0.6rem] text-white text-sm transition-all"
-                        }
-                        title="Remove Card Message"
-                      >
-                        X
-                      </button>
-                      <label
-                        className={
-                          (addCard ? "block" : "hidden") +
-                          " text-xs text-gray-500 uppercase"
-                        }
-                      >
-                        Card Message
-                        <textarea
-                          placeholder="I love you mom..."
-                          onChange={(e) => setCardMessage(e.target.value)}
-                          className={
-                            (addCard ? "block" : "hidden") +
-                            " w-full border rounded-lg p-2 text-base text-black"
-                          }
-                        ></textarea>
-                      </label>
-                    </div>
-
-                    {/* Totals */}
-                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-6 text-center flex flex-col justify-evenly">
-                      <h2 className="text-4xl md:text-3xl 2xl:text-4xl font-black mb-4">
-                        Customer Pays
-                      </h2>
-                      <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
-                        {/* Products Total */}
-                        <div>
-                          <label className="block text-xl opacity-90">
-                            Product Total
-                          </label>
-                          <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
-                            {roundToHundredth(pricing.productsTotal)}
-                          </p>
-                        </div>
-                        {/* Delivery Fee */}
-                        <div>
-                          <div className="relative">
-                            <label className="block text-xl opacity-90">
-                              Delivery fee
-                            </label>
-                            <div
-                              className={
-                                (shops.length < 1 ? "block" : "hidden") +
-                                " absolute top-1 right-2"
-                              }
-                            >
-                              <button
-                                onClick={() => {
-                                  if (editDeliveryFee) {
-                                    setEditDeliveryFee(false);
-                                  } else {
-                                    setEditDeliveryFee(true);
-                                  }
-                                }}
-                                title="Edit Delivery Fee"
-                              >
-                                {editDeliveryFee ? (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="1.5"
-                                    stroke="currentColor"
-                                    className="size-6 text-emerald-500"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="1.5"
-                                    stroke="currentColor"
-                                    className="size-6"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                          <input
-                            type="number"
-                            value={pricing?.deliveryFee}
-                            readOnly={!editDeliveryFee}
-                            onChange={(e) =>
-                              setPricing({
-                                ...pricing,
-                                deliveryFee: Number(e.target.value),
-                              })
-                            }
-                            className={
-                              (editDeliveryFee
-                                ? "border-2 border-emerald-500"
-                                : "border-none") +
-                              " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl"
-                            }
-                            placeholder="20"
-                          />
-                        </div>
-
-                        {/* Sales Tax */}
-                        <div>
-                          <div>
-                            <label className="block text-xl opacity-90">
-                              <span className="mr-2">Tax</span>
-                              <span className="max-w-24 px-2 text-xl font-bold text-center rounded-md bg-white/20 placeholder-white/60">
-                                {sendingShop.taxPercentage} %
-                              </span>
-                            </label>
-                          </div>
-                          <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
-                            {pricing.taxAmount}
+                          <p className="text-sm">
+                            This florist is not yet part of the GetBloomDirect network. You can still save this order and optionally send the order details directly to the florist by email.
                           </p>
                         </div>
 
-                        <div>
-                          <div className="relative">
-                            <label className="block text-xl opacity-90">
-                              Your profit (fee){" "}
-                              <span className="text-white text-xl font-bold">
-                                {sendingShop.feeType === "%" ? "%" : "$"}
-                              </span>
-                            </label>
-                            <div className="absolute top-1 right-2">
-                              <button
-                                onClick={() =>
-                                  setEditOriginatingFee((prev) => !prev)
-                                }
-                                title="Edit Originating Fee"
-                              >
-                                {editOriginatingFee ? (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="1.5"
-                                    stroke="currentColor"
-                                    className="size-6 text-emerald-500"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="1.5"
-                                    stroke="currentColor"
-                                    className="size-6"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              value={originatingFeeValue}
-                              readOnly={!editOriginatingFee}
-                              onChange={(e) =>
-                                setOriginatingFeeValue(Number(e.target.value))
-                              }
-                              className={
-                                (editOriginatingFee
-                                  ? "border-2 border-emerald-500"
-                                  : "border-none") +
-                                " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
-                              }
-                              placeholder={
-                                sendingShop.feeType === "%" ? "15" : "25"
-                              }
-                              step={
-                                sendingShop.feeType === "%" ? "0.01" : "0.01"
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      {/* Customer Pays + Fee Charge + Fulfilling Shop Gets */}
-                      <div>
-                        {/* Customer Pays */}
-                        <p className="text-7xl font-black mb-4">
-                          ${roundToHundredth(pricing.customerPays)}
-                        </p>
-                        {/* Fee Charge + Fulfilling Shop Gets */}
-                        <p className="text-3xl opacity-90">
-                          You keep{" "}
-                          <span className="text-yellow-300 font-black">
-                            ${roundToHundredth(pricing.feeCharge)}
-                          </span>{" "}
-                          • Fulfilling shop gets $
-                          {roundToHundredth(pricing.fulfillingShopGets)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Products */}
-                    <div>
-                      <h2 className="text-xl font-semi-bold mb-4">Products</h2>
-                      {selectedProducts.map((product, index) => (
-                        <div
-                          className="flex flex-col gap-4 border-b pb-4 mb-4"
-                          key={index}
-                        >
-                          <div className="flex gap-4">
-                            {/* photo */}
-                            <div
-                              className={
-                                !product.photo
-                                  ? "border p-1 rounded-md shadow-md w-32 h-32"
-                                  : "max-w-32"
-                              }
-                            >
-                              {product.photo && (
-                                <img
-                                  src={product.photo}
-                                  alt={product.name}
-                                  className="p-1 rounded-md shadow-md w-full"
-                                />
-                              )}
-                            </div>
-                            {/* details */}
-                            <div>
-                              {/* product name */}
-                              <p className="text-lg font-semibold">
-                                {product.name}
-                              </p>
-                              {/* product description */}
-                              <p className="max-w-sm">{product.description}</p>
-                              {/* product price */}
-                              <p className="font-semibold">${product.price}</p>
-                            </div>
-                          </div>
+                        {/* Save Order Button */}
+                        <div className="border-b pb-4">
                           <button
-                            onClick={() => {
-                              setSelectedProducts((prev) =>
-                                prev.filter(
-                                  (p) => p.productKey !== product.productKey,
-                                ),
-                              );
-                            }}
-                            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                            title="Remove Product"
+                            onClick={sendOrder}
+                            disabled={
+                              (!usingNetworkShop && !usingGoogleShop) ||
+                              !logistics.deliveryDate ||
+                              sendingOrder ||
+                              (usingNetworkShop && selectedProducts.length === 0)
+                            }
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
+                            title="Save Order"
                           >
-                            <svg
-                              xmlns="http://www.w3.org"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={1.5}
-                              stroke="currentColor"
-                              className="w-6 h-6"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                              />
-                            </svg>
+                            Save Order
+                          </button>
+                        </div>
+
+                        {/* Card Message */}
+                        <div className="border-b pb-4 flex flex-col gap-2">
+                          <button
+                            onClick={() => setAddCard(true)}
+                            className={
+                              (addCard ? "hidden" : "block") +
+                              " bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
+                            }
+                            title="Add Card Message"
+                          >
+                            Add Card Message
                           </button>
 
-                          {/* ADD THIS LATER FOR QTY */}
-                          {/* <div className="rounded-full border shadow-md max-w-32">
-                          </div> */}
+                          <button
+                            onClick={() => {
+                              setAddCard(false);
+                            }}
+                            className={
+                              (addCard ? "block" : "hidden") +
+                              " self-end mr-4 rounded-full bg-red-500 hover:bg-red-600 py-1 px-[0.6rem] text-white text-sm transition-all"
+                            }
+                            title="Remove Card Message"
+                          >
+                            X
+                          </button>
+
+                          <label
+                            className={
+                              (addCard ? "block" : "hidden") +
+                              " text-xs text-gray-500 uppercase"
+                            }
+                          >
+                            Card Message
+                            <textarea
+                              placeholder="I love you mom..."
+                              onChange={(e) => setCardMessage(e.target.value)}
+                              className={
+                                (addCard ? "block" : "hidden") +
+                                " w-full border rounded-lg p-2 text-base text-black"
+                              }
+                            ></textarea>
+                          </label>
                         </div>
-                      ))}
+
+                        {/* Totals */}
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-6 text-center flex flex-col justify-evenly">
+                          <h2 className="text-4xl md:text-3xl 2xl:text-4xl font-black mb-4">
+                            Customer Pays
+                          </h2>
+
+                          <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
+                            {/* Products Total */}
+                            <div>
+                              <label className="block text-xl opacity-90">
+                                Product Total
+                              </label>
+
+                              <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
+                              ${roundToHundredth(outsideTotals.productsTotal)}
+                              </p>
+                            </div>
+
+                            {/* Delivery Fee */}
+                            <div className="mt-3 flex items-center justify-between rounded-xl bg-white/20 px-4 py-3">
+                              <div>
+                                <p className="font-semibold">Tax Delivery Fee</p>
+                                <p className="text-sm opacity-80">
+                                  Turn off if delivery should not be taxed.
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOutsideNetwork((prev) => ({
+                                    ...prev,
+                                    deliveryTaxed: !prev.deliveryTaxed,
+                                  }))
+                                }
+                                className={
+                                  "relative inline-flex h-7 w-12 items-center rounded-full transition " +
+                                  (outsideNetwork.deliveryTaxed ? "bg-emerald-600" : "bg-gray-300")
+                                }
+                              >
+                                <span
+                                  className={
+                                    "inline-block h-5 w-5 transform rounded-full bg-white transition " +
+                                    (outsideNetwork.deliveryTaxed ? "translate-x-6" : "translate-x-1")
+                                  }
+                                />
+                              </button>
+                            </div>
+                            <div>
+                              <div className="relative">
+                                <label className="block text-xl opacity-90">
+                                  Delivery fee
+                                </label>
+
+                                <div
+                                  className={
+                                    (shops.length < 1 ? "block" : "hidden") +
+                                    " absolute top-1 right-2"
+                                  }
+                                >
+                                  <button
+                                    onClick={() => {
+                                      if (editDeliveryFee) {
+                                        editOutsideDeliveryFee();
+                                      } else {
+                                        setEditDeliveryFee(true);
+                                      }
+                                    }}
+                                    title="Edit Delivery Fee"
+                                  >
+                                    {editDeliveryFee ? (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-6 text-emerald-500"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                        />
+                                      </svg>
+                                    ) : (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-6"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                        />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold">
+                                  $
+                                </span>
+
+                                <input
+                                  type="number"
+                                  value={outsideNetwork.deliveryFee}
+                                  readOnly={!editDeliveryFee}
+                                  onChange={(e) =>
+                                    setOutsideNetwork({
+                                      ...outsideNetwork,
+                                      deliveryFee: Number(e.target.value),
+                                    })
+                                  }
+                                  className={
+                                  (editDeliveryFee
+                                    ? "border-2 border-emerald-500"
+                                    : "border-none") +
+                                  " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl"
+                                }
+                                />
+                              </div>
+                            </div>
+
+                            {/* Sales Tax */}
+                            <div>
+                              <div>
+                                <label className="flex justify-center items-center gap-1 text-xl opacity-90">
+                                  <span className="mr-2">Tax</span>
+
+                                  <input 
+                                    type="number"
+                                    value={outsideNetwork.taxPercent}
+                                    readOnly={!editOutsideTax}
+                                    onChange={(e) =>
+                                      setOutsideNetwork({
+                                        ...outsideNetwork,
+                                        taxPercent: Number(e.target.value),
+                                      })
+                                    }
+                                    className={
+                                      (editOutsideTax
+                                        ? "border-2 border-emerald-500"
+                                        : "border-none") +
+                                      " max-w-24 font-bold text-center bg-white/20 rounded-2xl"
+                                    }
+                                    placeholder="0"
+                                  />
+
+                                  <button
+                                    onClick={() => {
+                                      if (editOutsideTax) {
+                                        editOutsideTaxPercentage();
+                                      } else {
+                                        setEditOutsideTax(true);
+                                      }
+                                    }}
+                                    className="ml-2"
+                                  >
+                                    {editOutsideTax ? (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-6 text-emerald-500"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                        />
+                                      </svg>
+                                    ) : (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-6"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                        />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </label>
+                              </div>
+
+                              <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
+                                ${roundToHundredth(outsideTotals.taxAmount)}
+                              </p>
+                            </div>
+
+                            {/* Sending Shop's Fee */}
+                            <div>
+                              <div className="relative">
+                                <label className="block text-xl opacity-90">
+                                  Your profit (fee){" "}
+                                  <span className="text-white text-xl font-bold">
+                                    {sendingShop.feeType === "%" ? "%" : "$"}
+                                  </span>                   
+                                </label>
+
+                                <div className="absolute top-1 right-2">
+                                  <button
+                                    onClick={() => {
+                                      if (editOriginatingFee) {
+                                        editOutsideOriginatingFee();
+                                      } else {
+                                        setEditOriginatingFee(true);
+                                      }
+                                    }}
+                                    title="Edit Originating Fee"
+                                  >
+                                    {editOriginatingFee ? (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-6 text-emerald-500"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                        />
+                                      </svg>
+                                    ) : (
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        strokeWidth="1.5"
+                                        stroke="currentColor"
+                                        className="size-6"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                        />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={originatingFeeValue}
+                                  readOnly={!editOriginatingFee}
+                                  onChange={(e) =>
+                                    setOriginatingFeeValue(Number(e.target.value))
+                                  }
+                                  className={
+                                    (editOriginatingFee
+                                      ? "border-2 border-emerald-500"
+                                      : "border-none") +
+                                    " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
+                                  }
+                                  placeholder={
+                                    sendingShop.feeType === "%" ? "15" : "25"
+                                  }
+                                  step={
+                                    sendingShop.feeType === "%" ? "0.01" : "0.01"
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Customer Pays + Fee Charge + Fulfilling Shop Gets */}
+                          <div>
+                            {/* Customer Pays */}
+                            <p className="text-7xl font-black mb-4">
+                              ${roundToHundredth(outsideTotals.customerPays)}
+                            </p>
+
+                            {/* Fee Charge + Fulfilling Shop Gets */}
+                            <p className="text-3xl opacity-90">
+                              You keep{" "}
+                              <span className="text-yellow-300 font-black">
+                                ${roundToHundredth(outsideTotals.feeCharge)}
+                              </span>{" "}
+                              • Fulfilling shop gets $
+                              {roundToHundredth(outsideTotals.fulfillingShopGets)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mb-4 rounded-2xl border-2 border-purple-400 bg-purple-50 p-4 text-purple-900 flex flex-col gap-2">
+                          <h2 className="text-lg font-semibold">Send Order Via Email</h2>
+
+                          {outsideNetworkOrderSent ? (
+                            <div>
+                              <p>
+                                The order has been sent to the florist you have chosen. You can now save the order to your account!
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex gap-4">
+                              <input
+                                type="email"
+                                placeholder="Florist's email address"
+                                value={toEmail}
+                                onChange={(e) => setToEmail(e.target.value)}
+                                className="order-input"
+                              />
+  
+                              <button
+                                type="button"
+                                onClick={emailOutsideNetworkOrder}
+                                className="border border-purple-400 bg-purple-50 rounded-2xl p-2"
+                              >
+                                Send Order
+                              </button>
+                            </div>
+                          )}
+
+                        </div>
+                    </div>                    
+                  </div>
+                ) 
+                : 
+                (
+                  <div className="p-4 rounded-2xl shadow-lg bg-white">
+                    {/* Order Overview */}
+                    <div className="flex flex-col gap-4">
+                      {/* Send Button */}
+                      <div className="border-b pb-4">
+                        <button
+                          onClick={sendOrder}
+                          disabled={
+                            (!usingNetworkShop && !usingGoogleShop) ||
+                            !logistics.deliveryDate ||
+                            sendingOrder ||
+                            (usingNetworkShop && selectedProducts.length === 0)
+                          }
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
+                          title="Send Order"
+                        >
+                          Send Order & Keep ${pricing.feeCharge} →
+                        </button>
+                      </div>
+
+                      {/* Card Message */}
+                      <div className="border-b pb-4 flex flex-col gap-2">
+                        <button
+                          onClick={() => setAddCard(true)}
+                          className={
+                            (addCard ? "hidden" : "block") +
+                            " bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
+                          }
+                          title="Add Card Message"
+                        >
+                          Add Card Message
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAddCard(false);
+                          }}
+                          className={
+                            (addCard ? "block" : "hidden") +
+                            " self-end mr-4 rounded-full bg-red-500 hover:bg-red-600 py-1 px-[0.6rem] text-white text-sm transition-all"
+                          }
+                          title="Remove Card Message"
+                        >
+                          X
+                        </button>
+                        <label
+                          className={
+                            (addCard ? "block" : "hidden") +
+                            " text-xs text-gray-500 uppercase"
+                          }
+                        >
+                          Card Message
+                          <textarea
+                            placeholder="I love you mom..."
+                            onChange={(e) => setCardMessage(e.target.value)}
+                            className={
+                              (addCard ? "block" : "hidden") +
+                              " w-full border rounded-lg p-2 text-base text-black"
+                            }
+                          ></textarea>
+                        </label>
+                      </div>
+
+                      {/* Totals */}
+                      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-6 text-center flex flex-col justify-evenly">
+                        <h2 className="text-4xl md:text-3xl 2xl:text-4xl font-black mb-4">
+                          Customer Pays
+                        </h2>
+                        <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
+                          {/* Products Total */}
+                          <div>
+                            <label className="block text-xl opacity-90">
+                              Product Total
+                            </label>
+                            <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
+                              {roundToHundredth(pricing.productsTotal)}
+                            </p>
+                          </div>
+                          {/* Delivery Fee */}
+                          <div>
+                            <div className="relative">
+                              <label className="block text-xl opacity-90">
+                                Delivery fee
+                              </label>
+                              <div
+                                className={
+                                  (shops.length < 1 ? "block" : "hidden") +
+                                  " absolute top-1 right-2"
+                                }
+                              >
+                                <button
+                                  onClick={() => {
+                                    if (editDeliveryFee) {
+                                      setEditDeliveryFee(false);
+                                    } else {
+                                      setEditDeliveryFee(true);
+                                    }
+                                  }}
+                                  title="Edit Delivery Fee"
+                                >
+                                  {editDeliveryFee ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6 text-emerald-500"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            <input
+                              type="number"
+                              value={pricing?.deliveryFee}
+                              readOnly={!editDeliveryFee}
+                              onChange={(e) =>
+                                setPricing({
+                                  ...pricing,
+                                  deliveryFee: Number(e.target.value),
+                                })
+                              }
+                              className={
+                                (editDeliveryFee
+                                  ? "border-2 border-emerald-500"
+                                  : "border-none") +
+                                " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl"
+                              }
+                              placeholder="20"
+                            />
+                          </div>
+
+                          {/* Sales Tax */}
+                          <div>
+                            <div>
+                              <label className="block text-xl opacity-90">
+                                <span className="mr-2">Tax</span>
+                                <span className="max-w-24 px-2 text-xl font-bold text-center rounded-md bg-white/20 placeholder-white/60">
+                                  {sendingShop.taxPercentage} %
+                                </span>
+                              </label>
+                            </div>
+                            <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
+                              {pricing.taxAmount}
+                            </p>
+                          </div>
+
+                          <div>
+                            <div className="relative">
+                              <label className="block text-xl opacity-90">
+                                Your profit (fee){" "}
+                                <span className="text-white text-xl font-bold">
+                                  {sendingShop.feeType === "%" ? "%" : "$"}
+                                </span>
+                              </label>
+                              <div className="absolute top-1 right-2">
+                                <button
+                                  onClick={() =>
+                                    setEditOriginatingFee((prev) => !prev)
+                                  }
+                                  title="Edit Originating Fee"
+                                >
+                                  {editOriginatingFee ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6 text-emerald-500"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={originatingFeeValue}
+                                readOnly={!editOriginatingFee}
+                                onChange={(e) =>
+                                  setOriginatingFeeValue(Number(e.target.value))
+                                }
+                                className={
+                                  (editOriginatingFee
+                                    ? "border-2 border-emerald-500"
+                                    : "border-none") +
+                                  " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
+                                }
+                                placeholder={
+                                  sendingShop.feeType === "%" ? "15" : "25"
+                                }
+                                step={
+                                  sendingShop.feeType === "%" ? "0.01" : "0.01"
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        {/* Customer Pays + Fee Charge + Fulfilling Shop Gets */}
+                        <div>
+                          {/* Customer Pays */}
+                          <p className="text-7xl font-black mb-4">
+                            ${roundToHundredth(pricing.customerPays)}
+                          </p>
+                          {/* Fee Charge + Fulfilling Shop Gets */}
+                          <p className="text-3xl opacity-90">
+                            You keep{" "}
+                            <span className="text-yellow-300 font-black">
+                              ${roundToHundredth(pricing.feeCharge)}
+                            </span>{" "}
+                            • Fulfilling shop gets $
+                            {roundToHundredth(pricing.fulfillingShopGets)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Products */}
+                      <div>
+                        <h2 className="text-xl font-semi-bold mb-4">Products</h2>
+                        {selectedProducts.map((product, index) => (
+                          <div
+                            className="flex flex-col gap-4 border-b pb-4 mb-4"
+                            key={index}
+                          >
+                            <div className="flex gap-4">
+                              {/* photo */}
+                              <div
+                                className={
+                                  !product.photo
+                                    ? "border p-1 rounded-md shadow-md w-32 h-32"
+                                    : "max-w-32"
+                                }
+                              >
+                                {product.photo && (
+                                  <img
+                                    src={product.photo}
+                                    alt={product.name}
+                                    className="p-1 rounded-md shadow-md w-full"
+                                  />
+                                )}
+                              </div>
+                              {/* details */}
+                              <div>
+                                {/* product name */}
+                                <p className="text-lg font-semibold">
+                                  {product.name}
+                                </p>
+                                {/* product description */}
+                                <p className="max-w-sm">{product.description}</p>
+                                {/* product price */}
+                                <p className="font-semibold">${product.price}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedProducts((prev) =>
+                                  prev.filter(
+                                    (p) => p.productKey !== product.productKey,
+                                  ),
+                                );
+                              }}
+                              className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                              title="Remove Product"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.5}
+                                stroke="currentColor"
+                                className="w-6 h-6"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                />
+                              </svg>
+                            </button>
+
+                            {/* ADD THIS LATER FOR QTY */}
+                            {/* <div className="rounded-full border shadow-md max-w-32">
+                            </div> */}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

@@ -1,3 +1,5 @@
+// lib/auth.ts
+
 import CredentialsProvider from "next-auth/providers/credentials";
 import NextAuth from "next-auth";
 import type { NextAuthOptions } from "next-auth";
@@ -48,6 +50,7 @@ export const authOptions: NextAuthOptions = {
           name: shop.shopName,
           isPro: shop.isPro,
           proSince: shop.proSince ? shop.proSince.toISOString() : null,
+          role: shop.role,
           // logo: shop.logo ?? null,
         };
       },
@@ -70,6 +73,7 @@ export const authOptions: NextAuthOptions = {
         token.isPro = (user as any).isPro ?? Boolean(token.isPro);
         token.proSince = (user as any).proSince ?? token.proSince ?? null;
         // token.logo = (user as any).logo ?? token.logo ?? null;
+        token.role = (user as any).role ?? token.role;
         return token;
       }
 
@@ -78,11 +82,12 @@ export const authOptions: NextAuthOptions = {
       if (shopId) {
         try {
           await connectToDB();
-          const shop = await Shop.findById(shopId).select("isPro proSince shopName logo");
+          const shop = await Shop.findById(shopId).select("isPro proSince shopName logo role");
           if (shop) {
             token.isPro = shop.isPro;
             token.proSince = shop.proSince ? shop.proSince.toISOString() : null;
             token.name = shop.shopName ?? token.name;
+            token.role = shop.role ?? token.role;
             // token.logo = shop.logo ?? token.logo;
           }
         } catch (err) {
@@ -106,6 +111,8 @@ export const authOptions: NextAuthOptions = {
       session.user.proSince = (token.proSince as string | null) ?? undefined;
       // optional
       (session.user as any).logo = (token.logo as string | null) ?? null;
+      // role
+      session.user.role = token.role as string;
       return session;
     },
 

@@ -1,8 +1,8 @@
 // app/login/page.tsx
 "use client";
 
-import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { signIn, useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import BloomSpinner from "@/components/BloomSpinner";

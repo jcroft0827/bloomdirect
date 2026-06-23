@@ -1,3 +1,5 @@
+// src/app/api/email/email-history/[id]/route.ts
+
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import { EmailEvent } from "@/models/EmailEvent";

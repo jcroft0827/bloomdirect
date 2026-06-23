@@ -3,7 +3,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { NavLinks } from "@/components/NavLinks";
 import { Bell, Menu, X } from "lucide-react";
-import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 interface Branding {
   logo: string;
@@ -15,6 +15,7 @@ interface Shop {
   slug: string;
   onboardingComplete: boolean;
   isPro: boolean;
+  role: string;
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -118,7 +119,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <aside className="w-64 bg-white border-r flex-col justify-between rounded-2xl shadow-lg hidden lg:flex p-6">
           <div>
             <h2 className="text-xl font-bold mb-8">GetBloomDirect</h2>
-            <NavLinks slug={shop.slug} pro={shop.isPro} pathname={pathname} />
+            <NavLinks slug={shop.slug} pro={shop.isPro} pathname={pathname} role={shop.role} />
           </div>
         </aside>
       )}
@@ -147,6 +148,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           pro={shop?.isPro || false}
           pathname={pathname}
           onClose={() => setShowNav(false)}
+          role={shop?.role || ""}
         />
       </aside>
 
@@ -223,6 +225,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   POS Integration
                 </span>
+                {shop?.role === "admin" && (
+                  <span
+                    className={
+                      pathname === "/dashboard/admin"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    Admin Panel
+                  </span>
+                )}
               </h2>
             </div>
             {/* Today's Date + Search + Notifications + Emails */}
