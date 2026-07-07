@@ -55,7 +55,7 @@ export const NavLinks = ({ slug, pro, pathname, role, onClose }: NavLinksProps) 
         <Link
           href={`/dashboard/shops/${slug}`}
           onClick={onClose}
-          className={`block p-3 rounded-lg ${isActive("/dashboard/shops")}`}
+          className={`block p-3 rounded-lg ${isActive(`/dashboard/shops/${slug}`)}`}
         >
           Profile
         </Link>

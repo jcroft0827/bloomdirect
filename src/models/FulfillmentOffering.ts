@@ -57,6 +57,13 @@ const fulfillmentOfferingSchema = new Schema(
       default: "Designer's Choice",
     },
 
+    internalName: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: "",
+    },
+
     slug: {
       type: String,
       trim: true,
@@ -77,8 +84,8 @@ const fulfillmentOfferingSchema = new Schema(
       default: "",
     },
 
-    occasion: {
-      type: String,
+    occasions: {
+      type: [String],
       enum: [
         "birthday",
         "sympathy",
@@ -90,17 +97,56 @@ const fulfillmentOfferingSchema = new Schema(
         "holiday",
         "everyday",
       ],
-      default: "everyday",
+      default: ["everyday"],
       index: true,
     },
 
     pricingTiers: {
       type: [pricingTierSchema],
+      validate: {
+        validator: function (tiers: any[]) {
+          return tiers.length >= 1 && tiers.length <= 3;
+        },
+        message: "Offerings must have between 1 and 3 pricing tiers.",
+      },
       default: [
-        { label: "Standard", price: 75 },
-        { label: "Premium", price: 100 },
-        { label: "Luxury", price: 150 },
+        { label: "Standard", price: 75, description: "" },
+        { label: "Premium", price: 100, description: "" },
+        { label: "Luxury", price: 150, description: "" },
       ],
+    },
+
+    internalNotes: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: "",
+    },
+
+    seasonalAvailability: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      startMonth: Number,
+      startDay: Number,
+      endMonth: Number,
+      endDay: Number,
+    },
+
+    styleTags: {
+      type: [String],
+      default: [],
+    },
+
+    colorTags: {
+      type: [String],
+      default: [],
+    },
+
+    flowerTags: {
+      type: [String],
+      default: [],
     },
 
     taxable: {
@@ -152,6 +198,8 @@ const fulfillmentOfferingSchema = new Schema(
 fulfillmentOfferingSchema.index({ shop: 1, isActive: 1 });
 fulfillmentOfferingSchema.index({ shop: 1, type: 1 });
 fulfillmentOfferingSchema.index({ shop: 1, sortOrder: 1 });
+fulfillmentOfferingSchema.index({ shop: 1, isDefault: 1 });
+fulfillmentOfferingSchema.index({ shop: 1, occasions: 1 });
 fulfillmentOfferingSchema.index(
   { shop: 1, type: 1 },
   {
@@ -160,7 +208,8 @@ fulfillmentOfferingSchema.index(
       type: "designers_choice",
       isActive: true,
     },
-  }
+  },
 );
 
-export default mongoose.models.FulfillmentOffering || mongoose.model("FulfillmentOffering", fulfillmentOfferingSchema);
+export default mongoose.models.FulfillmentOffering ||
+  mongoose.model("FulfillmentOffering", fulfillmentOfferingSchema);

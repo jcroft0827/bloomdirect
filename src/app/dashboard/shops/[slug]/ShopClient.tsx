@@ -1,4 +1,4 @@
-// This is the client component for the shop page. It receives the shop data as a prop and renders the UI accordingly. The design is inspired by Instagram's profile layout, with a focus on showcasing the florist's brand, featured bouquet, and delivery details in a clean and engaging way.
+// This is the client component for the shop page. It receives the shop data as a prop and renders the UI accordingly. The design is inspired by Instagram's profile layout, with a focus on showcasing the florist's brand, featured arrangement, and delivery details in a clean and engaging way.
 
 "use client";
 
@@ -8,7 +8,6 @@ import {
   MapPinIcon,
   ClockIcon,
   GlobeAltIcon,
-  PencilSquareIcon,
   BuildingStorefrontIcon,
   XMarkIcon,
   StarIcon,
@@ -17,12 +16,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export default function ShopClient({ shop }: { shop: any }) {
+export default function ShopClient({
+  shop,
+  offerings = [],
+}: {
+  shop: any;
+  offerings?: any[];
+}) {
   const [loggedInShop, setLoggedInShop] = useState(null);
   const [loggedInShopName, setLoggedInShopName] = useState(null);
   const [comment, setComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [rating, setRating] = useState(0);
+
+  const featuredOffering = offerings.find(
+    (offering: any) =>
+      offering.type === "featured" &&
+    offering.isFeatured &&
+    offering.isActive,
+  );
 
   // Pull logged in shop data
   useEffect(() => {
@@ -97,33 +109,42 @@ export default function ShopClient({ shop }: { shop: any }) {
                 <h1 className="text-3xl font-bold tracking-tight">
                   {shop.businessName}
                 </h1>
+
                 {shop.verifiedFlorist && (
                   <CheckBadgeIcon className="h-7 w-7 text-purple-600" />
                 )}
               </div>
+
               <div className="flex gap-6 mt-3">
                 <div className="text-sm">
                   <span className="font-bold text-slate-900">
                     {shop.stats?.ordersCompleted || 0}
                   </span>
+
                   <span className="text-slate-500 ml-1">Orders Completed</span>
                 </div>
+
                 <div className="text-sm">
                   <span className="font-bold text-slate-900">
                     {shop.stats?.responseRate || 100}%
                   </span>
+
                   <span className="text-slate-500 ml-1">Response Rate</span>
                 </div>
+
                 <div className="text-sm">
                   <span className="font-bold text-slate-900">
                     {shop.stats?.ordersSent || 0}
                   </span>
+
                   <span className="text-slate-500 ml-1">Orders Sent</span>
                 </div>
+
                 <div className="text-sm">
                   <span className="font-bold text-slate-900">
                     {shop.stats?.orderDeclined || 0}
                   </span>
+
                   <span className="text-slate-500 ml-1">Orders Declined</span>
                 </div>
               </div>
@@ -168,35 +189,76 @@ export default function ShopClient({ shop }: { shop: any }) {
               </p>
             </section>
 
-            {/* Featured Bouquet Card */}
-            <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
-              <div className="flex flex-col md:flex-row gap-8">
-                <div className="w-full md:w-1/2 aspect-square rounded-2xl overflow-hidden shadow-lg p-2">
-                  <img
-                    src={shop.featuredBouquet.image}
-                    className="w-full h-full object-center object-fill rounded-xl"
-                    alt="Featured"
-                  />
-                </div>
-                <div className="w-full md:w-1/2 flex flex-col justify-center">
-                  <span className="text-emerald-600 font-bold text-sm uppercase tracking-tighter mb-2">
-                    Featured Selection
-                  </span>
-                  <h2 className="text-2xl font-bold mb-2">
-                    {shop.featuredBouquet.name}
-                  </h2>
-                  <p className="text-slate-600 mb-6">
-                    {shop.featuredBouquet.description}
-                  </p>
-                  <div className="text-3xl font-black text-purple-700 mb-6">
-                    ${shop.featuredBouquet.price.toFixed(2)}
+            {/* Featured Offering Card */}
+            {featuredOffering && (
+              <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
+                <div className="flex flex-col md:flex-row gap-8">
+                  {featuredOffering.image && (
+                    <div className="w-full md:w-1/2 aspect-square rounded-2xl overflow-hidden shadow-lg p-2">
+                      <img
+                        src={featuredOffering.image}
+                        className="w-full h-full object-center object-contain rounded-xl"
+                        alt={
+                          featuredOffering.name || "Featured arrangement"
+                        }
+                      />
+                    </div>
+                  )}
+
+                  <div className="w-full md:w-1/2 flex flex-col justify-center">
+                    <span className="text-emerald-600 font-bold text-sm uppercase tracking-tighter mb-2">
+                      Featured Arrangement
+                    </span>
+
+                    <h2 className="text-2xl font-bold mb-2">
+                      {featuredOffering.name}
+                    </h2>
+
+                    {featuredOffering.description && (
+                      <p className="text-slate-600 mb-6">
+                        {featuredOffering.description}
+                      </p>
+                    )}
+
+                    {featuredOffering.pricingTiers?.length > 0 && (
+                      <div className="space-y-2">
+                        {featuredOffering.pricingTiers.map((tier: any) => (
+                          <div
+                            key={tier.label}
+                            className="flex items-center justify-between rounded-xl bg-white px-4 py-3 border border-slate-100"
+                          >
+                            <div>
+                              <p className="font-bold text-slate-900">
+                                {tier.label}
+                              </p>
+                              {tier.description && (
+                                <p className="text-sm text-slate-500">
+                                  {tier.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <p className="text-xl font-black text-purple-700">
+                              ${Number(tier.price || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {/* <button className="w-full bg-white border-2 border-purple-600 text-purple-600 py-3 rounded-xl font-bold hover:bg-purple-50 transition-colors">
-                    Order This Arrangement
-                  </button> */}
                 </div>
-              </div>
-            </section>
+
+                {/* Edit Offerings */}
+                <div className="w-full flex justify-center mt-5">
+                    <Link 
+                      href={"/dashboard/offerings"}
+                      className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-center px-4 py-2 font-bold text-xl shadow-xl w-full transition-all"
+                    >
+                      Edit Offerings
+                    </Link>
+                </div>
+              </section>
+            )}
 
             {/* Review Section */}
             <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
@@ -294,7 +356,7 @@ export default function ShopClient({ shop }: { shop: any }) {
                 <div>
                   {shop.reviews.length > 0 ? (
                     <div className="space-y-6">
-                                        {shop.reviews.map((r: any) => (
+                      {shop.reviews.map((r: any) => (
                         <div
                           key={r._id}
                           className="bg-white rounded-xl p-4 shadow-sm border border-slate-100"
@@ -424,6 +486,7 @@ export default function ShopClient({ shop }: { shop: any }) {
                   <span className="text-slate-500">
                     Allows Same Day Delivery
                   </span>
+
                   <span className="font-bold text-emerald-700">
                     {shop.delivery.allowsSameDay ? (
                       <span className="flex items-center gap-1">
@@ -437,6 +500,7 @@ export default function ShopClient({ shop }: { shop: any }) {
                     )}
                   </span>
                 </div>
+
                 {shop.delivery.allowsSameDay && (
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500">Same Day Cutoff</span>
@@ -471,10 +535,12 @@ export default function ShopClient({ shop }: { shop: any }) {
                           : "Standard"}
                       </span>
                     </div>
+
                     <div className="pt-4 border-t border-slate-50">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block mb-2">
                         Serving Zip Codes
                       </span>
+
                       <div className="flex flex-wrap gap-1">
                         {shop.delivery.zipZones.map((z: any) => (
                           <span
@@ -524,6 +590,7 @@ export default function ShopClient({ shop }: { shop: any }) {
                 <div className="text-emerald-700 font-bold text-sm flex items-center justify-center gap-2">
                   <GlobeAltIcon className="h-5 w-5" /> Verified Local Florist
                 </div>
+
                 <p className="text-[11px] text-emerald-600/70 mt-1">
                   This florist is a verified member of the GetBloomDirect
                   Network.

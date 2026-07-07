@@ -15,15 +15,11 @@ export async function POST(req: Request) {
     const shopId = session?.user?.id;
 
     if (!shopId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    
     const body = await req.json();
-    
+
     // Check for P.O. Box in address (not supported by geocoding)
     function isPOBox(address: string) {
       if (!address) return false;
@@ -44,8 +40,11 @@ export async function POST(req: Request) {
 
     if (isPOBox(body.address)) {
       return NextResponse.json(
-        { error: "P.O. Box addresses are not supported. Please provide a physical address." },
-        { status: 400 }
+        {
+          error:
+            "P.O. Box addresses are not supported. Please provide a physical address.",
+        },
+        { status: 400 },
       );
     }
 
@@ -58,7 +57,6 @@ export async function POST(req: Request) {
       "state",
       "zip",
       "logo",
-      "featuredBouquet",
       "acceptsWalkIns",
       "weddingConsultations",
       "securityCode",
@@ -67,10 +65,7 @@ export async function POST(req: Request) {
     const shop = await Shop.findById(shopId);
 
     if (!shop) {
-      return NextResponse.json(
-        { error: "Shop not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
     // Only update defined + allowed fields
@@ -98,14 +93,13 @@ export async function POST(req: Request) {
       success: true,
       shop,
     });
-
   } catch (error: any) {
     console.error("UPDATE SHOP ERROR:", error);
 
     if (error instanceof ApiError) {
       return NextResponse.json(
         { error: error.message, code: error.code },
-        { status: error.status }
+        { status: error.status },
       );
     }
 
@@ -115,7 +109,7 @@ export async function POST(req: Request) {
           "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
         code: "SERVER_ERROR",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

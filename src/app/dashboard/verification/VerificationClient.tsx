@@ -1,3 +1,5 @@
+// app/dashboard/verification/VerificationClient.tsx
+
 "use client";
 
 import VerificationProgressBar from "@/components/verification/ProgressBar";
@@ -97,13 +99,6 @@ interface Address {
   geoLocation: Geo;
 }
 
-interface FeaturedBouquet {
-  name?: string;
-  price?: number;
-  description?: string;
-  image?: string;
-}
-
 interface Verification {
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -141,7 +136,6 @@ interface Shop {
   address: Address;
   paymentMethods: PaymentMethods;
   stripe: Stripe;
-  featuredBouquet: FeaturedBouquet;
   delivery: Delivery;
   stats: Stats;
 }

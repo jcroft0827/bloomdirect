@@ -79,13 +79,6 @@ interface BrandingState {
   socialLinks: SocialsState;
 }
 
-interface FeaturedBouquetState {
-  name: string;
-  price: number;
-  description: string;
-  image: string;
-}
-
 interface Reviews {
   customerName?: string;
   rating?: number;
@@ -127,7 +120,6 @@ interface Shop {
   delivery: DeliveryState;
   financials: FinancialsState;
   branding: BrandingState;
-  featuredBouquet: FeaturedBouquetState;
   stats: Stats;
 }
 
@@ -239,12 +231,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
         tiktok: "",
       },
     },
-    featuredBouquet: {
-      name: "",
-      price: 0.0,
-      description: "",
-      image: "",
-    },
     stats: {
       ordersSent: 0,
       ordersCompleted: 0,
@@ -271,7 +257,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   const [showTik, setShowTik] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
-  const bouquetInputRef = useRef<HTMLInputElement | null>(null);
 
   const [securityCodeInfo, setSecurityCodeInfo] = useState(false);
 
@@ -284,7 +269,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     delivery: "Delivery Settings",
     financials: "Taxes & Fees",
     branding: "Public Profile",
-    featuredBouquet: "Featured Bouquet",
     securityCode: "Security Code",
   };
 
@@ -370,10 +354,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
         payload = {
           ...shop.branding,
           socialLinks: shop.branding.socialLinks || {},
-        };
-      } else if (sectionKey === "featuredBouquet") {
-        payload = {
-          featuredBouquet: shop.featuredBouquet,
         };
       } else if (sectionKey === "securityCode") {
         payload = {
@@ -556,68 +536,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     }
   };
 
-  // Upload Featured Bouquet
-  const handleBouquetUpload = async (file: File) => {
-    try {
-      console.log("Starting upload...");
-      setUploadingImg(true);
-
-      // 1️⃣ Request signed upload URL from backend
-      const uploadRes = await fetch("/api/s3/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-        }),
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Failed to get upload URL");
-        setUploadingImg(false);
-      }
-
-      const { uploadUrl, fileKey } = await uploadRes.json();
-
-      // 2️⃣ Upload the file directly to S3
-      const s3Upload = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-        },
-        body: file,
-      });
-
-      if (!s3Upload.ok) {
-        throw new Error("Failed to upload file to S3");
-        setUploadingImg(false);
-      }
-
-      console.log("Uploaded to S3");
-
-      // 4️⃣ Save fileKey to database
-      await fetch("/api/shops/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: fileKey }),
-      });
-
-      const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
-      const cloudFrontUrl = `${cfBase}/${fileKey}`;
-
-      // 6️⃣ Update UI with signed URL
-      setShop((prev) => ({
-        ...prev,
-        featuredBouquet: { ...prev.featuredBouquet, image: cloudFrontUrl },
-      }));
-    } catch (err) {
-      console.error("Logo upload error:", err);
-      setUploadingImg(false);
-    } finally {
-      setUploadingImg(false);
-    }
-  };
-
   // Format Phone Number
   const formatDynamicPhone = (value: string) => {
     // 1. Strip everything except numbers
@@ -635,30 +553,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
 
     // 4. Format 888-888-8888 (exactly 10 digits)
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  };
-
-  // Format Featured Bouquet Price
-  const handlePriceBlur = () => {
-    // 1. Get the value (TypeScript knows this is a number)
-    const rawPrice = shop.featuredBouquet.price;
-    console.log(rawPrice);
-
-    // 2. Validation: check if it exists
-    if (rawPrice === undefined || rawPrice === null) return;
-
-    // 3. Round it (your helper returns a string like "10.00")
-    const rounded = Math.round(rawPrice * 100) / 100;
-
-    const newRounded = Number(rounded).toFixed(2);
-
-    // 4. Update State (convert back to number for your interface)
-    setShop((prev) => ({
-      ...prev,
-      featuredBouquet: {
-        ...prev.featuredBouquet,
-        price: Number(newRounded), // Convert back to number
-      },
-    }));
   };
 
   // Handle Checkbox Changes
@@ -748,14 +642,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
           [field]: value,
         },
       },
-    }));
-  };
-
-  // Update Featured Bouquet Info
-  const updateBouquet = (field: keyof FeaturedBouquetState, value: any) => {
-    setShop((prev) => ({
-      ...prev,
-      featuredBouquet: { ...prev.featuredBouquet, [field]: value },
     }));
   };
 
@@ -3108,174 +2994,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   </div>
                 ) : (
                   <p>No social links set yet!</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Featured Bouquet */}
-          <div className={normalSection}>
-            {/* Header */}
-            <div>
-              <h2 className={normalH2}>Featured Bouquet</h2>
-              <button
-                onClick={() => handleEditClick("featuredBouquet")}
-                className={
-                  (activeSection === "featuredBouquet" ? "hidden" : "block") +
-                  " absolute top-2 right-2"
-                }
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="1.5"
-                  stroke="currentColor"
-                  className="size-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                  />
-                </svg>
-              </button>
-            </div>
-            {activeSection === "featuredBouquet" ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 text-center lg:grid-cols-1">
-                {/* Bouquet Name */}
-                <div>
-                  <label className={normalLabel}>Bouquet Name</label>
-                  <input
-                    type="text"
-                    value={shop?.featuredBouquet?.name}
-                    onChange={(e) => updateBouquet("name", e.target.value)}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Bouquet Price */}
-                <div>
-                  <label className={normalLabel}>Bouquet Price ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="$0.00"
-                    value={shop?.featuredBouquet?.price}
-                    onChange={(e) => updateBouquet("price", e.target.value)}
-                    onBlur={handlePriceBlur}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Bouquet Description */}
-                <div>
-                  <label className={normalLabel}>Bouquet Description</label>
-                  <textarea
-                    placeholder="12 Roses vased..."
-                    value={shop?.featuredBouquet?.description}
-                    onChange={(e) =>
-                      updateBouquet("description", e.target.value)
-                    }
-                    className="w-full border-4 rounded-md px-2 py-1 md:h-40"
-                  ></textarea>
-                </div>
-                {/* Bouquet Image */}
-                <div>
-                  <label className={normalLabel}>Bouquet Image</label>
-                  <div
-                    onClick={() => bouquetInputRef.current?.click()}
-                    className="border-4 border-dashed border-purple-300 rounded-3xl h-64 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-purple-500 transition p-2"
-                  >
-                    {shop?.featuredBouquet?.image ? (
-                      <img
-                        src={shop?.featuredBouquet?.image}
-                        alt="Bouquet Image"
-                        className="max-h-full rounded-2xl"
-                      />
-                    ) : (
-                      <>
-                        <svg
-                          className="w-16 h-16 text-purple-600 mb-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        <p className="text-2xl font-bold text-purple-600">
-                          Click to upload image
-                        </p>
-                        <p className="text-lg text-gray-600">
-                          Square image recommended
-                        </p>
-                      </>
-                    )}
-                  </div>
-                  <input
-                    ref={bouquetInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleBouquetUpload(file);
-                      }
-                    }}
-                  />
-                </div>
-                {/* Buttons */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-2 lg:col-span-1">
-                  <button
-                    onClick={() => handleSave("featuredBouquet")}
-                    disabled={isSaving === "featuredBouquet"}
-                    className="bg-emerald-600 text-white text-xl px-10 py-2 rounded-xl transition-all hover:bg-emerald-700"
-                  >
-                    {isSaving === "featuredBouquet" ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    className="bg-red-500 text-white text-xl px-10 py-2 rounded-xl transition-all hover:bg-red-600"
-                    onClick={handleEditCancel}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 text-center gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                {/* Bouquet Name */}
-                <div>
-                  <label className={normalLabel}>Bouquet Name</label>
-                  <p className={previewP}>{shop?.featuredBouquet?.name}</p>
-                </div>
-                {/* Bouquet Price */}
-                <div>
-                  <label className={normalLabel}>Bouquet Price</label>
-                  <p className={previewP}>${shop?.featuredBouquet?.price}</p>
-                </div>
-                {/* Bouquet Description */}
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <label className={normalLabel}>Bouquet Description</label>
-                  <p className="font-semibold">
-                    {shop?.featuredBouquet?.description}
-                  </p>
-                </div>
-                {shop?.featuredBouquet?.image ? (
-                  <div className="rounded-xl w-40 h-40 p-1 sm:col-span-2 mx-auto flex justify-center border-4 border-purple-400 bg-white lg:col-span-1">
-                    <img
-                      src={shop?.featuredBouquet?.image}
-                      alt={`${shop?.businessName}'s Featured Bouquet`}
-                      className="max-w-full max-h-full"
-                    />
-                  </div>
-                ) : (
-                  <p className="sm:col-span-2 lg:col-span-1">
-                    No featured bouquet image added yet!
-                  </p>
                 )}
               </div>
             )}

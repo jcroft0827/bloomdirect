@@ -21,8 +21,8 @@ const steps = [
     path: "/dashboard/setup/financials",
   },
   {
-    label: "Featured Bouquet",
-    path: "/dashboard/setup/featured-bouquet",
+    label: "Featured Arrangement",
+    path: "/dashboard/setup/featured-arrangement",
   },
 ];
 

@@ -1,3 +1,5 @@
+// /app/dashboard/setup/layout.tsx
+
 "use client";
 
 import { usePathname } from "next/navigation";
@@ -8,7 +10,7 @@ const steps = [
   { label: "Payment Methods", path: "/dashboard/setup/payments" },
   { label: "Delivery Settings", path: "/dashboard/setup/delivery" },
   { label: "Taxes & Fees", path: "/dashboard/setup/financials" },
-  { label: "Featured Bouquet", path: "/dashboard/setup/featured-bouquet" },
+  { label: "Featured Arrangement", path: "/dashboard/setup/featured-arrangement" },
 ];
 
 export default function SetupLayout({ children }: { children: ReactNode }) {

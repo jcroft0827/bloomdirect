@@ -102,17 +102,23 @@ interface Address {
   geoLocation: Geo;
 }
 
-interface FeaturedBouquet {
-  name?: string;
-  price?: number;
-  description?: string;
-  image?: string;
-}
-
 interface Verification {
   emailVerified: boolean;
   phoneVerified: boolean;
   websiteVerified: boolean;
+}
+
+interface PricingTier {
+  label: string;
+  price: number;
+  description?: string;
+}
+
+interface FeaturedArrangement {
+  name?: string;
+  description?: string;
+  image?: string;
+  pricingTiers?: PricingTier[];
 }
 
 interface Shop {
@@ -137,9 +143,9 @@ interface Shop {
   address: Address;
   paymentMethods: PaymentMethods;
   stripe: Stripe;
-  featuredBouquet: FeaturedBouquet;
   delivery: Delivery;
   stats: Stats;
+  featuredArrangement?: FeaturedArrangement;
 }
 
 // #endregion

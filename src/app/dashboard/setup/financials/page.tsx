@@ -100,7 +100,7 @@ export default function FinancialsSetup() {
       });
 
       if (res.ok) {
-        router.push("/dashboard/setup/featured-bouquet");
+        router.push("/dashboard/setup/featured-arrangement");
       } else {
         const data = await res.json();
 

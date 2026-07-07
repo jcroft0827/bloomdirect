@@ -162,11 +162,17 @@ interface FulfillingAddress {
   geoLocation: FulfillingGeo;
 }
 
-interface FulfillingFeaturedBouquet {
+interface PricingTier {
+  label: string;
+  price: number;
+  description?: string;
+}
+
+interface FulfillingFeaturedArrangement {
   name?: string;
-  price?: number;
   description?: string;
   image?: string;
+  pricingTiers?: PricingTier[];
 }
 
 interface FulfillingShop {
@@ -183,7 +189,7 @@ interface FulfillingShop {
   contact: FulfillingContact;
   address: FulfillingAddress;
   paymentMethods: FulfillingPaymentMethods;
-  featuredBouquet: FulfillingFeaturedBouquet;
+  featuredArrangement?: FulfillingFeaturedArrangement;
   delivery: FulfillingDelivery;
   stats: FulfillingStats;
 }

@@ -1,3 +1,5 @@
+// app/api/register/route.ts
+
 import { connectToDB } from "@/lib/mongoose";
 import { NextResponse } from "next/server";
 import Shop from "@/models/Shop";

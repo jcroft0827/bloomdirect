@@ -2,21 +2,22 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
-import Shop from "@/models/Shop";
-import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
+import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
 
 export async function GET() {
   try {
     await connectToDB();
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const shop = await Shop.findById(session?.user?.shopId).lean();
+    const shop = await getAuthenticatedShop(session.user.id);
 
-    await ensureDefaultDesignerChoice(session?.user?.shopId.toString());
+    if (!shop) {
+      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ shop });
   } catch (error) {

@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { sendEmailVerificationCode } from "@/lib/email/send-email-verification-code";
+import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -25,7 +26,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const shop = await Shop.findById(session.user.id);
+    const shop = await getAuthenticatedShop(session.user.id);
 
     if (!shop) {
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });

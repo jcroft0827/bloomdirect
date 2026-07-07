@@ -394,7 +394,7 @@ const shopSchema = new mongoose.Schema(
     },
 
     // ===============================
-    // FEATURED PRODUCT
+    // FEATURED PRODUCT -- OLD CODE
     // ===============================
 
     featuredBouquet: {
@@ -405,6 +405,14 @@ const shopSchema = new mongoose.Schema(
       description: String,
 
       image: String,
+    },
+
+    // ===============================
+    // FEATURED BOUQUET MIGRATED TO OFFERINGS
+    // ===============================
+    offeringsInitialized: {
+      type: Boolean,
+      default: false,
     },
 
     // ===============================

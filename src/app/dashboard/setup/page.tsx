@@ -14,7 +14,7 @@ interface IShop {
     paymentMethods: boolean;
     deliverySettings: boolean;
     financialSettings: boolean;
-    featuredBouquet: boolean;
+    featuredArrangement: boolean;
   };
 }
 
@@ -45,7 +45,7 @@ export default async function SetupHome() {
     { key: "paymentMethods", path: "/dashboard/setup/payments" },
     { key: "deliverySettings", path: "/dashboard/setup/delivery" },
     { key: "financialSettings", path: "/dashboard/setup/financials" },
-    { key: "featuredBouquet", path: "/dashboard/setup/featured-bouquet" },
+    { key: "featuredArrangement", path: "/dashboard/setup/featured-arrangement" },
   ] as const;
 
   // 5. Find the first incomplete step in setupProgress

@@ -15,7 +15,7 @@ export default function HomeHero() {
         <h1 className="text-5xl font-black leading-tight text-gray-900">
           Send Flowers <span className="text-purple-600">Directly</span>
           <br />
-          No Wire Services. Ever.
+          No Wire Fees. Ever.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-gray-600">
           Connect with trusted florists, send orders instantly, and keep 100% of

@@ -1,7 +1,7 @@
 import authOptions from "@/lib/auth";
-import { geoCodeAddress } from "@/lib/geocode";
 import { connectToDB } from "@/lib/mongoose";
 import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
+import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
 import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -16,7 +16,8 @@ export async function PATCH(req: Request) {
 
     const { section, data } = await req.json();
 
-    const shop = await Shop.findById(session.user.id);
+    const shop = await getAuthenticatedShop(session.user.id);
+    
     if (!shop)
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
 
@@ -76,18 +77,14 @@ export async function PATCH(req: Request) {
         break;
 
       case "featuredBouquet":
-        shop.featuredBouquet = {
-          ...shop.featuredBouquet,
-          ...data.featuredBouquet,
-        };
-        break;
+        return NextResponse.json(
+          { error: "Featured arrangement settings have moved to FulfillmentOfferings."},
+          { status: 400 },
+        );
 
       case "securityCode":
         shop.securityCode = data.securityCode;
         break;
-
-    case "":
-
     }
 
     // Save Changes

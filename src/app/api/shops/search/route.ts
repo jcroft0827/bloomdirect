@@ -1,6 +1,9 @@
+// app/api/shops/search/route.ts
+
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
+import FulfillmentOffering from "@/models/FulfillmentOffering";
 import moment from "moment";
 import { Types } from "mongoose";
 
@@ -33,11 +36,14 @@ interface ShopResponse {
     sameDayCutoff?: string;
     blackoutTimes?: BlackoutTime[];
   };
-  featuredBouquet?: {
+  featuredArrangement?: {
     name?: string;
-    price?: number;
     description?: string;
     image?: string;
+    pricingTiers?: {
+      label: string;
+      price: number;
+    }[];
   };
 }
 
@@ -60,8 +66,8 @@ export async function POST(req: Request) {
 
     const idsToExclude = [
       ...(currentShopId ? [new Types.ObjectId(currentShopId)] : []),
-      ...excludedShopIds.map((id: string) => new Types.ObjectId(id))
-    ]
+      ...excludedShopIds.map((id: string) => new Types.ObjectId(id)),
+    ];
 
     // 1. Geocode Destination (OpenCage)
     const newAddress = address.replace(/ /g, "+");
@@ -101,7 +107,7 @@ export async function POST(req: Request) {
           ...(isToday
             ? {
                 "delivery.allowSameDay": true,
-                
+
                 $or: [
                   { "delivery.noMoreOrdersTodayUntil": null },
                   { "delivery.noMoreOrdersTodayUntil": { $exists: false } },
@@ -200,6 +206,38 @@ export async function POST(req: Request) {
       },
       { $match: { isZipValid: true, isDistanceValid: true } },
       {
+        $lookup: {
+          from: "fulfillmentofferings",
+          let: { shopId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$shop", "$$shopId"] },
+                isActive: true,
+                isFeatured: true,
+                type: "featured",
+              },
+            },
+            { $sort: { sortOrder: 1, createdAt: -1 } },
+            { $limit: 1 },
+            {
+              $project: {
+                name: 1,
+                description: 1,
+                image: 1,
+                pricingTiers: 1,
+              },
+            },
+          ],
+          as: "featuredArrangement",
+        },
+      },
+      {
+        $addFields: {
+          featuredArrangement: { $first: "$featuredArrangement" },
+        },
+      },
+      {
         $project: {
           businessName: 1,
           slug: 1,
@@ -217,7 +255,7 @@ export async function POST(req: Request) {
           },
           "delivery.sameDayCutoff": 1,
           "delivery.blackoutTimes": 1,
-          "featuredBouquet": 1,
+          featuredArrangement: 1,
         },
       },
     ]);
