@@ -5,6 +5,8 @@ import {
   Users,
   MapPin,
   BarChart3,
+  Flower,
+  Mailbox,
 } from "lucide-react";
 
 const features = [
@@ -18,29 +20,29 @@ const features = [
     icon: Zap,
     title: "Instant Order Sending",
     description:
-      "Send orders to nearby florists in seconds - no phone calls required.",
+      "Send fulfillment orders directly to trusted florists in minutes.",
   },
   {
     icon: Users,
-    title: "Trusted Florist Network",
+    title: "Verified Florist Network",
     description:
-      "Work only with verified florists who care about quality and service.",
+      "Search, review, and build relationships with trusted independent florists.",
   },
   {
-    icon: MapPin,
-    title: "Local Delivery Coverage",
-    description: "Find florists exactly where you need them, city by city.",
+    icon: Flower,
+    title: "Flexible Fulfillment Offerings",
+    description: "Showcase Designer's Choice, Featured Arrangements, and fulfillment options for sending florists.",
   },
   {
     icon: ShieldCheck,
-    title: "No Wire Service Control",
-    description: "You own your relationships and your customers - always.",
+    title: "Customer Relationships Stay Yours",
+    description: "Work directly with other florists while keeping your customer relationships.",
   },
   {
-    icon: BarChart3,
-    title: "Built for Growth",
+    icon: Mailbox,
+    title: "Outside-Network Orders",
     description:
-      "Modern tools designed to help independent florists scale together.",
+      "Search for non-member florists and email professional fulfillment orders when needed.",
   },
 ];
 

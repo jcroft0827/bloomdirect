@@ -5,6 +5,7 @@ import HomeFeatures from "@/components/HomeFeatures";
 import HomeFooter from "@/components/HomeFooter";
 import HomeHeader from "@/components/HomeHeader";
 import HomeHero from "@/components/HomeHero";
+import HomeNetworkGrowth from "@/components/HomeNetworkGrowth";
 import HomePricing from "@/components/HomePricing";
 import HomeWhySwitch from "@/components/HomeWhySwitch";
 import HowItWorks from "@/components/HowItWorks";
@@ -19,6 +20,7 @@ export default function Home() {
 
       <HowItWorks />
       <HomeWhySwitch />
+      <HomeNetworkGrowth />
       <HomeFeatures />
       <HomePricing />
       <HomeFAQ />

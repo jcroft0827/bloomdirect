@@ -13,27 +13,28 @@ export default function HomeHero() {
         transition={{ duration: 0.6 }}
       >
         <h1 className="text-5xl font-black leading-tight text-gray-900">
-          Send Flowers <span className="text-purple-600">Directly</span>
+          Send Florist Orders <span className="text-purple-600">Directly</span>
           <br />
           No Wire Fees. Ever.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-gray-600">
-          Connect with trusted florists, send orders instantly, and keep 100% of
-          your profits. Built by florists - for florists.
+          Connect with trusted independent florists, send fulfillment orders
+          directly, and keep control of your customer relationships - without
+          wire-service commissions.
         </p>
 
         <div className="mt-10 flex gap-4">
           <Link
             href="/register"
-            className="rounded-2xl border-2 border-purple-600 bg-purple-600 px-8 py-4 inline-block font-bold text-white shadow-lg mr-4 hover:bg-purple-700"
+            className="inline-block rounded-2xl border-2 border-purple-600 bg-purple-600 px-8 py-4 font-bold text-white shadow-lg hover:bg-purple-700"
           >
-            Get Started
+            Join Free
           </Link>
           <Link
-            href='#how-it-works'
-            className="rounded-2xl border-2 border-emerald-600 px-8 py-4 text-lg font-bold text-emerald-600 hover:bg-purple-50"
+            href="#how-it-works"
+            className="rounded-2xl border-2 border-emerald-600 px-8 py-4 text-lg font-bold text-emerald-600 hover:bg-emerald-50"
           >
-            How It Works
+            See How It Works
           </Link>
         </div>
       </motion.div>
@@ -47,33 +48,35 @@ export default function HomeHero() {
       >
         {/* Network Lines */}
         <motion.div
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="absolute inset-0 rounded-full border-2 border-dashed border-emerald-400"
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{ duration: 4, repeat: Infinity }}
+          className="absolute inset-0 rounded-full border-2 border-dashed border-emerald-400"
         >
-            
-            {/* Shop Nodes */}
-            {["top-8 left-10", "top-24 right-12", "bottom-20 left-16", "bottom-8 right-20"].map(
-                (pos, i) => (
-                    <motion.div
-                        key={i}
-                        className={`absolute ${pos} flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xl`}
-                        animate={{ y: [0, -8, 0] }}
-                        transition={{ duration: 3, repeat: Infinity }}
-                    >
-                        🌸
-                    </motion.div>    
-                )
-            )}
-
-            {/* Moving Delivery */}
+          {/* Shop Nodes */}
+          {[
+            "top-8 left-10",
+            "top-24 right-12",
+            "bottom-20 left-16",
+            "bottom-8 right-20",
+          ].map((pos, i) => (
             <motion.div
-                className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-3xl bg-purple-600 text-3xl text-white shadow-2xl"
-                animate={{ rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 5, repeat: Infinity }}
+              key={i}
+              className={`absolute ${pos} flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xl`}
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 3, repeat: Infinity }}
             >
-                🚚
+              🌸
             </motion.div>
+          ))}
+
+          {/* Moving Delivery */}
+          <motion.div
+            className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-3xl bg-purple-600 text-3xl text-white shadow-2xl"
+            animate={{ rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 5, repeat: Infinity }}
+          >
+            🚚
+          </motion.div>
         </motion.div>
       </motion.div>
     </div>

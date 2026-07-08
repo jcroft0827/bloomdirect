@@ -1,4 +1,4 @@
-import { XCircle, CheckCircle, X } from "lucide-react";
+import { XCircle, CheckCircle } from "lucide-react";
 
 const reasons = [
     {
@@ -48,7 +48,7 @@ export default function HomeWhySwitch() {
                             <div className="flex-1">
                                 <div className="mb-2 flex items-center gap-2 text-emerald-700">
                                     <CheckCircle className="h-5 w-5" />
-                                    <span className="font-semibold">Get Bloom Direct</span>
+                                    <span className="font-semibold">GetBloomDirect</span>
                                 </div>
                                 <p className="font-semibold text-gray-700">{item.new}</p>
                             </div>
@@ -58,7 +58,7 @@ export default function HomeWhySwitch() {
 
                 <div className="mt-16 text-center">
                     <p className="text-lg font-semibold text-gray-700">
-                        Built by florists. Owned by florists. No middleman.
+                        Built around florist feedback. Designed for independent shops. No middleman.
                     </p>
                 </div>
             </div>

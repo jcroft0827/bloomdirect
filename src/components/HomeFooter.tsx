@@ -15,7 +15,7 @@ export default function HomeFooter() {
               services, no commissions, no nonsense.
             </p>
             <p className="mt-4 text-sm font-semibold text-green-400">
-              Built alongside florists. For florists.
+              Helping independent florists build trusted fulfillment relationships.
             </p>
           </div>
 
@@ -41,13 +41,13 @@ export default function HomeFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/register" className="hover:text-white">
-                  Get Started
+                <Link href="/api-docs/external/v1" className="hover:text-white">
+                  POS API
                 </Link>
               </li>
               <li>
-                <Link href="/api-docs/external/v1" className="hover:text-white">
-                  POS Development
+                <Link href="/register" className="hover:text-white">
+                  Get Started
                 </Link>
               </li>
             </ul>
@@ -60,8 +60,8 @@ export default function HomeFooter() {
             </h4>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link href="/login" className="hover:text-white">
-                  Log In
+                <Link href="/contact" className="hover:text-white">
+                  Contact
                 </Link>
               </li>
               <li>
@@ -70,8 +70,8 @@ export default function HomeFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-white">
-                  Contact
+                <Link href="/login" className="hover:text-white">
+                  Log In
                 </Link>
               </li>
             </ul>
@@ -83,10 +83,10 @@ export default function HomeFooter() {
               Why Florists Switch
             </h4>
             <ul className="space-y-3 text-sm text-gray-400">
-              <li>✓ Keep 100% of every order</li>
-              <li>✓ No wire service fees</li>
-              <li>✓ Direct florist-to-florist network</li>
-              <li>✓ Free to join</li>
+              <li>✓ Send orders directly</li>
+              <li>✓ Keep your customer relationships</li>
+              <li>✓ No wire-service commissions</li>
+              <li>✓ Bloom Free available today</li>
             </ul>
           </div>
         </div>
@@ -94,9 +94,9 @@ export default function HomeFooter() {
         {/* Bottom bar */}
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-gray-800 pt-8 text-sm md:flex-row">
           <p className="text-gray-500">
-            © {new Date().getFullYear()} GetBloomDirect. All rights reserved.
+            © {new Date().getFullYear()} GetBloomDirect. Helping independent florists connect directly.
           </p>
-          <div className="flex gap-6">
+          <div className="flex gap-6 hidden">
             <Link href="/privacy" className="hover:text-white">
               Privacy Policy
             </Link>
