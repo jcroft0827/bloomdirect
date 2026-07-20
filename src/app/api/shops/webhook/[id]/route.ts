@@ -39,9 +39,10 @@ function mapWebhookForClient(webhook: any) {
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
     const shop = await getCurrentShop();
 
     if (!shop.isPro) {
@@ -79,7 +80,7 @@ export async function PATCH(
         : {};
 
     const webhook = await Webhook.findOne({
-      _id: params.id,
+      _id: id,
       shopId: shop._id,
     });
 

@@ -12,7 +12,7 @@ import {
   calculateOrderSettlement,
   centsToDollars,
 } from "@/lib/order-settlement";
-import { OrderActivityActions } from "@/lib/order-activity";
+import { OrderActivityActions } from "@/lib/order-activity-actions";
 import Notifications from "@/models/Notifications";
 import ZipDemand from "@/models/ZipDemand";
 import { getMonthlySendUsage } from "@/lib/order-send-usage";

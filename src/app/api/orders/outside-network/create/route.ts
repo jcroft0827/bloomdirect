@@ -2,7 +2,7 @@
 
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
-import { OrderActivityActions } from "@/lib/order-activity";
+import { OrderActivityActions } from "@/lib/order-activity-actions";
 import Order from "@/models/Order";
 import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";

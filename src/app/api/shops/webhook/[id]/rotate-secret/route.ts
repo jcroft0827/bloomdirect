@@ -8,9 +8,11 @@ import {
 
 export async function POST(
   _req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
+
     const shop = await getCurrentShop();
 
     if (!shop.isPro) {
@@ -28,7 +30,7 @@ export async function POST(
     }
 
     const webhook = await Webhook.findOne({
-      _id: params.id,
+      _id: id,
       shopId: shop._id,
     }).select("+encryptedSecret +encryptionIv +encryptionAuthTag");
 

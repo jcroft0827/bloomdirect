@@ -2,7 +2,7 @@
 
 import mongoose, { Schema } from "mongoose";
 import { OrderStatus } from "@/lib/order-status";
-import { OrderActivityActions } from "@/lib/order-activity";
+import { OrderActivityActions } from "@/lib/order-activity-actions";
 
 const moneyValidator = {
   validator: Number.isInteger,
