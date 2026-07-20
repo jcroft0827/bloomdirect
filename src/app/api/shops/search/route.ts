@@ -26,6 +26,7 @@ interface ShopResponse {
     phone: string;
   };
   verifiedFlorist: boolean;
+  isPro: boolean;
   stats: {
     ordersCompleted: number;
     responseRate: number;
@@ -244,6 +245,7 @@ export async function POST(req: Request) {
           address: 1,
           "contact.phone": 1,
           verifiedFlorist: 1,
+          isPro: 1,
           "stats.ordersCompleted": 1,
           "stats.responseRate": 1,
           avgRating: { $ifNull: [{ $avg: "$reviews.rating" }, 0] },
@@ -278,10 +280,23 @@ export async function POST(req: Request) {
         }
         return true;
       })
-      .sort(
-        (a, b) =>
-          a.deliveryCharge - b.deliveryCharge || b.avgRating - a.avgRating,
-      );
+      .sort((a, b) => {
+        const aVerified = a.verifiedFlorist ? 1 : 0;
+        const bVerified = b.verifiedFlorist ? 1 : 0;
+
+        const aPro = a.isPro ? 1 : 0;
+        const bPro = b.isPro ? 1 : 0;
+
+        const aPriority = aVerified * 2 + aPro;
+        const bPriority = bVerified * 2 + bPro;
+
+        return (
+          bPriority - aPriority ||
+          a.deliveryCharge - b.deliveryCharge ||
+          b.avgRating - a.avgRating ||
+          a.businessName.localeCompare(b.businessName)
+        );
+      });
 
     return NextResponse.json(results);
   } catch (error) {

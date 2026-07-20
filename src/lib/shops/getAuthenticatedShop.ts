@@ -1,16 +1,22 @@
 // lib/shops/getAuthenticatedShop.ts
 
 import Shop from "@/models/Shop";
+import { connectToDB } from "@/lib/mongoose";
 import { ensureShopOfferingsInitialized } from "../offerings/ensureDefaultOfferings";
 
+export async function getAuthenticatedShop(
+  sessionUserId: string,
+) {
+  await connectToDB();
 
-export async function getAuthenticatedShop(sessionUserId: string) {
   const shop = await Shop.findById(sessionUserId);
 
   if (!shop) return null;
 
   if (shop.onboardingComplete) {
-    await ensureShopOfferingsInitialized(shop._id.toString());
+    await ensureShopOfferingsInitialized(
+      shop._id.toString(),
+    );
   }
 
   return shop;

@@ -12,9 +12,13 @@ import {
   XMarkIcon,
   StarIcon,
 } from "@heroicons/react/24/solid";
+import { StarIcon as OutlineStarIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import AppButton from "@/components/ui/AppButton";
+import AppModal from "@/components/ui/AppModal";
+import toast from "react-hot-toast";
 
 export default function ShopClient({
   shop,
@@ -23,34 +27,60 @@ export default function ShopClient({
   shop: any;
   offerings?: any[];
 }) {
-  const [loggedInShop, setLoggedInShop] = useState(null);
-  const [loggedInShopName, setLoggedInShopName] = useState(null);
+  const [loggedInShop, setLoggedInShop] = useState<any>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
   const [comment, setComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [rating, setRating] = useState(0);
+  const [offeringModal, setOfferingModal] = useState(false);
+  const [isLoadingLoggedInShop, setIsLoadingLoggedInShop] = useState(true);
 
-  const featuredOffering = offerings.find(
-    (offering: any) =>
-      offering.type === "featured" &&
-    offering.isFeatured &&
-    offering.isActive,
-  );
+  const activeOfferings = offerings
+    .filter((offering: any) => offering.isActive)
+    .sort((a: any, b: any) => {
+      if (a.isDesignerChoice && !b.isDesignerChoice) return -1;
+      if (!a.isDesignerChoice && b.isDesignerChoice) return 1;
+
+      const sortOrderDifference = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+
+      if (sortOrderDifference !== 0) {
+        return sortOrderDifference;
+      }
+
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
 
   // Pull logged in shop data
   useEffect(() => {
     async function loadShop() {
       try {
         const res = await fetch("/api/shops/me");
+
+        if (!res.ok) {
+          return;
+        }
+
         const data = await res.json();
 
-        setLoggedInShop(data.shop._id);
-        setLoggedInShopName(data.shop.businessName);
+        setLoggedInShop(data.shop);
+
+        const alreadyFavorited =
+          data.shop?.preferredFlorists?.some((favorite: any) => {
+            const favoriteShopId =
+              favorite?.shopId?._id || favorite?.shopId || favorite;
+
+            return String(favoriteShopId) === String(shop?._id);
+          }) ?? false;
+
+        setIsFavorite(alreadyFavorited);
       } catch (err) {
         console.error("Failed to load shop data", err);
       }
     }
+
     loadShop();
-  }, []);
+  }, [shop?._id]);
 
   const router = useRouter();
 
@@ -70,7 +100,7 @@ export default function ShopClient({
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to submit review.");
+        toast.error(data.error || "Failed to submit review.");
         return;
       }
 
@@ -81,13 +111,47 @@ export default function ShopClient({
       router.refresh();
     } catch (err) {
       console.error("Failed to submit review:", err);
-      alert("Something went wrong submitting the review.");
+      toast.error("Something went wrong submitting the review.");
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!loggedInShop) {
+      return;
+    }
+
+    if (!loggedInShop.isPro) {
+      toast("Favorite Florists is available with Bloom Pro.");
+      return;
+    }
+
+    try {
+      setIsUpdatingFavorite(true);
+
+      const res = await fetch(`/api/shops/${shop._id}/favorite`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Unable to update favorite florist.");
+        return;
+      }
+
+      setIsFavorite(data.isFavorite);
+    } catch (error) {
+      console.error("Failed to update favorite florist:", error);
+
+      toast.error("Something went wrong updating this favorite.");
+    } finally {
+      setIsUpdatingFavorite(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-20">
-      {/* 1. TOP NAV / COVER AREA */}
+      {/* 1. Banner */}
       <div className="h-32 bg-gradient-to-r from-purple-700 via-purple-600 to-purple-400 w-full rounded-t-lg shadow-lg" />
 
       <div className="max-w-5xl mx-auto px-4">
@@ -97,62 +161,112 @@ export default function ShopClient({
             {/* Logo */}
             <div className="h-32 w-32 rounded-2xl bg-white p-1 shadow-xl border border-slate-100">
               <img
-                src={shop.branding?.logo || "/placeholder-logo.png"}
+                src={shop?.branding?.logo || "/placeholder-logo.png"}
                 className="h-full w-full object-cover rounded-xl"
                 alt="Shop Logo"
               />
             </div>
 
             {/* Title & Stats */}
-            <div className="mb-2">
+            <div
+              className={
+                (shop?.isPro && loggedInShop?._id === shop?._id
+                  ? "md:mt-12 xl:mt-0"
+                  : "md:mt-0") + " mb-2"
+              }
+            >
               <div className="flex items-center gap-2">
                 <h1 className="text-3xl font-bold tracking-tight">
-                  {shop.businessName}
+                  {shop?.businessName}
                 </h1>
 
-                {shop.verifiedFlorist && (
+                {shop?.verifiedFlorist && (
                   <CheckBadgeIcon className="h-7 w-7 text-purple-600" />
+                )}
+
+                {shop?.isPro && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 to-yellow-100 px-3 py-1 text-xs font-bold text-amber-700">
+                    <StarIcon className="h-4 w-4" />
+                    Bloom Pro
+                  </span>
                 )}
               </div>
 
-              <div className="flex gap-6 mt-3">
-                <div className="text-sm">
-                  <span className="font-bold text-slate-900">
-                    {shop.stats?.ordersCompleted || 0}
-                  </span>
+              {loggedInShop?._id && loggedInShop._id !== shop?._id && (
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={toggleFavorite}
+                    disabled={isUpdatingFavorite}
+                    className={[
+                      "inline-flex items-center gap-2 rounded-full",
+                      "border px-3 py-1.5 text-sm font-semibold",
+                      "transition-all disabled:cursor-not-allowed",
+                      "disabled:opacity-60",
+                      isFavorite
+                        ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 hover:text-amber-600",
+                    ].join(" ")}
+                  >
+                    {isFavorite ? (
+                      <StarIcon className="h-5 w-5 text-amber-500" />
+                    ) : (
+                      <OutlineStarIcon className="h-5 w-5" />
+                    )}
 
-                  <span className="text-slate-500 ml-1">Orders Completed</span>
+                    {isUpdatingFavorite
+                      ? "Updating..."
+                      : isFavorite
+                        ? "Favorited"
+                        : "Add to Favorites"}
+                  </button>
                 </div>
+              )}
 
-                <div className="text-sm">
-                  <span className="font-bold text-slate-900">
-                    {shop.stats?.responseRate || 100}%
-                  </span>
+              {/* Stats */}
+              {shop?.isPro && loggedInShop?._id === shop?._id && (
+                <div className="flex gap-6 mt-3">
+                  {/* Orders Completed */}
+                  <div className="text-sm">
+                    <span className="font-bold text-slate-900">
+                      {shop.stats?.ordersCompleted || 0}
+                    </span>
 
-                  <span className="text-slate-500 ml-1">Response Rate</span>
+                    <span className="text-slate-500 ml-1">
+                      Orders Completed
+                    </span>
+                  </div>
+                  {/* Response Rate */}
+                  <div className="text-sm">
+                    <span className="font-bold text-slate-900">
+                      {shop.stats?.responseRate || 100}%
+                    </span>
+
+                    <span className="text-slate-500 ml-1">Response Rate</span>
+                  </div>
+                  {/* Orders Sent */}
+                  <div className="text-sm">
+                    <span className="font-bold text-slate-900">
+                      {shop.stats?.ordersSent || 0}
+                    </span>
+
+                    <span className="text-slate-500 ml-1">Orders Sent</span>
+                  </div>
+                  {/* Orders Declined */}
+                  <div className="text-sm">
+                    <span className="font-bold text-slate-900">
+                      {shop.stats?.orderDeclined || 0}
+                    </span>
+
+                    <span className="text-slate-500 ml-1">Orders Declined</span>
+                  </div>
                 </div>
-
-                <div className="text-sm">
-                  <span className="font-bold text-slate-900">
-                    {shop.stats?.ordersSent || 0}
-                  </span>
-
-                  <span className="text-slate-500 ml-1">Orders Sent</span>
-                </div>
-
-                <div className="text-sm">
-                  <span className="font-bold text-slate-900">
-                    {shop.stats?.orderDeclined || 0}
-                  </span>
-
-                  <span className="text-slate-500 ml-1">Orders Declined</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
           {/* Action Buttons */}
-          {loggedInShop != shop._id ? (
+          {loggedInShop?._id != shop?._id ? (
             <div className="flex gap-3 mb-2">
               {/* <button className="flex-1 md:flex-none px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold transition-all shadow-md shadow-purple-200">
                 Send Flowers
@@ -165,7 +279,7 @@ export default function ShopClient({
             <div className="flex gap-3 mb-2">
               <Link
                 href={`/dashboard/settings`}
-                className="px-6 py-2.5 bg-white border-2 border-purple-600 text-purple-600 rounded-full font-bold hover:bg-purple-50 transition-colors"
+                className="px-6 py-2.5 bg-white border-2 border-purple-600 text-purple-600 rounded-full font-bold hover:bg-purple-50 transition-colors md:text-center"
               >
                 Edit Shop Details
               </Link>
@@ -185,89 +299,42 @@ export default function ShopClient({
               </div>
               <p className="text-lg leading-relaxed text-slate-700">
                 {shop.branding?.bio ||
-                  `Professional florist serving ${shop.address.city} with custom, seasonal arrangements.`}
+                  `Professional florist serving ${shop?.address?.city} with custom, seasonal arrangements.`}
               </p>
             </section>
 
-            {/* Featured Offering Card */}
-            {featuredOffering && (
-              <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
-                <div className="flex flex-col md:flex-row gap-8">
-                  {featuredOffering.image && (
-                    <div className="w-full md:w-1/2 aspect-square rounded-2xl overflow-hidden shadow-lg p-2">
-                      <img
-                        src={featuredOffering.image}
-                        className="w-full h-full object-center object-contain rounded-xl"
-                        alt={
-                          featuredOffering.name || "Featured arrangement"
-                        }
-                      />
-                    </div>
-                  )}
-
-                  <div className="w-full md:w-1/2 flex flex-col justify-center">
-                    <span className="text-emerald-600 font-bold text-sm uppercase tracking-tighter mb-2">
-                      Featured Arrangement
-                    </span>
-
-                    <h2 className="text-2xl font-bold mb-2">
-                      {featuredOffering.name}
-                    </h2>
-
-                    {featuredOffering.description && (
-                      <p className="text-slate-600 mb-6">
-                        {featuredOffering.description}
-                      </p>
-                    )}
-
-                    {featuredOffering.pricingTiers?.length > 0 && (
-                      <div className="space-y-2">
-                        {featuredOffering.pricingTiers.map((tier: any) => (
-                          <div
-                            key={tier.label}
-                            className="flex items-center justify-between rounded-xl bg-white px-4 py-3 border border-slate-100"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-900">
-                                {tier.label}
-                              </p>
-                              {tier.description && (
-                                <p className="text-sm text-slate-500">
-                                  {tier.description}
-                                </p>
-                              )}
-                            </div>
-
-                            <p className="text-xl font-black text-purple-700">
-                              ${Number(tier.price || 0).toFixed(2)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            {!isLoadingLoggedInShop &&
+              (loggedInShop?._id === shop?._id ? (
+                <div className="w-full flex justify-center">
+                  <Link
+                    href="/dashboard/offerings"
+                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-center px-4 py-2 font-bold text-xl shadow-xl w-full transition-all"
+                  >
+                    Edit Offerings
+                  </Link>
                 </div>
-
-                {/* Edit Offerings */}
-                <div className="w-full flex justify-center mt-5">
-                    <Link 
-                      href={"/dashboard/offerings"}
+              ) : (
+                <div className="w-full flex justify-center">
+                  {activeOfferings.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOfferingModal(true)}
                       className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-center px-4 py-2 font-bold text-xl shadow-xl w-full transition-all"
                     >
-                      Edit Offerings
-                    </Link>
+                      View Offerings
+                    </button>
+                  )}
                 </div>
-              </section>
-            )}
+              ))}
 
             {/* Review Section */}
             <section className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
               <div className="w-full flex items-start justify-between pr-5">
                 <h3 className="text-sm uppercase tracking-widest font-bold text-slate-400 mb-4">
-                  Customer Reviews
+                  Florist Reviews
                 </h3>
               </div>
-              {loggedInShop != shop._id ? (
+              {loggedInShop?._id != shop._id ? (
                 <div>
                   {shop.reviews.length > 0 ? (
                     <div className="space-y-6">
@@ -344,12 +411,14 @@ export default function ShopClient({
                         </div>
                       </div>
                     )}
-                    <button
-                      className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition-colors"
-                      onClick={() => setIsSubmittingReview(true)}
-                    >
-                      Write a Review
-                    </button>
+                    {loggedInShop?._id && loggedInShop?._id !== shop._id && (
+                      <button
+                        className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition-colors"
+                        onClick={() => setIsSubmittingReview(true)}
+                      >
+                        Write a Review
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -429,7 +498,7 @@ export default function ShopClient({
                   </span>
                 </div>
 
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex justify-between items-center text-sm gap-1">
                   <span className="text-slate-500">Email</span>
                   <span className="font-bold text-emerald-700">
                     {shop.email}
@@ -438,7 +507,7 @@ export default function ShopClient({
 
                 {/* Optional Secondary Contact Info */}
                 {shop.contact.secondaryEmail && (
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-sm gap-1">
                     <span className="text-slate-500">Secondary Email</span>
                     <span className="font-bold text-emerald-700">
                       {shop.contact.secondaryEmail}
@@ -447,7 +516,7 @@ export default function ShopClient({
                 )}
 
                 {shop.contact.whatsApp && (
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-sm gap-1">
                     <span className="text-slate-500">WhatsApp</span>
                     <span className="font-bold text-emerald-700">
                       {shop.contact.whatsApp}
@@ -456,7 +525,7 @@ export default function ShopClient({
                 )}
 
                 {shop.contact.website && (
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-sm gap-1">
                     <span className="text-slate-500">Website</span>
                     <a
                       href={
@@ -488,7 +557,7 @@ export default function ShopClient({
                   </span>
 
                   <span className="font-bold text-emerald-700">
-                    {shop.delivery.allowsSameDay ? (
+                    {shop.delivery.allowSameDay ? (
                       <span className="flex items-center gap-1">
                         <CheckBadgeIcon className="h-4 w-4 text-green-500" />{" "}
                         Yes
@@ -501,7 +570,7 @@ export default function ShopClient({
                   </span>
                 </div>
 
-                {shop.delivery.allowsSameDay && (
+                {shop.delivery.allowSameDay && (
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500">Same Day Cutoff</span>
                     <span className="font-bold text-purple-700 flex items-center gap-1">
@@ -600,6 +669,104 @@ export default function ShopClient({
           </aside>
         </div>
       </div>
+
+      {/* Offerings Modal */}
+      <AppModal
+        open={offeringModal}
+        title={`${shop.businessName}'s Fulfillment Offerings`}
+        description={`Review the active fulfillment options available from ${shop.businessName}.`}
+        onClose={() => setOfferingModal(false)}
+        maxWidth="lg"
+        footer={
+          <AppButton
+            type="button"
+            variant="outline"
+            fullWidth
+            onClick={() => setOfferingModal(false)}
+          >
+            Close
+          </AppButton>
+        }
+      >
+        {activeOfferings.length > 0 ? (
+          <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
+            {activeOfferings.map((offering: any) => (
+              <div
+                key={offering._id}
+                className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row"
+              >
+                {/* Offering Image */}
+                <div className="h-48 w-full shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-32 sm:w-32">
+                  <img
+                    src={offering.image || "/placeholder-logo.png"}
+                    alt={offering.name || "Fulfillment offering"}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+
+                {/* Offering Details */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-900">
+                      {offering.name}
+                    </h3>
+
+                    {offering.isDesignerChoice && (
+                      <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-700">
+                        Designer&apos;s Choice
+                      </span>
+                    )}
+                  </div>
+
+                  {offering.description && (
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                      {offering.description}
+                    </p>
+                  )}
+
+                  {offering.pricingTiers?.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {offering.pricingTiers.map(
+                        (tier: any, tierIndex: number) => (
+                          <div
+                            key={`${offering._id}-${tier.label}-${tierIndex}`}
+                            className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 border border-slate-100"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900">
+                                {tier.label}
+                              </p>
+
+                              {tier.description && (
+                                <p className="text-xs text-slate-500">
+                                  {tier.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <p className="shrink-0 font-bold text-purple-700">
+                              ${Number(tier.price || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm italic text-slate-500">
+                      Contact this florist for pricing.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-600">
+            This florist does not currently have any active fulfillment
+            offerings.
+          </div>
+        )}
+      </AppModal>
     </div>
   );
 }

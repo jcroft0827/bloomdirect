@@ -9,12 +9,27 @@ import Order from "@/models/Order";
 import { connectToDB } from "@/lib/mongoose";
 import { addOrderActivity, OrderActivityActions } from "@/lib/order-activity";
 import { sendOrderEvent } from "@/lib/send-order-event";
+import { ApiError } from "@/lib/api-error";
+import { checkPosApiRateLimit } from "@/lib/pos-api-rate-limit";
 
 export async function POST(req: Request, { params }: any) {
   try {
     await connectToDB();
 
     const shop = await getShopFromApiKey(req);
+
+    const rateLimit = checkPosApiRateLimit({
+      key: `pos-accept:${shop._id.toString()}`,
+      limit: 20,
+    });
+
+    if (!rateLimit.allowed) {
+      return apiError(
+        "RATE_LIMIT_EXCEEDED",
+        "Too many accept requests. Please wait before trying again.",
+        429,
+      );
+    }
 
     const order = await Order.findById(params.id);
 
@@ -26,12 +41,11 @@ export async function POST(req: Request, { params }: any) {
       return apiError("UNAUTHORIZED", "Not authorized", 403);
     }
 
-    if (shop.isApiReadOnly) {
-      return apiError("READ_ONLY_MODE", "Upgrade to Pro to modify orders", 403);
-    }
-
     // Idempotency
-    if (order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT && order.acceptedAt) {
+    if (
+      order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT &&
+      order.acceptedAt
+    ) {
       return apiSuccess({ order: mapOrderForPOS(order) });
     }
 
@@ -45,27 +59,43 @@ export async function POST(req: Request, { params }: any) {
     order.acceptedAt = new Date();
 
     await order.save();
-    
-    await addOrderActivity({
-      orderId: order._id,
-      action: OrderActivityActions.ORDER_ACCEPTED,
-      actorShopId: shop._id,
-      message: "Order accepted via POS API",
-    });
 
-    await sendOrderEvent({
-      event: "order.accepted",
-      order,
-      actorShopId: shop._id,
-    });
+    const sideEffects = await Promise.allSettled([
+      addOrderActivity({
+        orderId: order._id,
+        action: OrderActivityActions.ORDER_ACCEPTED,
+        actorShopId: shop._id,
+        message: "Order accepted via POS API",
+      }),
+      sendOrderEvent({
+        event: "order.accepted",
+        order,
+        actorShopId: shop._id,
+      }),
+    ]);
+
+    for (const result of sideEffects) {
+      if (result.status === "rejected") {
+        console.error(
+          "Accept-order side effect failed after order was saved:",
+          result.reason,
+        );
+      }
+    }
 
     return apiSuccess({
       order: mapOrderForPOS(order),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof Response) {
       return err;
     }
+
+    if (err instanceof ApiError) {
+      return apiError(err.code, err.message, err.status);
+    }
+
+    console.error("External POS order action failed:", err);
 
     return apiError("INVALID_REQUEST", "Something went wrong", 500);
   }

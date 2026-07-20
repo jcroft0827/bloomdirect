@@ -105,70 +105,89 @@ export async function POST(req: Request) {
     }
 
     // Activity Log
-    await addOrderActivity({
-      orderId: order._id,
-      action: OrderActivityActions.PAYMENT_MARKED,
-      actorShopId: session.user.id,
-      message: `Payment marked as received via ${paymentMethodUsed.toUpperCase()}`,
-    });
+    const paymentSideEffects = await Promise.allSettled([
+      addOrderActivity({
+        orderId: updatedOrder._id,
+        action: OrderActivityActions.PAYMENT_MARKED,
+        actorShopId: session.user.id,
+        message: `Payment marked as received via ${paymentMethodUsed.toUpperCase()}`,
+      }),
+      sendOrderEvent({
+        event: "order.paid",
+        order: updatedOrder,
+        actorShopId: session.user.id,
+      }),
+    ]);
 
-    await sendOrderEvent({
-      event: "order.paid",
-      order,
-      actorShopId: session?.user?.id,
-    });
+    for (const result of paymentSideEffects) {
+      if (result.status === "rejected") {
+        console.error(
+          "Payment side effect failed after order was marked paid:",
+          result.reason,
+        );
+      }
+    }
 
     const originShop = await Shop.findById(order.originatingShop);
     const fulfillShop = await Shop.findById(order.fulfillingShop);
 
-    // Mark Current Notification As READ
-    await Notifications.updateMany(
-      {
-        order: order._id,
-        receivingShop: session.user.id,
-        read: false,
-        type: "OrderAccepted",
-      },
-      {
-        $set: {
-          read: true,
-          readAt: new Date(),
-        },
-      },
-    );
     const notificationMessage = "You've been paid! Time to start designing!";
 
-    // Add to notification queue
-    const newNotification = new Notifications({
-      type: "OrderPaid",
-      receivingShop: order.fulfillingShop,
-      sendingShop: order.originatingShop,
-      order: order._id,
-      message: notificationMessage,
-      read: false,
-      readAt: null,
-    });
+    const paymentNotificationSideEffects = await Promise.allSettled([
+      Notifications.updateMany(
+        {
+          order: updatedOrder._id,
+          receivingShop: session.user.id,
+          read: false,
+          type: "OrderAccepted",
+        },
+        {
+          $set: {
+            read: true,
+            readAt: new Date(),
+          },
+        },
+      ),
 
-    await newNotification.save();
+      Notifications.create({
+        type: "OrderPaid",
+        receivingShop: updatedOrder.fulfillingShop,
+        sendingShop: updatedOrder.originatingShop,
+        order: updatedOrder._id,
+        message: notificationMessage,
+        read: false,
+        readAt: null,
+      }),
 
-    if (originShop?.email && fulfillShop?.email) {
-      const resend = getResend();
-      await resend.emails.send({
-        from: "GetBloomDirect <new-orders@getbloomdirect.com>",
-        to: fulfillShop.email,
-        subject:
-          getOrderEmailSubject(order.orderNumber, order.status) +
-          ` - Ready to Fulfill`,
-        html: `
-          <p>Order #${order.orderNumber} has been marked as paid by ${
+      originShop?.email && fulfillShop?.email
+        ? getResend().emails.send({
+            from: "GetBloomDirect <new-orders@getbloomdirect.com>",
+            to: fulfillShop.email,
+            subject:
+              getOrderEmailSubject(
+                updatedOrder.orderNumber,
+                updatedOrder.status,
+              ) + " - Ready to Fulfill",
+            html: `
+          <p>Order #${updatedOrder.orderNumber} has been marked as paid by ${
             originShop.businessName
           } via ${paymentMethodUsed.toUpperCase()}.</p>
           <p>Start preparing the order and mark it as fulfilled once done.</p>
         `,
-      });
+          })
+        : Promise.resolve(),
+    ]);
+
+    for (const result of paymentNotificationSideEffects) {
+      if (result.status === "rejected") {
+        console.error(
+          "Payment notification side effect failed after order was marked paid:",
+          result.reason,
+        );
+      }
     }
 
-    return NextResponse.json({ success: true, order });
+    return NextResponse.json({ success: true, updatedOrder });
   } catch (error: any) {
     console.error("PAYMENT ERROR:", error);
 

@@ -196,7 +196,6 @@ const fulfillmentOfferingSchema = new Schema(
 );
 
 fulfillmentOfferingSchema.index({ shop: 1, isActive: 1 });
-fulfillmentOfferingSchema.index({ shop: 1, type: 1 });
 fulfillmentOfferingSchema.index({ shop: 1, sortOrder: 1 });
 fulfillmentOfferingSchema.index({ shop: 1, isDefault: 1 });
 fulfillmentOfferingSchema.index({ shop: 1, occasions: 1 });

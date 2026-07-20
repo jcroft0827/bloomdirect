@@ -3,9 +3,9 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { OrderStatus } from "@/lib/order-status";
 import OrderFlowHelper from "@/components/OrderFlowHelper";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
@@ -42,7 +42,11 @@ export default function OrdersDashboard() {
   const [mobileFilters, setMobileFilters] = useState(false);
   const [desktopFilters, setDesktopFilters] = useState(false);
 
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -81,12 +85,11 @@ export default function OrdersDashboard() {
 
       // Date Filters
       if (dateRange.start) {
-        const start = new Date(`${dateRange.start}T00:00:00`);
-        params.append("startDate", start.toISOString());
+        params.append("startDate", dateRange.start);
       }
+
       if (dateRange.end) {
-        const end = new Date(`${dateRange.end}T23:59:59`);
-        params.append("endDate", end.toISOString());
+        params.append("endDate", dateRange.end);
       }
 
       params.append("dateType", dateType);
@@ -96,6 +99,7 @@ export default function OrdersDashboard() {
 
       if (res.ok) {
         setOrders(data.orders || []);
+        setTotalOrders(data.total ?? data.orders?.length ?? 0);
       } else {
         toast.error(data.error || "Failed to load orders.");
         return;
@@ -110,16 +114,79 @@ export default function OrdersDashboard() {
     }
   };
 
+  function formatLocalDate(date: Date) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
   // Runs when filters change
   useEffect(() => {
-    fetchOrders();
-  }, [activeFilters]);
+    if (!filtersInitialized) return;
 
-  // Runs once (polling)
-  // useEffect(() => {
-  //   const interval = setInterval(fetchOrders, 15000);
-  //   return () => clearInterval(interval);
-  // }, []);
+    fetchOrders();
+  }, [activeFilters, filtersInitialized]);
+
+  useEffect(() => {
+    const roleParam = searchParams.get("role");
+    const periodParam = searchParams.get("period");
+
+    const role: "originating" | "fulfilling" | "all" =
+      roleParam === "originating" ||
+      roleParam === "fulfilling" ||
+      roleParam === "all"
+        ? roleParam
+        : "all";
+
+    const startDateParam = searchParams.get("startDate");
+
+    const endDateParam = searchParams.get("endDate");
+
+    let dateRange = {
+      start: "",
+      end: "",
+    };
+
+    let preset = "";
+
+    if (periodParam === "current-month") {
+      const now = new Date();
+
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      dateRange = {
+        start: formatLocalDate(monthStart),
+        end: formatLocalDate(monthEnd),
+      };
+
+      preset = "current-month";
+    }
+
+    if (startDateParam && endDateParam) {
+      dateRange = {
+        start: startDateParam,
+        end: endDateParam,
+      };
+
+      preset = "custom";
+    }
+
+    const nextFilters: typeof activeFilters = {
+      status: [],
+      role,
+      dateRange,
+      dateType: "Order Date",
+      preset,
+    };
+
+    setActiveFilters(nextFilters);
+    setDraftFilters(nextFilters);
+    setFiltersInitialized(true);
+  }, [searchParams]);
 
   const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
     if (actionOrderId === orderId) return; // Prevent duplicate actions
@@ -155,7 +222,7 @@ export default function OrdersDashboard() {
     method: "venmo" | "cashapp" | "zelle" | "paypal",
   ) => {
     if (actionOrderId === orderId) return;
-    
+
     try {
       setActionOrderId(orderId);
 
@@ -242,7 +309,6 @@ export default function OrdersDashboard() {
 
   return (
     <>
-      <Toaster position="top-center" />
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-4 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -251,7 +317,12 @@ export default function OrdersDashboard() {
               Orders
             </h1>
             <p className="text-center text-xl text-gray-700">
-              Showing <b>{orders.length}</b> Orders
+              Showing <b>{totalOrders}</b>{" "}
+              {activeFilters.role === "originating"
+                ? "Sent Orders"
+                : activeFilters.role === "fulfilling"
+                  ? "Incoming Orders"
+                  : "Orders"}
             </p>
           </div>
 
@@ -576,12 +647,17 @@ export default function OrdersDashboard() {
                         : "border-yellow-500"
                   }`}
                 >
-                  <div className="flex flex-col w-full p-2 text-gray-700 bg-yellow-200 text-center">
-                    <h2 className="text-lg font-black">Outside Network Order</h2>
-                    <p className="text-sm font-semibold">
-                      This is an outside network order & is stored for your records only.
-                    </p>
-                  </div>
+                  {order.fulfillmentType === "outside_network" && (
+                    <div className="flex flex-col w-full p-2 text-center text-gray-700 bg-yellow-200">
+                      <h2 className="text-lg font-black">
+                        Outside Network Order
+                      </h2>
+                      <p className="text-sm font-semibold">
+                        This order is stored for your records and is not part of
+                        the BloomDirect network.
+                      </p>
+                    </div>
+                  )}
                   <div className="grid lg:grid-cols-2 gap-8 p-4 lg:py-6 2xl:grid-cols-3 2xl:gap-4">
                     {/* LEFT: Order Info + Order Status */}
                     <div className="space-y-4 text-center lg:col-span-1">
@@ -705,17 +781,23 @@ export default function OrdersDashboard() {
                           )}
 
                         {/* Payment buttons → Only originating shop */}
-                        {order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT &&
-                          session?.user?.id === order.originatingShop && (() => {
-                            const availablePaymentMethods = getAvailablePaymentMethods(order.paymentMethods);
-                            const preferredPaymentMethod = getPreferredPaymentMethod(order.paymentMethods);
+                        {order.status ===
+                          OrderStatus.ACCEPTED_AWAITING_PAYMENT &&
+                          session?.user?.id === order.originatingShop &&
+                          (() => {
+                            const availablePaymentMethods =
+                              getAvailablePaymentMethods(order.paymentMethods);
+                            const preferredPaymentMethod =
+                              getPreferredPaymentMethod(order.paymentMethods);
 
                             return (
                               <div className="flex flex-col gap-2 justify-center w-full">
                                 <p className="font-bold text-lg capitalize">
                                   Preferred Payment Method:{" "}
                                   <span className="text-lg uppercase text-emerald-600">
-                                    {preferredPaymentMethod ? preferredPaymentMethod : "None Available"}
+                                    {preferredPaymentMethod
+                                      ? preferredPaymentMethod
+                                      : "None Available"}
                                   </span>
                                 </p>
                                 <div className="flex flex-wrap gap-2 justify-center w-full">
@@ -723,7 +805,9 @@ export default function OrdersDashboard() {
                                     <button
                                       disabled={actionOrderId === order._id}
                                       key={method}
-                                      onClick={() => handleMarkPaid(order._id, method)}
+                                      onClick={() =>
+                                        handleMarkPaid(order._id, method)
+                                      }
                                       className={`flex-1 max-w-xs py-3 rounded-3xl font-black text-white px-2 ${
                                         method === "venmo"
                                           ? "bg-blue-500 hover:bg-blue-600"
@@ -744,7 +828,8 @@ export default function OrdersDashboard() {
 
                                 {availablePaymentMethods.length === 0 && (
                                   <p className="text-sm text-red-600 font-semibold">
-                                    No payment methods are available for this order.
+                                    No payment methods are available for this
+                                    order.
                                   </p>
                                 )}
                               </div>

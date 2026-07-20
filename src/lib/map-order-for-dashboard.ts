@@ -74,6 +74,8 @@ export function mapOrderForDashboard(order: any) {
     declineReason: order.declineReason || "",
     declineMessage: order.declineMessage || "",
 
+    fulfillmentType: order.fulfillmentType || "network",
+
     acceptedAt: order.acceptedAt || null,
     declinedAt: order.declinedAt || null,
     paidAt: order.paidAt || null,

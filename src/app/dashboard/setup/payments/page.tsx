@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BloomSpinner from "@/components/BloomSpinner";
+import toast from "react-hot-toast";
 
 interface PaymentState {
   venmoHandle: string;
@@ -110,7 +111,7 @@ export default function PaymentsSetup() {
     // 1. Ensure a default is chosen
     if (!defaultMethod) {
       setLoading(false);
-      return alert("Please select a default payment method.");
+      return toast("Please select a default payment method.");
     }
 
     // 2. Map state values to keys (Ensuring names match your State interface exactly)
@@ -126,7 +127,7 @@ export default function PaymentsSetup() {
     // 3. Ensure the chosen default field isn't empty
     if (!selectedValue || selectedValue.trim() === "") {
       setLoading(false);
-      return alert(
+      return toast(
         `You must provide your ${defaultMethod} details to set it as default.`,
       );
     }
@@ -134,12 +135,12 @@ export default function PaymentsSetup() {
     // 4. Specific Format Validations
     if (defaultMethod === "paypal" && !isValidEmail(form.paypalEmail)) {
       setLoading(false);
-      return alert("The PayPal email address is invalid.");
+      return toast("The PayPal email address is invalid.");
     }
 
     if (defaultMethod === "zelle" && !isValidZelle(form.zellePhoneOrEmail)) {
       setLoading(false);
-      return alert(
+      return toast(
         "The Zelle field must be a valid 10-digit phone number or email.",
       );
     }

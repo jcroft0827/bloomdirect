@@ -11,7 +11,25 @@ import { useRouter } from "next/navigation";
 import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
 import VerificationProgressBar from "@/components/verification/ProgressBar";
 
+type DashboardReportPeriod = "month" | "year" | "all";
+
 // #region Shop
+interface DashboardReportSummary {
+  period: DashboardReportPeriod;
+  ordersReceived: number;
+  fulfillmentValueCents: number;
+  averageFulfillmentOrderCents: number;
+}
+
+interface MonthlySendUsage {
+  isPro: boolean;
+  sentThisMonth: number;
+  limit: number | null;
+  remaining: number | null;
+  allowed: boolean;
+  monthStart: string;
+  nextMonthStart: string;
+}
 
 interface Stripe {
   status?: string;
@@ -162,19 +180,21 @@ export default function DashboardClient() {
   const [profit, setProfit] = useState(0);
   const [ordersSent, setOrdersSent] = useState(0);
   const [ordersReceived, setOrdersReceived] = useState(0);
-  const [logo, setLogo] = useState<string | null>(null);
-  const [isPro, setIsPro] = useState(false);
-  const [proSince, setProSince] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const [newOrderLoading, setNewOrderLoading] = useState(false);
-  const [loadSettings, setLoadSettings] = useState(false);
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [roleFilter, setRoleFilter] = useState<
-    "originating" | "fulfilling" | "all"
-  >("all");
+  const [isPro, setIsPro] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [monthlySendUsage, setMonthlySendUsage] =
+    useState<MonthlySendUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+
+  const [reportPeriod, setReportPeriod] =
+    useState<DashboardReportPeriod>("month");
+
+  const [reportSummary, setReportSummary] =
+    useState<DashboardReportSummary | null>(null);
+
+  const [reportLoading, setReportLoading] = useState(false);
 
   // Invite Florists
   const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
@@ -196,30 +216,99 @@ export default function DashboardClient() {
 
     async function loadDashboard() {
       try {
-        console.log("Fetching dashboard info...");
         setIsLoading(true);
+        setUsageLoading(true);
 
-        const res = await fetch("/api/shops/me");
-        const data = await res.json();
+        const [shopRes, usageRes] = await Promise.all([
+          fetch("/api/shops/me"),
+          fetch("/api/orders/send-usage"),
+        ]);
 
-        if (data && data.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-          }
-          setShop(data.shop);
-          setShopId(data.id);
+        const shopData = await shopRes.json();
+        const usageData = await usageRes.json();
+
+        if (!shopRes.ok) {
+          throw new Error(shopData.error || "Unable to load shop information.");
         }
+
+        if (!usageRes.ok) {
+          throw new Error(
+            usageData.error || "Unable to load monthly order usage.",
+          );
+        }
+
+        if (shopData?.shop) {
+          if (!shopData.shop.onboardingComplete) {
+            router.push("/dashboard/setup");
+            return;
+          }
+
+          setShop(shopData.shop);
+          setShopId(shopData.shop._id || shopData.id || "");
+          setIsPro(Boolean(shopData.shop.isPro));
+        }
+
+        setMonthlySendUsage(usageData.usage);
       } catch (err) {
         console.error("Failed to load dashboard:", err);
+
         toast.error(
           "Failed to load dashboard data. Please refresh the page. If the problem persists, contact GetBloomDirect support.",
         );
       } finally {
         setIsLoading(false);
+        setUsageLoading(false);
       }
     }
+
     loadDashboard();
-  }, [status]);
+  }, [status, router]);
+
+  useEffect(() => {
+    if (!shop?.isPro) {
+      setReportSummary(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadReportSummary() {
+      try {
+        setReportLoading(true);
+
+        const res = await fetch(
+          `/api/reports/dashboard-summary?period=${reportPeriod}`,
+          {
+            signal: controller.signal,
+          },
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Unable to load performance summary.");
+        }
+
+        setReportSummary(data.summary);
+      } catch (error: any) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+
+        console.error("Failed to load dashboard report:", error);
+
+        toast.error("Unable to load Bloom Pro performance data.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setReportLoading(false);
+        }
+      }
+    }
+
+    loadReportSummary();
+
+    return () => controller.abort();
+  }, [shop?.isPro, reportPeriod]);
 
   if (status === "unauthenticated") {
     return (
@@ -308,6 +397,16 @@ export default function DashboardClient() {
     },
   ];
 
+  // ------------------------------
+  // CURRENCY FORMATTER
+  // ------------------------------
+  function formatCurrencyFromCents(cents: number) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format((cents || 0) / 100);
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-[70vh] items-center gap-8 justify-center">
@@ -326,7 +425,6 @@ export default function DashboardClient() {
           isVerified={shop?.isVerified ?? false}
         />
 
-
         {/* Invite A Shop */}
         <div className="mb-12 bg-gradient-to-br from-emerald-400 to-emerald-700 rounded-3xl p-10 text-center text-white shadow-2xl flex flex-col gap-2">
           <h2 className="text-2xl font-black tracking-wide md:text-3xl">
@@ -343,62 +441,213 @@ export default function DashboardClient() {
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {isPro ? (
-            <>
-              {/* REAL STATS — Pro users only */}
-              <div className="bg-white rounded-3xl shadow-2xl p-10 border border-emerald-200 hover:scale-105 transition-all">
-                <div className="text-emerald-600 text-6xl font-black">
-                  ${profit}
-                </div>
-                <p className="text-xl text-gray-600 mt-2">Profit This Month</p>
-              </div>
-              <div className="bg-white rounded-3xl shadow-2xl p-10 border border-teal-200 hover:scale-105 transition-all">
-                <div className="text-teal-600 text-6xl font-black">
-                  {ordersSent}
-                </div>
-                <p className="text-xl text-gray-600 mt-2">Orders Sent</p>
-              </div>
-              <div className="bg-white rounded-3xl shadow-2xl p-10 border border-cyan-200 hover:scale-105 transition-all">
-                <div className="text-cyan-600 text-6xl font-black">
-                  {ordersReceived}
-                </div>
-                <p className="text-xl text-gray-600 mt-2">Incoming Orders</p>
-              </div>
-            </>
+        {/* Monthly Sent Order Usage */}
+        <div className="mb-12 rounded-3xl border border-purple-200 bg-white p-6 shadow-xl md:p-8">
+          {usageLoading || !monthlySendUsage ? (
+            <div className="text-center text-gray-500">
+              Loading monthly order usage...
+            </div>
           ) : (
-            /* BLURRED PAYWALL — Free users see this */
-            <div className="col-span-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl p-12 text-center text-white shadow-2xl">
-              <h2 className="text-3xl font-black mb-4 md:text-4xl">
-                {/* Unlock Your Real Numbers */}
-                Pro Coming Soon!
-              </h2>
-              <p className="text-xl mb-8 opacity-90 md:text-2xl">
-                Pro shops see live profit, gain access to POS Integration, get
-                featured first, and much more!
-              </p>
-              <form action="/api/checkout" method="POST">
-                <input
-                  type="hidden"
-                  name="priceId"
-                  value={
-                    process.env.STRIPE_PRICE_ID ||
-                    "price_1SUum5DgUvbWeRnauCjeXu7X"
-                  } // Fallback for local
-                />
-                <button
-                  type="submit"
-                  className="hidden bg-white text-purple-600 font-black text-3xl py-6 rounded-3xl hover:scale-110 transition-all shadow-2xl sm:px-6"
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-widest text-purple-600">
+                  Orders Sent This Month
+                </p>
+
+                <div className="mt-2 flex items-end gap-3">
+                  <span className="text-5xl font-black text-slate-900">
+                    {monthlySendUsage.sentThisMonth}
+                  </span>
+
+                  {!monthlySendUsage.isPro && (
+                    <span className="pb-1 text-2xl font-bold text-slate-400">
+                      / {monthlySendUsage.limit}
+                    </span>
+                  )}
+                </div>
+
+                {monthlySendUsage.isPro ? (
+                  <p className="mt-2 font-semibold text-emerald-700">
+                    Unlimited sending with Bloom Pro
+                  </p>
+                ) : monthlySendUsage.remaining === 0 ? (
+                  <p className="mt-2 font-bold text-red-600">
+                    You have reached your monthly sending limit.
+                  </p>
+                ) : monthlySendUsage.remaining !== null &&
+                  monthlySendUsage.remaining <= 2 ? (
+                  <p className="mt-2 font-bold text-amber-700">
+                    Only {monthlySendUsage.remaining} order
+                    {monthlySendUsage.remaining === 1 ? "" : "s"} remaining this
+                    month.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-slate-600">
+                    {monthlySendUsage.remaining} orders remaining this month.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
+                <Link
+                  href="/dashboard/incoming?role=originating&period=current-month"
+                  className="rounded-xl border border-purple-200 px-5 py-3 text-center font-bold text-purple-700 transition-colors hover:bg-purple-50"
                 >
-                  Upgrade to Pro
-                  <br /> $29/month
-                </button>
-              </form>
-              <p className="hidden mt-6 text-xl">Cancel anytime</p>
+                  View This Month&apos;s Orders
+                </Link>
+
+                {!monthlySendUsage.isPro && (
+                  <Link
+                    href="/dashboard/upgrade"
+                    className="rounded-xl bg-purple-600 px-5 py-3 text-center font-bold text-white transition-colors hover:bg-purple-700"
+                  >
+                    Upgrade to Bloom Pro
+                  </Link>
+                )}
+              </div>
             </div>
           )}
         </div>
+
+        {/* Bloom Pro Performance Overview */}
+        <section className="mb-12">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-purple-600">
+                Bloom Pro
+              </p>
+
+              <h2 className="mt-1 text-3xl font-black text-slate-900">
+                Performance Overview
+              </h2>
+
+              <p className="mt-1 text-slate-600">
+                Accepted fulfillment business through GetBloomDirect.
+              </p>
+            </div>
+
+            {shop?.isPro && (
+              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                {[
+                  {
+                    value: "month" as const,
+                    label: "This Month",
+                  },
+                  {
+                    value: "year" as const,
+                    label: "This Year",
+                  },
+                  {
+                    value: "all" as const,
+                    label: "All Time",
+                  },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setReportPeriod(option.value)}
+                    className={[
+                      "rounded-lg px-4 py-2 text-sm font-bold",
+                      "transition-colors",
+                      reportPeriod === option.value
+                        ? "bg-purple-600 text-white shadow-sm"
+                        : "text-slate-600 hover:bg-purple-50 hover:text-purple-700",
+                    ].join(" ")}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {shop?.isPro ? (
+            <>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                {/* Fulfillment Value */}
+                <div className="rounded-3xl border border-emerald-200 bg-white p-8 shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl">
+                  <p className="text-sm font-bold uppercase tracking-wider text-emerald-700">
+                    Fulfillment Value
+                  </p>
+
+                  <div className="mt-4 text-4xl font-black text-slate-900 md:text-3xl">
+                    {reportLoading
+                      ? "—"
+                      : formatCurrencyFromCents(
+                          reportSummary?.fulfillmentValueCents ?? 0,
+                        )}
+                  </div>
+
+                  <p className="mt-3 text-sm text-slate-500">
+                    Expected fulfillment payout from accepted orders.
+                  </p>
+                </div>
+
+                {/* Orders Received */}
+                <div className="rounded-3xl border border-teal-200 bg-white p-8 shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl">
+                  <p className="text-sm font-bold uppercase tracking-wider text-teal-700">
+                    Orders Received
+                  </p>
+
+                  <div className="mt-4 text-4xl font-black text-slate-900 md:text-3xl">
+                    {reportLoading ? "—" : (reportSummary?.ordersReceived ?? 0)}
+                  </div>
+
+                  <p className="mt-3 text-sm text-slate-500">
+                    Accepted network fulfillment orders.
+                  </p>
+                </div>
+
+                {/* Average Fulfillment Order */}
+                <div className="rounded-3xl border border-cyan-200 bg-white p-8 shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl">
+                  <p className="text-sm font-bold uppercase tracking-wider text-cyan-700">
+                    Average Fulfillment Order
+                  </p>
+
+                  <div className="mt-4 text-4xl font-black text-slate-900 md:text-3xl">
+                    {reportLoading
+                      ? "—"
+                      : formatCurrencyFromCents(
+                          reportSummary?.averageFulfillmentOrderCents ?? 0,
+                        )}
+                  </div>
+
+                  <p className="mt-3 text-sm text-slate-500">
+                    Average expected payout per accepted order.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-center">
+                <Link
+                  href="/dashboard/reports"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2 font-bold text-purple-700 transition-colors hover:bg-purple-50"
+                >
+                  View Full Reporting
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-3xl bg-gradient-to-r from-purple-600 to-pink-600 p-8 text-center text-white shadow-2xl md:p-12">
+              <h3 className="text-3xl font-black">
+                Unlock Bloom Pro Reporting
+              </h3>
+
+              <p className="mx-auto mt-3 max-w-2xl text-lg text-purple-50">
+                Track fulfillment value, received orders, average order value,
+                tax reporting, and more.
+              </p>
+
+              <Link
+                href="/dashboard/upgrade"
+                className="mt-6 inline-flex rounded-xl bg-white px-6 py-3 font-black text-purple-700 transition-transform hover:scale-105"
+              >
+                Explore Bloom Pro
+              </Link>
+            </div>
+          )}
+        </section>
 
         {/* Pro Tip */}
         <div

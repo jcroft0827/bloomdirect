@@ -1,8 +1,12 @@
 "use client";
 
+import BloomSpinner from "@/components/BloomSpinner";
 import AppButton from "@/components/ui/AppButton";
 import AppModal from "@/components/ui/AppModal";
+import { ChevronLeftIcon } from "@heroicons/react/24/outline";
+import { DragControls } from "framer-motion";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -13,12 +17,14 @@ export default function OfferingsClient() {
 
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopProStatus, setShopProStatus] = useState(false);
+  const [shopSlug, setShopSlug] = useState("");
   const [offerings, setOfferings] = useState<any[]>([]);
   const [editingOffering, setEditingOffering] = useState<any | null>(null);
   const [showProModal, setShowProModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [offeringToDelete, setOfferingToDelete] = useState<any | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const editImageInputRef = useRef<HTMLInputElement | null>(null);
 
   // useEffect to pull user
@@ -27,6 +33,7 @@ export default function OfferingsClient() {
 
     async function loadUser() {
       try {
+        setIsLoading(true);
         const res = await fetch("/api/shops/me");
         const data = await res.json();
 
@@ -42,6 +49,7 @@ export default function OfferingsClient() {
 
           setShopId(data.shop._id);
           setShopProStatus(!!data.shop.isPro);
+          setShopSlug(data.shop.slug);
 
           const offeringsRes = await fetch(
             `/api/shops/${data.shop._id}/offerings`,
@@ -54,14 +62,16 @@ export default function OfferingsClient() {
 
           setOfferings(offeringsData.offerings || []);
         }
+        setIsLoading(false);
       } catch (error) {
         console.error("Failed to load user: ", error);
         toast.error(
           "Failed to load user data. Refresh the page. If the problem persists, contact GetBloomDirect support.",
         );
+      } finally {
+        setIsLoading(false);
       }
     }
-
     loadUser();
   }, [status]);
 
@@ -260,197 +270,230 @@ export default function OfferingsClient() {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div>
-          <h1 className="text-3xl font-black text-purple-700">
-            Fulfillment Offerings
-          </h1>
-          <p className="mt-1 text-gray-600">
-            Manage the arrangements other florists can select when sending you
-            an order.
-          </p>
-        </div>
-
-        {!shopProStatus && (
-          <div className="rounded-3xl bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-white shadow-2xl">
-            <h2 className="text-2xl font-black">Upgrade to Bloom Pro</h2>
-            <p className="mt-2 text-white/90">
-              Free shops can manage Designer&apos;s Choice and one Featured
-              Arrangement. Bloom Pro unlocks additional offerings like sympathy,
-              funeral, wedding, holiday, and everyday arrangements.
+      {isLoading ? (
+        <div className="mx-auto max-w-5xl space-y-6">
+          <div>
+            <h1 className="text-3xl font-black text-purple-700">
+              Fulfillment Offerings
+            </h1>
+            <p className="mt-1 text-gray-600">
+              Manage the arrangements other florists can select when sending you
+              an order.
             </p>
+          </div>
 
-            <AppButton type="button" variant="pro" className="mt-4">
-              Bloom Pro coming Soon
+          <div className="flex flex-col gap-5">
+            <p className="text-xl font-semibold text-emerald-700">
+              Loading Fulfillment Offerings...
+            </p>
+            <BloomSpinner />
+          </div>
+        </div>
+      ) : (
+        <div className="mx-auto max-w-5xl space-y-6">
+          <div>
+            <Link 
+              href={`/dashboard/shops/${shopSlug}`}
+              className="text-xl text-gray-700 border border-gray-700 rounded-full px-4 py-1 flex items-center gap-1 w-full sm:w-48 hover:bg-gray-100"
+            >
+              <span>
+                <ChevronLeftIcon width={21} />
+              </span>
+              Back to Profile
+            </Link>
+          </div>
+
+          <div>
+            <h1 className="text-3xl font-black text-purple-700">
+              Fulfillment Offerings
+            </h1>
+            <p className="mt-1 text-gray-600">
+              Manage the arrangements other florists can select when sending you
+              an order.
+            </p>
+          </div>
+
+          {!shopProStatus && (
+            <div className="rounded-3xl bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-white shadow-2xl">
+              <h2 className="text-2xl font-black">Upgrade to Bloom Pro</h2>
+              <p className="mt-2 text-white/90">
+                Free shops can manage Designer&apos;s Choice and one Featured
+                Arrangement. Bloom Pro unlocks additional offerings like
+                sympathy, funeral, wedding, holiday, and everyday arrangements.
+              </p>
+
+              <AppButton type="button" variant="pro" className="mt-4">
+                Bloom Pro coming Soon
+              </AppButton>
+            </div>
+          )}
+
+          {/* Heading + Add Offering Button */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Your Offerings</h2>
+            {/* Add Offering Button */}
+            <AppButton
+              type="button"
+              variant={shopProStatus ? "success" : "outline"}
+              onClick={() => {
+                if (!shopProStatus) {
+                  setShowProModal(true);
+                  return;
+                }
+
+                addOffering();
+              }}
+            >
+              {shopProStatus ? "+ Add Offering" : "+ Add Offering 🔒"}
             </AppButton>
           </div>
-        )}
 
-        {/* Heading + Add Offering Button */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Your Offerings</h2>
-          {/* Add Offering Button */}
-          <AppButton
-            type="button"
-            variant={shopProStatus ? "success" : "outline"}
-            onClick={() => {
-              if (!shopProStatus) {
-                setShowProModal(true);
-                return;
-              }
-
-              addOffering();
-            }}
-          >
-            {shopProStatus ? "+ Add Offering" : "+ Add Offering 🔒"}
-          </AppButton>
-        </div>
-
-        {/* Offerings Cards */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 items-stretch">
-          {offerings.map((offering: any) => (
-            <div
-              key={offering._id}
-              className="flex h-full min-h-[720px] flex-col overflow-hidden rounded-3xl border border-purple-100 bg-white shadow-xl"
-            >
-              {offering.image ? (
-                <div className="h-56 p-4 hover:p-2 transition-all w-full bg-purple-50">
-                  <img
-                    src={offering.image}
-                    alt={offering.name}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-56 items-center justify-center text-center bg-purple-50 text-purple-700 font-bold">
-                  <p className="text-lg">
-                    <span className="text-4xl">📷</span>
-                    <br />
-                    No image uploaded
-                    <br />
-                    Click Edit to upload an image
-                  </p>
-                </div>
-              )}
-
-              <div className="p-5 flex flex-col flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    {/* Badges */}
-                    <div className="flex flex-wrap gap-2">
-                      {offering.isDesignerChoice && (
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-                          Designer&apos;s Choice
-                        </span>
-                      )}
-
-                      {offering.isFeatured && (
-                        <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
-                          Featured
-                        </span>
-                      )}
-
-                      {!offering.isActive && (
-                        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
-                          Inactive
-                        </span>
-                      )}
-
-                      {offering.isDefault && (
-                        <span className="px-3 py-1 text-xs font-bold">
-                          ⭐ Default
-                        </span>
-                      )}
-                    </div>
-                    {/* Offering Name */}
-                    <h3 className="mt-3 text-2xl font-black text-gray-900 mb-2">
-                      {offering.name}
-                    </h3>
+          {/* Offerings Cards */}
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 items-stretch">
+            {offerings.map((offering: any) => (
+              <div
+                key={offering._id}
+                className="flex h-full min-h-[720px] flex-col overflow-hidden rounded-3xl border border-purple-100 bg-white shadow-xl"
+              >
+                {offering.image ? (
+                  <div className="h-56 p-4 hover:p-2 transition-all w-full bg-purple-50">
+                    <img
+                      src={offering.image}
+                      alt={offering.name}
+                      className="h-full w-full object-contain"
+                    />
                   </div>
-                </div>
+                ) : (
+                  <div className="flex h-56 items-center justify-center text-center bg-purple-50 text-purple-700 font-bold">
+                    <p className="text-lg">
+                      <span className="text-4xl">📷</span>
+                      <br />
+                      No image uploaded
+                      <br />
+                      Click Edit to upload an image
+                    </p>
+                  </div>
+                )}
 
-                {/* Offering Description */}
-                <p className="text-gray-600">
-                  {offering.description || "No description added yet."}
-                </p>
+                <div className="p-5 flex flex-col flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      {/* Badges */}
+                      <div className="flex flex-wrap gap-2">
+                        {offering.isDesignerChoice && (
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                            Designer&apos;s Choice
+                          </span>
+                        )}
 
-                {/* Pricing Tiers & Buttons */}
-                <div className="mt-auto space-y-4">
-                  <div className="space-y-2">
-                    {offering.pricingTiers?.map((tier: any) => (
-                      <div
-                        key={tier.label}
-                        className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
-                      >
-                        <div>
-                          <p className="font-bold text-gray-900">
-                            {tier.label}
-                          </p>
-                          {tier.description && (
-                            <p className="text-sm text-gray-500">
-                              {tier.description}
-                            </p>
-                          )}
-                        </div>
+                        {offering.isFeatured && (
+                          <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
+                            Featured
+                          </span>
+                        )}
 
-                        <p className="text-xl font-black text-purple-700">
-                          ${Number(tier.price || 0).toFixed(2)}
-                        </p>
+                        {!offering.isActive && (
+                          <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+                            Inactive
+                          </span>
+                        )}
+
+                        {offering.isDefault && (
+                          <span className="px-3 py-1 text-xs font-bold">
+                            ⭐ Default
+                          </span>
+                        )}
                       </div>
-                    ))}
+                      {/* Offering Name */}
+                      <h3 className="mt-3 text-2xl font-black text-gray-900 mb-2">
+                        {offering.name}
+                      </h3>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col gap-3 pt-2">
-                    <div className="flex gap-3">
-                      <AppButton
-                        variant="primary"
-                        onClick={() => editOffering(offering)}
-                        className="flex-1"
-                      >
-                        Edit
-                      </AppButton>
+                  {/* Offering Description */}
+                  <p className="text-gray-600">
+                    {offering.description || "No description added yet."}
+                  </p>
 
-                      {shopProStatus && !offering.isDesignerChoice && (
-                        <AppButton
-                          type="button"
-                          variant="outline"
-                          onClick={() => toggleOfferingActive(offering)}
+                  {/* Pricing Tiers & Buttons */}
+                  <div className="mt-auto space-y-4">
+                    <div className="space-y-2">
+                      {offering.pricingTiers?.map((tier: any) => (
+                        <div
+                          key={tier.label}
+                          className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
                         >
-                          {offering.isActive ? "Deactivate" : "Activate"}
-                        </AppButton>
-                      )}
+                          <div>
+                            <p className="font-bold text-gray-900">
+                              {tier.label}
+                            </p>
+                            {tier.description && (
+                              <p className="text-sm text-gray-500">
+                                {tier.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <p className="text-xl font-black text-purple-700">
+                            ${Number(tier.price || 0).toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
                     </div>
 
-                    {shopProStatus &&
-                      offerings.length > 2 &&
-                      !offering.isDesignerChoice && (
+                    <div className="flex flex-col gap-3 pt-2">
+                      <div className="flex gap-3">
                         <AppButton
-                          type="button"
-                          variant="danger"
-                          onClick={() => setOfferingToDelete(offering)}
+                          variant="primary"
+                          onClick={() => editOffering(offering)}
+                          className="flex-1"
                         >
-                          Delete
+                          Edit
                         </AppButton>
-                      )}
+
+                        {shopProStatus && !offering.isDesignerChoice && (
+                          <AppButton
+                            type="button"
+                            variant="outline"
+                            onClick={() => toggleOfferingActive(offering)}
+                          >
+                            {offering.isActive ? "Deactivate" : "Activate"}
+                          </AppButton>
+                        )}
+                      </div>
+
+                      {shopProStatus &&
+                        offerings.length > 2 &&
+                        !offering.isDesignerChoice && (
+                          <AppButton
+                            type="button"
+                            variant="danger"
+                            onClick={() => setOfferingToDelete(offering)}
+                          >
+                            Delete
+                          </AppButton>
+                        )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {offerings.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-purple-300 bg-white p-10 text-center shadow">
-            <h2 className="text-2xl font-bold text-purple-700">
-              No offerings found
-            </h2>
-            <p className="mt-2 text-gray-600">
-              Your default Designer&apos;s Choice offering should be created
-              automatically.
-            </p>
+            ))}
           </div>
-        )}
-      </div>
+
+          {offerings.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-purple-300 bg-white p-10 text-center shadow">
+              <h2 className="text-2xl font-bold text-purple-700">
+                No offerings found
+              </h2>
+              <p className="mt-2 text-gray-600">
+                Your default Designer&apos;s Choice offering should be created
+                automatically.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Edit Offering Modal */}
       {editingOffering && (

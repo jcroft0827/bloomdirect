@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import OutsideNetworkFlorists from "@/models/OutsideNetworkFlorists";
 import { OrderStatus } from "@/lib/order-status";
 import ZipDemand from "@/models/ZipDemand";
+import { getMonthlySendUsage } from "@/lib/order-send-usage";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -78,6 +79,28 @@ export async function POST(req: Request) {
       );
     }
 
+    const sendUsage = await getMonthlySendUsage({
+      shopId: originShop._id,
+      isPro: Boolean(originShop.isPro),
+    });
+
+    if (!sendUsage.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "You have reached the Bloom Free limit of 15 sent orders this month.",
+          code: "MONTHLY_SEND_LIMIT_REACHED",
+          upgradeRequired: true,
+          usage: {
+            sentThisMonth: sendUsage.sentThisMonth,
+            limit: sendUsage.limit,
+            remaining: sendUsage.remaining,
+          },
+        },
+        { status: 403 },
+      );
+    }
+
     const normalizedName = outsideShop.name.trim();
 
     const outsideFloristQuery = outsideShop.googlePlaceId
@@ -111,7 +134,7 @@ export async function POST(req: Request) {
       {
         new: true,
         upsert: true,
-      }
+      },
     );
 
     const products = manualOrder.items.map((item: any) => {
@@ -220,13 +243,32 @@ export async function POST(req: Request) {
           upsert: true,
           new: true,
           setDefaultsOnInsert: true,
-        }
+        },
       );
     } catch (error) {
       console.error("Failed to update ZipDemand:", error);
     }
 
-    return NextResponse.json({ success: true, orderId: order._id }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        orderId: order._id,
+        usage: originShop.isPro
+          ? {
+              isPro: true,
+              sentThisMonth: sendUsage.sentThisMonth + 1,
+              limit: null,
+              remaining: null,
+            }
+          : {
+              isPro: false,
+              sentThisMonth: sendUsage.sentThisMonth + 1,
+              limit: sendUsage.limit,
+              remaining: Math.max((sendUsage.remaining ?? 1) - 1, 0),
+            },
+      },
+      { status: 201 },
+    );
   } catch (error: any) {
     console.error("OUTSIDE NETWORK ORDER CREATE ERROR: ", error);
     return NextResponse.json(

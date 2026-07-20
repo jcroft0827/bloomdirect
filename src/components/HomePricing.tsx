@@ -45,7 +45,7 @@ export default function HomePricing() {
             </div>
 
             <ul className="mt-8 space-y-4 text-left text-gray-700">
-              <li>✓ Send up to 20 orders per month</li>
+              <li>✓ Send up to 15 orders per month</li>
               <li>✓ Receive unlimited orders</li>
               <li>✓ No per-order commissions</li>
               <li>✓ Basic public florist profile</li>

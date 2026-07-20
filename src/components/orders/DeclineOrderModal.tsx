@@ -1,3 +1,5 @@
+// components/orders/DeclineOrderModal.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -97,12 +99,14 @@ export default function DeclineOrderModal({
 
         <div className="flex gap-3 pt-4">
           <button
+            type="button"
             onClick={onClose}
             className="flex-1 rounded-xl border py-3 font-semibold"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold py-3"
           >

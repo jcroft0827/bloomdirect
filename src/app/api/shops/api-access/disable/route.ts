@@ -1,7 +1,6 @@
 // app/api/shops/api-access/disable/route.ts
 import { NextResponse } from "next/server";
 import { getCurrentShop } from "@/lib/get-current-shop";
-import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST() {
   try {
@@ -10,6 +9,13 @@ export async function POST() {
     if (!shop.isPro) {
       return NextResponse.json(
         { error: "Only pro shops can disable API access." },
+        { status: 403 },
+      );
+    }
+
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        { error: "Suspended shops cannot manage API access." },
         { status: 403 },
       );
     }
@@ -25,8 +31,6 @@ export async function POST() {
     shop.apiAccess.keyDisabledAt = new Date();
 
     await shop.save();
-
-    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       success: true,

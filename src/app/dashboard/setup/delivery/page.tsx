@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BloomSpinner from "@/components/BloomSpinner";
+import toast from "react-hot-toast";
 
 interface ZipZone {
   name: string;
@@ -311,7 +312,7 @@ export default function DeliverySetup() {
     // 2. Validate top-level fields (like Fallback Fee)
     if (!deliveryForm.fallbackFee && deliveryForm.fallbackFee !== 0) {
       setLoading(false);
-      return alert(
+      return toast(
         "Please provide a Fallback Fee for orders outside your zones.",
       );
     }
@@ -319,7 +320,7 @@ export default function DeliverySetup() {
     // 3. Stop if any validation (duplicates, overlaps, or empty fields) failed
     if (!isValid) {
       setLoading(false);
-      return alert(
+      return toast(
         `Please fix the errors in your ${isZip ? "ZIP" : "Distance"} zones before continuing.`,
       );
     }

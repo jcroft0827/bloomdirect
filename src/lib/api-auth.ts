@@ -3,7 +3,6 @@ import Shop from "@/models/Shop";
 import { connectToDB } from "@/lib/mongoose";
 import { apiError } from "./api-response";
 import { hashApiKey } from "./api-key";
-import { ensureDefaultDesignerChoice } from "./offerings/ensureDefaultOfferings";
 
 export async function getShopFromApiKey(req: Request) {
   await connectToDB();
@@ -66,17 +65,35 @@ export async function getShopFromApiKey(req: Request) {
   // TRACK USAGE (IMPORTANT)
   // ===============================
 
-  try {
-    shop.apiAccess.lastUsedAt = new Date();
-    shop.apiAccess.lastUsedIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
-    shop.apiAccess.lastUsedUserAgent = req.headers.get("user-agent") || null;
+  const now = new Date();
 
-    await shop.save();
+  const lastUsedAt = shop.apiAccess?.lastUsedAt
+    ? new Date(shop.apiAccess.lastUsedAt)
+    : null;
 
-    await ensureDefaultDesignerChoice(shop._id.toString());
-  } catch (err) {
-    console.error("Failed to update API usage metadata", err);
+  const shouldUpdateUsage = 
+    !lastUsedAt ||
+    now.getTime() - lastUsedAt.getTime() >= 5 * 60 * 1000;
+
+  if (shouldUpdateUsage) {
+    try {
+      await Shop.updateOne(
+        { _id: shop._id },
+        {
+          $set: {
+            "apiAccess.lastUsedAt": now,
+            "apiAccess.lastUsedIp":
+              req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+            "apiAccess.lastUsedUserAgent":
+              req.headers.get("user-agent") || null,
+          },
+        },
+      );
+
+      shop.apiAccess.lastUsedAt = now;
+    } catch (err) {
+      console.error("Failed to update API usage metadata", err);
+    }
   }
 
   return shop;

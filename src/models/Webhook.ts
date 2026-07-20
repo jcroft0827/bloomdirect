@@ -1,40 +1,61 @@
 // models/Webhook.ts
 import mongoose from "mongoose";
 
-const webhookSchema = new mongoose.Schema({
-  shopId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Shop",
-    required: true,
-  },
+const webhookSchema = new mongoose.Schema(
+  {
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
+      required: true,
+    },
 
-  url: {
-    type: String,
-    required: true,
-    trim: true,
-  },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 2048,
+    },
 
-  events: {
-    type: [String], // ["order.paid", "order.completed"]
-    default: [],
-  },
+    events: {
+      type: [String],
+      enum: [
+        "order.created",
+        "order.accepted",
+        "order.declined",
+        "order.paid",
+        "order.completed",
+      ],
+      default: [],
+    },
 
-  secret: {
-    type: String,
-    required: true,
-    trim: true,
-  },
+    encryptedSecret: {
+      type: String,
+      required: true,
+      select: false,
+    },
 
-  isActive: {
-    type: Boolean,
-    default: true,
-  },
+    encryptionIv: {
+      type: String,
+      required: true,
+      select: false,
+    },
 
-  createdAt: {
-    type: Date,
-    default: Date.now,
+    encryptionAuthTag: {
+      type: String,
+      required: true,
+      select: false,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
-}, { timestamps: true });
+  { timestamps: true },
+);
+
+webhookSchema.index({ shopId: 1 }, { unique: true },);
 
 export default mongoose.models.Webhook ||
   mongoose.model("Webhook", webhookSchema);
+

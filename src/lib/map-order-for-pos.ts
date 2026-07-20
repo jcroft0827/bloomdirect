@@ -1,3 +1,5 @@
+// src/lib/map-order-for-pos.ts
+
 export function mapOrderForPOS(order: any) {
   return {
     id: order._id.toString(),
@@ -25,10 +27,6 @@ export function mapOrderForPOS(order: any) {
     },
 
     products: (order.products || []).map((product: any) => ({
-      id:
-        product.id?.toString?.() ||
-        product.productId?.toString?.() ||
-        undefined,
       name: product.name || "",
       description: product.description || "",
       photo: product.photo || "",
@@ -39,12 +37,22 @@ export function mapOrderForPOS(order: any) {
 
     totals: {
       currency: "USD",
-      productsSubtotal: Number(
-        (order.pricing?.productsSubtotalCents || 0) / 100,
+
+      productsSubtotal: Number((order.pricing?.productsTotalCents ?? 0) / 100),
+
+      deliveryFee: Number((order.pricing?.deliveryFeeCents ?? 0) / 100),
+
+      originatingFee: Number(
+        (order.pricing?.originatingShopFeeCents ?? 0) / 100,
       ),
-      deliveryFee: Number((order.pricing?.deliveryFeeCents || 0) / 100),
-      tax: Number((order.pricing?.taxCents || 0) / 100),
-      total: Number((order.pricing?.orderTotalCents || 0) / 100),
+
+      tax: Number((order.pricing?.taxAmountCents ?? 0) / 100),
+
+      orderTotal: Number((order.pricing?.orderTotalCents ?? 0) / 100),
+
+      fulfillmentAmount: Number(
+        (order.pricing?.fulfillingShopGetsCents ?? 0) / 100,
+      ),
     },
 
     delivery: {
@@ -57,7 +65,7 @@ export function mapOrderForPOS(order: any) {
       instructions: order.logistics?.specialInstructions || "",
     },
 
-    paid: order.paidAt,
+    paidAt: order.paidAt ? new Date(order.paidAt).toISOString() : null,
 
     timestamps: {
       created: order.createdAt,

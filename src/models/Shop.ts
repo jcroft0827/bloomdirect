@@ -315,14 +315,8 @@ const shopSchema = new mongoose.Schema(
 
     preferredFlorists: [
       {
-        shopId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Shop",
-        },
-
-        name: String,
-
-        zip: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Shop",
       },
     ],
 
@@ -477,11 +471,6 @@ const shopSchema = new mongoose.Schema(
     // ===============================
     // POS API
     // ===============================
-
-    isApiReadOnly: {
-      type: Boolean,
-      default: false,
-    },
 
     apiAccess: {
       enabled: { type: Boolean, default: false },

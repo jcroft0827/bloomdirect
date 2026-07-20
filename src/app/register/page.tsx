@@ -3,6 +3,7 @@ import BloomSpinner from "@/components/BloomSpinner";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -27,7 +28,7 @@ export default function Register() {
     });
 
     if (!res.ok) {
-      alert("Something went wrong");
+      toast.error("Something went wrong");
       setLoading(false);
       return;
     }
@@ -40,7 +41,7 @@ export default function Register() {
     });
 
     if (login?.error) {
-      alert("Account created, but login failed. Please log in.");
+      toast.error("Account created, but login failed. Please log in.");
       router.push("/login");
       return;
     }

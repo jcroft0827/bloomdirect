@@ -55,18 +55,18 @@ export async function GET(req: Request) {
       const dateQuery: any = {};
 
       if (startDate) {
-        const s = new Date(startDate);
-        if (!Number.isNaN(s.getTime())) {
-          s.setUTCHours(0, 0, 0, 0);
-          dateQuery.$gte = s;
+        const start = new Date(`${startDate}T00:00:00.000Z`);
+
+        if (!Number.isNaN(start.getTime())) {
+          dateQuery.$gte = start;
         }
       }
 
       if (endDate) {
-        const e = new Date(endDate);
-        if (!Number.isNaN(e.getTime())) {
-          e.setUTCHours(23, 59, 59, 999);
-          dateQuery.$lte = e;
+        const end = new Date(`${endDate}T23:59:59.999Z`);
+
+        if (!Number.isNaN(end.getTime())) {
+          dateQuery.$lte = end;
         }
       }
 
@@ -87,13 +87,15 @@ export async function GET(req: Request) {
       delete baseFilter.$or;
     }
 
-    const orders = await Order.find(baseFilter)
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
+    const [orders, total] = await Promise.all([
+      Order.find(baseFilter).sort({ createdAt: -1 }).lean(),
+
+      Order.countDocuments(baseFilter),
+    ]);
 
     return NextResponse.json({
       orders: orders.map(mapOrderForDashboard),
+      total,
     });
   } catch (error: any) {
     console.error("ORDERS FETCH ERROR:", error);

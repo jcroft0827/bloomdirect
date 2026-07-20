@@ -13,6 +13,8 @@ import Shop from "@/models/Shop";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
 import StarRating from "@/components/ui/StarRating";
 import { sendInvite } from "@/lib/client/sendInvite";
+import DeclineOrderModal from "@/components/orders/DeclineOrderModal";
+import type { DeclineReason } from "@/lib/decline-reasons";
 
 interface OrderClientProps {
   order: OrderLean;
@@ -25,13 +27,6 @@ interface Shop {
   businessName: string;
 }
 
-interface Decline {
-  orderId: string;
-  reason: string;
-  message: string;
-  loading: boolean;
-}
-
 export default function OrderClient({
   order,
   isFulfilling,
@@ -40,7 +35,8 @@ export default function OrderClient({
   const router = useRouter();
   const role = isOriginating ? "ORIGINATING" : "FULFILLING";
   const [actionOrderId, setActionOrderId] = useState<string | null>(null);
-  const [decline, setDecline] = useState<Decline | null>(null);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [decliningOrder, setDecliningOrder] = useState(false);
   const [handlingStatus, setHandlingStatus] = useState(false);
   const [availableShops, setAvailableShops] = useState<Shop[]>([]);
   const [reassignShop, setReassignShop] = useState("");
@@ -65,7 +61,6 @@ export default function OrderClient({
       searchShops();
     }
   }, [order.status]);
-
 
   const handleMarkPaid = async (
     orderId: string,
@@ -149,6 +144,55 @@ export default function OrderClient({
       );
     } finally {
       setHandlingStatus(false);
+    }
+  };
+
+  const handleDeclineOrder = async ({
+    reason,
+    message,
+  }: {
+    reason: DeclineReason;
+    message?: string;
+  }) => {
+    if (decliningOrder || actionOrderId === order._id) return;
+
+    try {
+      setDecliningOrder(true);
+      setActionOrderId(order._id);
+
+      const res = await fetch("/api/orders/status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: order._id,
+          status: OrderStatus.DECLINED,
+          declineReason: reason,
+          declineMessage: message,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to decline order.");
+      }
+
+      setShowDeclineModal(false);
+      toast.success("Order declined.");
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to decline order:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to decline order. Please try again.",
+      );
+    } finally {
+      setDecliningOrder(false);
+      setActionOrderId(null);
     }
   };
 
@@ -369,21 +413,29 @@ export default function OrderClient({
       }
 
       try {
-        const updateRes = await fetch("/api/orders/outside-network/update-email", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: order._id,
-            email: emailToUseFinal,
-          }),
-        });
+        const updateRes = await fetch(
+          "/api/orders/outside-network/update-email",
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: order._id,
+              email: emailToUseFinal,
+            }),
+          },
+        );
 
         if (!updateRes.ok) {
           const updateData = await updateRes.json();
-          console.warn("Email sent, but failed to save email:", updateData.error);
+          console.warn(
+            "Email sent, but failed to save email:",
+            updateData.error,
+          );
         }
       } catch (updateError) {
-        toast.error("Email set successfully, but failed to save email to order.")
+        toast.error(
+          "Email set successfully, but failed to save email to order.",
+        );
         console.warn("Email sent, but failed to save email:", updateError);
       }
 
@@ -395,12 +447,12 @@ export default function OrderClient({
     } finally {
       setEmailingOrder(false);
     }
-  }
+  };
 
   const handleInviteFlorist = async () => {
     try {
       if (!order.outsideFlorist?.email) {
-        alert("Please add the florist email first.");
+        toast("Please add the florist email first.");
         return;
       }
 
@@ -418,7 +470,7 @@ export default function OrderClient({
       toast.success("Invitation sent successfully.");
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Failed to send invitation.");
+      toast.error(error.message || "Failed to send invitation.");
     } finally {
       setEmailInviteOpen(false);
       setEmailingInvite(false);
@@ -427,7 +479,7 @@ export default function OrderClient({
 
   return (
     <>
-      <Toaster position="top-center" />    
+      <Toaster position="top-center" />
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-6 px-4">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Back To Orders Button */}
@@ -479,7 +531,8 @@ export default function OrderClient({
                 role === "ORIGINATING" && (
                   <p className="mt-1 text-sm text-red-600">
                     Reason:{" "}
-                    {order.declineReason?.replaceAll("_", " ") || "Not specified"}
+                    {order.declineReason?.replaceAll("_", " ") ||
+                      "Not specified"}
                   </p>
                 )}
 
@@ -608,7 +661,9 @@ export default function OrderClient({
                         </span>
                         <div className="flex flex-col justify-between">
                           <p>
-                            <span className="text-sm font-semibold">Price:</span>{" "}
+                            <span className="text-sm font-semibold">
+                              Price:
+                            </span>{" "}
                             <span className="text-emerald-600 font-semibold">
                               {formatCurrencyFromCents(product.priceCents)}
                             </span>
@@ -750,7 +805,9 @@ export default function OrderClient({
                         </span>
                         <div className="flex flex-col justify-between">
                           <p>
-                            <span className="text-sm font-semibold">Price:</span>{" "}
+                            <span className="text-sm font-semibold">
+                              Price:
+                            </span>{" "}
                             <span className="text-emerald-600 font-semibold">
                               {formatCurrencyFromCents(product.priceCents)}
                             </span>
@@ -849,7 +906,9 @@ export default function OrderClient({
               </div>
               {/* Card Message */}
               <div className="col-span-2">
-                <p className="text-purple-600 font-bold text-lg">Card Message</p>
+                <p className="text-purple-600 font-bold text-lg">
+                  Card Message
+                </p>
                 <p className="text-black text-sm p-4 rounded-md bg-gray-50">
                   {order.recipient.message || "No message"}
                 </p>
@@ -956,109 +1015,20 @@ export default function OrderClient({
                     </button>
                     <button
                       type="button"
-                      disabled={actionOrderId === order._id}
-                      onClick={() => {
-                        setDecline({
-                          ...decline,
-                          orderId: order._id.toString(),
-                          reason: "",
-                          message: "",
-                          loading: true,
-                        });
-                      }}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xl py-4 rounded-2xl"
+                      disabled={decliningOrder || actionOrderId === order._id}
+                      onClick={() => setShowDeclineModal(true)}
+                      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white font-black text-xl py-4 rounded-2xl"
                     >
-                      Decline Order
+                      {decliningOrder ? (
+                        <div className="flex gap-2 items-center justify-center">
+                          <span>Declining Order</span>
+                          <BloomSpinner size={28} />
+                        </div>
+                      ) : (
+                        "Decline Order"
+                      )}
                     </button>
                   </div>
-                  // <>
-                  //   <form action="/api/orders/status" method="POST">
-                  //     <input
-                  //       type="hidden"
-                  //       name="orderId"
-                  //       value={order._id.toString()}
-                  //     />
-                  //     <input
-                  //       type="hidden"
-                  //       name="status"
-                  //       value={OrderStatus.ACCEPTED_AWAITING_PAYMENT}
-                  //     />
-                  //     <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-4 rounded-2xl">
-                  //       Accept Order
-                  //     </button>
-                  //   </form>
-
-                  //   <p className="text-xs text-red-500 text-center">
-                  //     This action cannot be undone.
-                  //   </p>
-
-                  //   <details className="group">
-                  //     <summary className="cursor-pointer w-full bg-red-600 hover:bg-red-700 text-white font-black text-xl py-4 rounded-2xl text-center">
-                  //       Decline Order
-                  //     </summary>
-
-                  //     <form
-                  //       action="/api/orders/status"
-                  //       method="POST"
-                  //       className="mt-4 space-y-3"
-                  //     >
-                  //       <input
-                  //         type="hidden"
-                  //         name="orderId"
-                  //         value={order._id.toString()}
-                  //       />
-                  //       <input
-                  //         type="hidden"
-                  //         name="status"
-                  //         value={OrderStatus.DECLINED}
-                  //       />
-
-                  //       <select
-                  //         name="declineReason"
-                  //         required
-                  //         className="w-full rounded-xl border px-4 py-3"
-                  //       >
-                  //         <option value="">Select reason…</option>
-                  //         <option value="OUT_OF_STOCK">Out of stock</option>
-                  //         <option value="TOO_BUSY">Too busy</option>
-                  //         <option value="DELIVERY_AREA">
-                  //           Outside delivery area
-                  //         </option>
-                  //         <option value="OTHER">Other</option>
-                  //       </select>
-
-                  //       <textarea
-                  //         name="declineMessage"
-                  //         placeholder="Optional message for originating shop"
-                  //         className="w-full rounded-xl border px-4 py-3"
-                  //         rows={3}
-                  //       />
-
-                  //       <button
-                  //         type="submit"
-                  //         className="w-full bg-red-700 hover:bg-red-800 text-white font-black py-3 rounded-xl"
-                  //       >
-                  //         Confirm Decline
-                  //       </button>
-                  //     </form>
-                  //   </details>
-
-                  //   <form action="/api/orders/status" method="POST">
-                  //     <input
-                  //       type="hidden"
-                  //       name="orderId"
-                  //       value={order._id.toString()}
-                  //     />
-                  //     <input
-                  //       type="hidden"
-                  //       name="status"
-                  //       value={OrderStatus.DECLINED}
-                  //     />
-                  //     <button className="w-full bg-red-600 hover:bg-red-700 text-white font-black text-xl py-4 rounded-2xl">
-                  //       Decline Order
-                  //     </button>
-                  //   </form>
-                  // </>
                 )}
 
               {/* MARK PAID */}
@@ -1143,9 +1113,9 @@ export default function OrderClient({
                       </p>
 
                       <p className="text-sm text-gray-500">
-                        Once reassigned, the new shop will receive this order and
-                        can choose to accept or decline it. You will be notified
-                        by email.
+                        Once reassigned, the new shop will receive this order
+                        and can choose to accept or decline it. You will be
+                        notified by email.
                       </p>
 
                       <p className="text-xs text-red-500 text-center">
@@ -1354,6 +1324,16 @@ export default function OrderClient({
             </div>
           </div>
         )}
+
+        <DeclineOrderModal
+          open={showDeclineModal}
+          onClose={() => {
+            if (!decliningOrder) {
+              setShowDeclineModal(false);
+            }
+          }}
+          onConfirm={handleDeclineOrder}
+        />
       </div>
     </>
   );

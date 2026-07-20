@@ -4,6 +4,9 @@ import Webhook from "@/models/Webhook";
 import WebhookLog from "@/models/WebhookLog";
 import { signPayload } from "./webhook-sign";
 import { getNextRetryTime } from "./webhook-retry";
+import Shop from "@/models/Shop";
+import crypto from "crypto";
+import { decryptWebhookSecret } from "./webhook-secret";
 
 async function postWithTimeout(
   url: string,
@@ -32,14 +35,28 @@ export async function sendWebhookEvent({
   shopId: string;
   data: any;
 }) {
+  const shop = await Shop.findById(shopId).select(
+    "isPro isSuspended apiAccess.enabled",
+  );
+
+  if (!shop || !shop.isPro || shop.isSuspended || !shop.apiAccess?.enabled) {
+    console.log(
+      `Skipping POS webhook "${event}" for shop ${shopId}: POS API access is inactive`,
+    );
+
+    return;
+  }
+
   const webhooks = await Webhook.find({
     shopId,
     isActive: true,
     events: event,
-  });
+  }).select("+encryptedSecret +encryptionIv +encryptionAuthTag");
 
   await Promise.all(
     webhooks.map(async (hook) => {
+      const deliveryId = crypto.randomUUID();
+
       const basePayload = {
         event,
         data,
@@ -52,6 +69,7 @@ export async function sendWebhookEvent({
       const log = await WebhookLog.create({
         shopId,
         webhookId: hook._id,
+        deliveryId,
         event,
         url: hook.url,
         payload: basePayload,
@@ -64,11 +82,17 @@ export async function sendWebhookEvent({
         ...basePayload,
         meta: {
           ...basePayload.meta,
-          deliveryId: log._id.toString(),
+          deliveryId,
         },
       };
 
-      const signature = signPayload(payload, hook.secret);
+      const webhookSecret = decryptWebhookSecret({
+        encryptedSecret: hook.encryptedSecret,
+        encryptionIv: hook.encryptionIv,
+        encryptionAuthTag: hook.encryptionAuthTag,
+      });
+
+      const signature = signPayload(payload, webhookSecret);
 
       log.payload = payload;
       log.signature = signature;
@@ -82,7 +106,7 @@ export async function sendWebhookEvent({
               "Content-Type": "application/json",
               "X-Webhook-Signature": signature,
               "X-Webhook-Event": event,
-              "X-Webhook-Delivery_Id": log._id.toString(),
+              "X-Webhook-Delivery-Id": deliveryId,
             },
             body: JSON.stringify(payload),
           },

@@ -3,15 +3,27 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import "react-datepicker/dist/react-datepicker.css";
 import { searchGoogleFlorists } from "@/app/actions";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import BloomSpinner from "@/components/BloomSpinner";
 import { sendInvite } from "@/lib/client/sendInvite";
+import { Star } from "lucide-react";
+import Link from "next/link";
+import PreviousMap_ from "postcss/lib/previous-map";
 
 // #region Interfaces
+
+interface MonthlySendUsage {
+  isPro: boolean;
+  allowed: boolean;
+  sentThisMonth: number;
+  limit: number | null;
+  remaining: number | null;
+  monthStart: string;
+}
 
 interface GoogleFlorist {
   id: string;
@@ -41,8 +53,6 @@ interface RecipientData {
   state: string;
   company: string;
 }
-
-interface ShopsData {}
 
 interface CustomerData {
   firstName: string;
@@ -77,6 +87,7 @@ interface SendingShop {
   feeTaxed: boolean;
   feeType: string;
   feeValue: number;
+  preferredFlorists: string[];
 }
 
 // #region Fulfilling Shop
@@ -227,6 +238,7 @@ export default function NewOrderClient() {
     feeTaxed: false,
     feeType: "",
     feeValue: 0.0,
+    preferredFlorists: [],
   });
 
   //Fulfilling Shop Data
@@ -347,12 +359,20 @@ export default function NewOrderClient() {
 
   const [emailingInvite, setEmailingInvite] = useState(false);
 
+  // Monthly Usage
+  const [monthlySendUsage, setMonthlySendUsage] =
+    useState<MonthlySendUsage | null>(null);
+  const [checkingSendUsage, setCheckingSendUsage] = useState(true);
+
   // Variables
   const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(
     `florist flower shop near ${recipient.city} ${recipient.state} ${recipient.zip}`,
   )}`;
   const usingGoogleShop = !!googleShop?.name && !selectedShop?._id;
   const usingNetworkShop = !!selectedShop?._id;
+  const favoriteShopIds = new Set(
+    sendingShop.preferredFlorists.map((favoriteId) => String(favoriteId)),
+  );
 
   // #endregion
 
@@ -362,32 +382,59 @@ export default function NewOrderClient() {
   useEffect(() => {
     async function loadShop() {
       try {
-        const res = await fetch("/api/shops/me");
-        const data = await res.json();
+        const [shopRes, usageRes] = await Promise.all([
+          fetch("/api/shops/me"),
+          fetch("/api/orders/send-usage"),
+        ]);
 
-        if (data && data.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-          }
+        const shopData = await shopRes.json();
+        const usageData = await usageRes.json();
+
+        if (!shopRes.ok) {
+          throw new Error(shopData.error || "Failed to load shop data.");
+        }
+
+        if (!usageRes.ok) {
+          throw new Error(
+            usageData.error || "Failed to load sending usage.",
+          );
+        }
+
+        if (!shopData?.shop) {
+          throw new Error("Shop information was not returned.");
+        }
+
+        if (!shopData.shop.onboardingComplete) {
+          router.push("/dashboard/setup");
+          return;
         }
 
         setSendingShop({
-          ...sendingShop,
-          shopId: data.shop._id,
-          shopName: data.shop.businessName,
-          taxPercentage: data.shop.financials.taxPercentage,
-          deliveryTaxed: data.shop.financials.deliveryTaxed,
-          feeTaxed: data.shop.financials.feeTaxed,
-          feeType: data.shop.financials.feeType,
-          feeValue: data.shop.financials.feeValue,
+          shopId: shopData.shop._id,
+          shopName: shopData.shop.businessName,
+          taxPercentage: shopData.shop.financials?.taxPercentage ?? 0,
+          deliveryTaxed: shopData.shop.financials?.deliveryTaxed ?? false,
+          feeTaxed: shopData.shop.financials?.feeTaxed ?? false,
+          feeType: shopData.shop.financials?.feeType ?? "flat",
+          feeValue: shopData.shop.financials?.feeValue ?? 0,
+          preferredFlorists: shopData.shop.preferredFlorists ?? [],
         });
-        setOriginatingFeeValue(data.shop.financials.feeValue || 0);
+
+        setOriginatingFeeValue(shopData.shop.financials?.feeValue ?? 0);
+
+        setMonthlySendUsage(usageData.usage);
       } catch (err) {
-        console.error("Failed to load shop data", err);
+        console.error("Failed to load shop data or sending usage", err);
+
+        toast.error(
+          "We couldn't load your shop information. Please refresh and try again.",
+        );
+      } finally {
+        setCheckingSendUsage(false);
       }
     }
     loadShop();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const deliveryFee = Number(pricing.deliveryFee) || 0;
@@ -639,8 +686,8 @@ export default function NewOrderClient() {
         : [];
 
       const outsideTotals = usingGoogleShop
-          ? calculateOutsideNetworkTotals()
-          : null;
+        ? calculateOutsideNetworkTotals()
+        : null;
 
       const payload = usingGoogleShop
         ? {
@@ -689,7 +736,9 @@ export default function NewOrderClient() {
                 description: item.description || "",
                 qty: Number(item.qty) || 1,
                 price: roundMoney(item.price),
-                lineTotal: roundMoney((Number(item.qty) || 1) * (Number(item.price) || 0)),
+                lineTotal: roundMoney(
+                  (Number(item.qty) || 1) * (Number(item.price) || 0),
+                ),
                 taxable: item.taxable !== false,
               })),
               productTotal: outsideTotals?.productsTotal || 0,
@@ -765,13 +814,45 @@ export default function NewOrderClient() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed to create order");
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.code === "MONTHLY_SEND_LIMIT_REACHED") {
+          setMonthlySendUsage((previous) => {
+            if (!previous) {
+              return previous;
+            }
+
+            return {
+              ...previous,
+              allowed: false,
+              sentThisMonth:
+                data.usage?.sentThisMonth ?? previous.sentThisMonth,
+              limit: data.usage?.limit ?? previous.limit,
+              remaining: 0,
+            };
+          });
+
+          toast(
+            "You have reached your monthly sending limit. Upgrade to Bloom Pro for unlimited sending.",
+            {
+              icon: "⭐",
+              duration: 5000,
+            },
+          );
+
+          return;
+        }
+
+        throw new Error(data.error || "Failed to create order.",);
+      }
 
       toast.success("Order sent successfully!");
       router.push("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to send order", error);
-      toast.error("Failed to send order. Please try again.");
+
+      toast.error(error.message || "Failed to send order. Please try again.");
     } finally {
       setSendingOrder(false);
     }
@@ -877,7 +958,7 @@ export default function NewOrderClient() {
     try {
       setShopChosen(false);
       if (!name) return;
-      
+
       setGoogleShop({
         name,
         phone: phone || "",
@@ -891,8 +972,6 @@ export default function NewOrderClient() {
       setFulfillShopId("");
       setOfferings([]);
       setSelectedProducts([]);
-
-
 
       // setPricing((prev) => ({
       //   ...prev,
@@ -1000,7 +1079,10 @@ export default function NewOrderClient() {
         setGoogleResults([]);
         setGoogleApiFailed(true);
         setOutsideFloristFormOpen(true);
-        toast.error(result.error || "Google florist search is unavailable. You can search Google manually or enter the florist below.");
+        toast.error(
+          result.error ||
+            "Google florist search is unavailable. You can search Google manually or enter the florist below.",
+        );
         return;
       }
 
@@ -1021,7 +1103,9 @@ export default function NewOrderClient() {
       setLastZip(zip);
 
       if (sortedData.length === 0) {
-        toast.error("No Google florist results found. You can enter the florist manually.");
+        toast.error(
+          "No Google florist results found. You can enter the florist manually.",
+        );
         setOutsideFloristFormOpen(true);
       }
 
@@ -1037,7 +1121,9 @@ export default function NewOrderClient() {
       setGoogleResults([]);
       setGoogleApiFailed(true);
       setOutsideFloristFormOpen(true);
-      toast.error("Google florist search is unavailable. You can enter the florist manually.");
+      toast.error(
+        "Google florist search is unavailable. You can enter the florist manually.",
+      );
     } finally {
       setLoading(false);
     }
@@ -1087,7 +1173,10 @@ export default function NewOrderClient() {
   const addOutsideItem = () => {
     setOutsideNetwork((prev) => ({
       ...prev,
-      items: [...prev.items, { name: "", description: "", qty: 1, price: 0, taxable: true }],
+      items: [
+        ...prev.items,
+        { name: "", description: "", qty: 1, price: 0, taxable: true },
+      ],
     }));
   };
 
@@ -1118,8 +1207,7 @@ export default function NewOrderClient() {
     const taxPercent =
       overrides?.taxPercent ?? (Number(outsideNetwork.taxPercent) || 0);
 
-    const feeValue =
-      overrides?.feeValue ?? (Number(originatingFeeValue) || 0);
+    const feeValue = overrides?.feeValue ?? (Number(originatingFeeValue) || 0);
 
     const taxableSubtotal = outsideNetwork.items.reduce((sum, item) => {
       const qty = Number(item.qty) || 1;
@@ -1136,9 +1224,7 @@ export default function NewOrderClient() {
     }, 0);
 
     const feeCharge =
-      sendingShop.feeType === "%"
-        ? productsTotal * (feeValue / 100)
-        : feeValue;
+      sendingShop.feeType === "%" ? productsTotal * (feeValue / 100) : feeValue;
 
     const taxableBasis =
       taxableSubtotal +
@@ -1326,10 +1412,10 @@ export default function NewOrderClient() {
     }
   };
 
-    const handleInviteFlorist = async () => {
+  const handleInviteFlorist = async () => {
     try {
       if (!manualOutsideFlorist.email) {
-        alert("Please add the florist email first.");
+        toast("Please add the florist email first.");
         return;
       }
 
@@ -1346,7 +1432,7 @@ export default function NewOrderClient() {
       toast.success("Invitation sent successfully.");
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Failed to send invitation.");
+      toast.error(error.message || "Failed to send invitation.");
     } finally {
       setEmailingInvite(false);
     }
@@ -1354,9 +1440,97 @@ export default function NewOrderClient() {
 
   // #endregion
 
+  if (checkingSendUsage) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <BloomSpinner size={64} />
+      </div>
+    );
+  }
+
+  if (monthlySendUsage && !monthlySendUsage.allowed) {
+    return (
+      <>
+        <div className="mx-auto max-w-3xl py-12">
+          <div className="overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-2xl">
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-8 py-10 text-center text-white">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+                <Star className="h-8 w-8 fill-current text-yellow-300" />
+              </div>
+
+              <h1 className="text-3xl font-black sm:text-4xl">
+                Monthly Sending Limit Reached
+              </h1>
+
+              <p className="mx-auto mt-3 max-w-xl text-lg text-purple-100">
+                You've used all {monthlySendUsage.limit} orders including with
+                Bloom Free this month.
+              </p>
+            </div>
+
+            <div className="p-8 text-center sm:p-10">
+              <div className="mx-auto grid max-w-lg grid-cols-2 gap-4">
+                <div className="rounded-2xl bg-gray-50 p-5">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+                    Orders Sent
+                  </p>
+
+                  <p className="mt-1 text-4xl font-black text-gray-900">
+                    {monthlySendUsage.sentThisMonth}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-gray-50 p-5">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+                    Monthly Limit
+                  </p>
+
+                  <p className="mt-1 text-4xl font-black text-gray-900">
+                    {monthlySendUsage.limit}
+                  </p>
+                </div>
+              </div>
+
+              <h2 className="mt-8 text-2xl font-bold text-gray-900">
+                Need to keep sending orders?
+              </h2>
+
+              <p className="mx-auto mt-2 max-w-xl text-gray-600">
+                Upgrade to Bloom Pro for unlimited sending, advanced reporting,
+                expanded fulfillment offerings, POS integration, and more.
+              </p>
+
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/dashboard/upgrade"
+                  className="rounded-xl bg-purple-600 px-6 py-3 font-bold text-white transition hover:bg-purple-700"
+                >
+                  Upgrade to Bloom Pro
+                </Link>
+
+                <Link
+                  href="/dashboard/incoming?role=originating&period=current-month"
+                  className="rounded-xl border border-gray-200 px-6 py-3 font-bold text-gray-700 transition hover:bg-gray-50"
+                >
+                  View This Month's Orders
+                </Link>
+              </div>
+
+              <Link
+                href="/dashboard"
+                className="mt-6 inline-block text-sm font-semibold text-gray-500 hover:text-purple-600"
+              >
+                ← Back to Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <Toaster position="top-center" />
       <div>
         <div className="mx-auto space-y-8 xl:space-y-4">
           <div className="bg-transparent rounded-2xl shadow-lg">
@@ -1450,7 +1624,7 @@ export default function NewOrderClient() {
                           <h2 className="block text-xl font-bold text-white">
                             Address Lookup
                           </h2>
-                          
+
                           <p
                             className={
                               googleShop && shops.length < 1
@@ -1576,6 +1750,7 @@ export default function NewOrderClient() {
                             }
                           />
                         </div>
+
                         {/* Zip */}
                         <div>
                           <label className="order-input-label">
@@ -1595,6 +1770,7 @@ export default function NewOrderClient() {
                             }
                           />
                         </div>
+
                         {/* City */}
                         <div>
                           <label className="order-input-label">
@@ -1613,6 +1789,7 @@ export default function NewOrderClient() {
                             }
                           />
                         </div>
+
                         {/* State */}
                         <div>
                           <label className="order-input-label">
@@ -1632,7 +1809,7 @@ export default function NewOrderClient() {
                           />
                         </div>
                       </div>
-                      
+
                       {/* Search Button */}
                       <button
                         onClick={searchShops}
@@ -1652,7 +1829,8 @@ export default function NewOrderClient() {
                           </h2>
 
                           <p className="mt-2 max-w-md">
-                            Enter the recipient address and delivery details, then search for available florists.
+                            Enter the recipient address and delivery details,
+                            then search for available florists.
                           </p>
                         </div>
                       )}
@@ -1679,53 +1857,113 @@ export default function NewOrderClient() {
                             </h2>
 
                             <p className="text-gray-600">
-                              These GetBloomDirect florists can serve this delivery area.
+                              These GetBloomDirect florists can serve this
+                              delivery area.
                             </p>
                           </div>
 
-                          {shops.map((shop) => (
-                            <label
-                              key={shop._id}
-                              className={`block p-5 border-2 rounded-2xl cursor-pointer transition-all ${
+                          <button onClick={() => console.log(favoriteShopIds)}>
+                            test
+                          </button>
+
+                          {shops.map((shop) => {
+                            const isFavorite = favoriteShopIds.has(
+                              String(shop._id),
+                            );
+
+                            return (
+                              <label
+                                key={shop._id}
+                                className={`relative block overflow-hidden rounded-2xl border-2 p-5 pt-7 cursor-pointer transition-all ${
                                   selectedShop?._id === shop._id
                                     ? "border-emerald-600 bg-emerald-50 shadow-xl"
-                                    : "border-gray-200 hover:border-purple-500 hover:shadow-lg"
+                                    : isFavorite
+                                      ? "border-amber-300 bg-amber-50/30 hover:border-amber-400 hover:shadow-lg"
+                                      : "border-gray-200 hover:border-purple-500 hover:shadow-lg"
                                 }`}
-                            >
-                              <div className="flex justify-between gap-4">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-bold text-gray-900">
-                                      {shop.businessName}
-                                    </h3>
+                              >
+                                {/* Favorite Florist Banner */}
+                                {isFavorite && (
+                                  <div className="absolute inset-x-0 top-0 flex items-center justify-center gap-1.5 border-b border-amber-300 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                                    <Star className="h-3.5 w-3.5 fill-current" />
+                                    Favorite Florist
+                                  </div>
+                                )}
 
-                                    {shop.verifiedFlorist && (
-                                      <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
-                                        Verified
-                                      </span>
-                                    )}
+                                <div className="flex justify-between gap-4">
+                                  <div className="flex-1">
+                                    {/* Shop Name + Badges */}
+                                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                      <div>
+                                        <h3 className="text-2xl font-bold text-gray-900">
+                                          {shop.businessName}
+                                        </h3>
+
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {shop.verifiedFlorist && (
+                                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                              ✓ Verified Florist
+                                            </span>
+                                          )}
+
+                                          {shop.isPro && (
+                                            <span className="flex items-center gap-1 rounded-full border border-amber-300 bg-gradient-to-r from-amber-100 to-yellow-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                              <Star className="h-3.5 w-3.5 fill-current" />
+                                              Bloom Pro
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <Link
+                                          href={`/dashboard/shops/${shop.slug}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="inline-flex items-center rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                        >
+                                          View Profile
+                                        </Link>
+                                      </div>
+
+                                      <div className="rounded-xl bg-purple-50 px-4 py-2 text-center">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
+                                          Delivery
+                                        </p>
+
+                                        <p className="text-xl font-bold text-purple-700">
+                                          ${shop.deliveryCharge.toFixed(2)}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* Contact */}
+                                    <div className="mt-4 space-y-1 text-sm text-gray-600">
+                                      <p>{shop.contact?.phone}</p>
+
+                                      <p>
+                                        {shop.address?.street}
+                                        <br />
+                                        {shop.address?.city},{" "}
+                                        {shop.address?.state}
+                                      </p>
+                                    </div>
                                   </div>
 
-                                  <p className="text-gray-600">{shop.contact?.phone}</p>
-                                  <p>
-                                    {shop.address?.street} • {shop.address?.city}, {shop.address?.state}
-                                  </p>
-
-                                  <p className="mt-2 font-semibold text-gray-800">
-                                    Delivery Charge: ${shop.deliveryCharge}
-                                  </p>
+                                  <input
+                                    type="radio"
+                                    name="shop"
+                                    checked={selectedShop?._id === shop._id}
+                                    onChange={() =>
+                                      selectShop(shop, setSelectedShop)
+                                    }
+                                    className="mt-2 h-7 w-7"
+                                  />
                                 </div>
-
-                                <input 
-                                  type="radio"
-                                  name="shop"
-                                  checked={selectedShop?._id === shop._id}
-                                  onChange={() => selectShop(shop, setSelectedShop)}
-                                  className="mt-2 h-7 w-7"
-                                />
-                              </div>
-                            </label>
-                          ))}
+                              </label>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -1737,7 +1975,8 @@ export default function NewOrderClient() {
                             </h2>
 
                             <p className="mt-1 text-gray-700">
-                              GetBloomDirect does not currently have a partner florist who serves this address.
+                              GetBloomDirect does not currently have a partner
+                              florist who serves this address.
                             </p>
                           </div>
 
@@ -1757,7 +1996,9 @@ export default function NewOrderClient() {
                               disabled={loading}
                               className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-2xl font-bold shadow-lg transition-all"
                             >
-                              {loading ? "Searching Google..." : "Show More Shops Outside Our Network"}
+                              {loading
+                                ? "Searching Google..."
+                                : "Show More Shops Outside Our Network"}
                             </button>
 
                             <button
@@ -1772,7 +2013,8 @@ export default function NewOrderClient() {
                           {googleApiFailed && (
                             <div className="rounded-xl border-2 border-red-500 bg-red-50 p-4">
                               <p className="text-red-700 font-bold mb-3">
-                                Google search failed. You can still search manually and enter the florist below.
+                                Google search failed. You can still search
+                                manually and enter the florist below.
                               </p>
 
                               <a
@@ -1786,67 +2028,75 @@ export default function NewOrderClient() {
                             </div>
                           )}
 
-                          {googleSearch && !googleApiFailed && googleResults.length > 0 && (
-                            <div className="space-y-4">
-                              <div>
-                                <h2 className="text-xl font-bold text-purple-700">
-                                  Shops pulled from Google Search
-                                </h2>
+                          {googleSearch &&
+                            !googleApiFailed &&
+                            googleResults.length > 0 && (
+                              <div className="space-y-4">
+                                <div>
+                                  <h2 className="text-xl font-bold text-purple-700">
+                                    Shops pulled from Google Search
+                                  </h2>
 
-                                <p className="text-sm text-gray-600">
-                                  These shops are not part of GetBloomDirect yet.
-                                </p>
-                              </div>
+                                  <p className="text-sm text-gray-600">
+                                    These shops are not part of GetBloomDirect
+                                    yet.
+                                  </p>
+                                </div>
 
-                              {googleResults.map((shop) => (
-                                <div
-                                  key={shop.id}
-                                  className={
-                                    (googleShop.name === shop.displayName.text
-                                      ? "border-purple-600 bg-purple-50"
-                                      : "border-gray-200 bg-white") +
-                                    " p-4 border-2 rounded-xl shadow-sm flex justify-between gap-4"
-                                  }
-                                >
-                                  <div>
-                                    <h3 className="font-bold text-lg text-emerald-900">
-                                      {shop.displayName.text}
-                                    </h3>
-
-                                    <p className="text-gray-600">
-                                      {shop.nationalPhoneNumber || "No phone listed"}
-                                    </p>
-
-                                    <p className="text-gray-600">
-                                      {shop.formattedAddress || "No address listed"}
-                                    </p>
-
-                                    {shop.rating && (
-                                      <div className="text-yellow-500 font-medium">
-                                        ★ {shop.rating}
-                                        <span className="text-gray-400 text-sm"> Google Rating</span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <button
-                                    className="self-start rounded-lg px-4 py-2 bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
-                                    onClick={() =>
-                                      selectGoogleShop(
-                                        shop.displayName.text,
-                                        shop.nationalPhoneNumber,
-                                        shop.formattedAddress,
-                                        "",
-                                        shop.id,
-                                      )
+                                {googleResults.map((shop) => (
+                                  <div
+                                    key={shop.id}
+                                    className={
+                                      (googleShop.name === shop.displayName.text
+                                        ? "border-purple-600 bg-purple-50"
+                                        : "border-gray-200 bg-white") +
+                                      " p-4 border-2 rounded-xl shadow-sm flex justify-between gap-4"
                                     }
                                   >
-                                    Select
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                                    <div>
+                                      <h3 className="font-bold text-lg text-emerald-900">
+                                        {shop.displayName.text}
+                                      </h3>
+
+                                      <p className="text-gray-600">
+                                        {shop.nationalPhoneNumber ||
+                                          "No phone listed"}
+                                      </p>
+
+                                      <p className="text-gray-600">
+                                        {shop.formattedAddress ||
+                                          "No address listed"}
+                                      </p>
+
+                                      {shop.rating && (
+                                        <div className="text-yellow-500 font-medium">
+                                          ★ {shop.rating}
+                                          <span className="text-gray-400 text-sm">
+                                            {" "}
+                                            Google Rating
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      className="self-start rounded-lg px-4 py-2 bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+                                      onClick={() =>
+                                        selectGoogleShop(
+                                          shop.displayName.text,
+                                          shop.nationalPhoneNumber,
+                                          shop.formattedAddress,
+                                          "",
+                                          shop.id,
+                                        )
+                                      }
+                                    >
+                                      Select
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
                           {outsideFloristFormOpen && (
                             <div className="mt-6 rounded-2xl bg-white p-4 shadow-xl border-2 border-purple-600 max-w-2xl">
@@ -1855,7 +2105,8 @@ export default function NewOrderClient() {
                               </h3>
 
                               <p className="text-sm text-gray-600 mb-4">
-                                Enter the florist you contacted. Once saved, you can continue building the order.
+                                Enter the florist you contacted. Once saved, you
+                                can continue building the order.
                               </p>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1946,7 +2197,9 @@ export default function NewOrderClient() {
                                   onClick={handleInviteFlorist}
                                   className="bg-purple-100 hover:bg-purple-200 text-purple-700 px-4 py-2 rounded-xl font-semibold w-full"
                                 >
-                                  {emailingInvite ? "Sending..." : "Also Invite This Florist"}
+                                  {emailingInvite
+                                    ? "Sending..."
+                                    : "Also Invite This Florist"}
                                 </button>
                               </div>
                             </div>
@@ -2175,12 +2428,12 @@ export default function NewOrderClient() {
                           </p>
                         </div>
 
-                        <div 
-                          className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-2"
-                        >
+                        <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-2">
                           <div className="sm:col-span-2 space-y-3">
                             <div className="flex items-center justify-between">
-                              <h3 className="font-bold text-lg">Manual Items</h3>
+                              <h3 className="font-bold text-lg">
+                                Manual Items
+                              </h3>
 
                               <button
                                 type="button"
@@ -2199,26 +2452,37 @@ export default function NewOrderClient() {
                                 {/* Taxable Switch */}
                                 <div className="sm:col-span-4 flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 border">
                                   <div>
-                                    <p className="font-semibold text-gray-800">Taxable Item</p>
+                                    <p className="font-semibold text-gray-800">
+                                      Taxable Item
+                                    </p>
                                     <p className="text-xs text-gray-500">
-                                      Turn off if this item should not be included in tax.
+                                      Turn off if this item should not be
+                                      included in tax.
                                     </p>
                                   </div>
 
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      updateOutsideItem(index, "taxable", item.taxable === false)
+                                      updateOutsideItem(
+                                        index,
+                                        "taxable",
+                                        item.taxable === false,
+                                      )
                                     }
                                     className={
                                       "relative inline-flex h-7 w-12 items-center rounded-full transition " +
-                                      (item.taxable !== false ? "bg-emerald-600" : "bg-gray-300")
+                                      (item.taxable !== false
+                                        ? "bg-emerald-600"
+                                        : "bg-gray-300")
                                     }
                                   >
                                     <span
                                       className={
                                         "inline-block h-5 w-5 transform rounded-full bg-white transition " +
-                                        (item.taxable !== false ? "translate-x-6" : "translate-x-1")
+                                        (item.taxable !== false
+                                          ? "translate-x-6"
+                                          : "translate-x-1")
                                       }
                                     />
                                   </button>
@@ -2234,7 +2498,11 @@ export default function NewOrderClient() {
                                     placeholder="Designer's Choice, balloon, chocolates..."
                                     value={item.name}
                                     onChange={(e) =>
-                                      updateOutsideItem(index, "name", e.target.value)
+                                      updateOutsideItem(
+                                        index,
+                                        "name",
+                                        e.target.value,
+                                      )
                                     }
                                     className="order-input"
                                   />
@@ -2251,7 +2519,11 @@ export default function NewOrderClient() {
                                     min={1}
                                     value={item.qty}
                                     onChange={(e) =>
-                                      updateOutsideItem(index, "qty", Number(e.target.value))
+                                      updateOutsideItem(
+                                        index,
+                                        "qty",
+                                        Number(e.target.value),
+                                      )
                                     }
                                     className="order-input"
                                   />
@@ -2267,7 +2539,11 @@ export default function NewOrderClient() {
                                     type="number"
                                     value={item.price === 0 ? "" : item.price}
                                     onChange={(e) =>
-                                      updateOutsideItem(index, "price", Number(e.target.value))
+                                      updateOutsideItem(
+                                        index,
+                                        "price",
+                                        Number(e.target.value),
+                                      )
                                     }
                                     className="order-input"
                                   />
@@ -2284,7 +2560,11 @@ export default function NewOrderClient() {
                                     placeholder="Optional item details"
                                     value={item.description}
                                     onChange={(e) =>
-                                      updateOutsideItem(index, "description", e.target.value)
+                                      updateOutsideItem(
+                                        index,
+                                        "description",
+                                        e.target.value,
+                                      )
                                     }
                                     className="order-input"
                                   />
@@ -2293,7 +2573,13 @@ export default function NewOrderClient() {
                                 <div className="sm:col-span-4 flex justify-between items-center text-sm">
                                   <p>
                                     Line Total:{" "}
-                                    <b>${roundToHundredth((Number(item.qty) || 1) * (Number(item.price) || 0))}</b>
+                                    <b>
+                                      $
+                                      {roundToHundredth(
+                                        (Number(item.qty) || 1) *
+                                          (Number(item.price) || 0),
+                                      )}
+                                    </b>
                                   </p>
 
                                   {outsideNetwork.items.length > 1 && (
@@ -2316,17 +2602,17 @@ export default function NewOrderClient() {
                               Contact Person
                             </label>
                             <input
-                                type="text"
-                                placeholder="Contact person at florist"
-                                value={outsideNetwork.contactPerson}
-                                onChange={(e) =>
-                                  setOutsideNetwork({
-                                    ...outsideNetwork,
-                                    contactPerson: e.target.value,
-                                  })
-                                }
-                                className="order-input"
-                              />
+                              type="text"
+                              placeholder="Contact person at florist"
+                              value={outsideNetwork.contactPerson}
+                              onChange={(e) =>
+                                setOutsideNetwork({
+                                  ...outsideNetwork,
+                                  contactPerson: e.target.value,
+                                })
+                              }
+                              className="order-input"
+                            />
                           </div>
 
                           {/* Notes */}
@@ -2758,415 +3044,425 @@ export default function NewOrderClient() {
                   <div className="p-4 rounded-2xl shadow-lg bg-white">
                     {/* Order Overview */}
                     <div className="flex flex-col gap-4">
-                        <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900">
-                          <h3 className="font-bold text-lg">Outside-Network Reference Order</h3>
+                      <div className="mb-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-900">
+                        <h3 className="font-bold text-lg">
+                          Outside-Network Reference Order
+                        </h3>
 
-                          <p className="text-sm">
-                            This florist is not yet part of the GetBloomDirect network. You can still save this order and optionally send the order details directly to the florist by email.
-                          </p>
-                        </div>
+                        <p className="text-sm">
+                          This florist is not yet part of the GetBloomDirect
+                          network. You can still save this order and optionally
+                          send the order details directly to the florist by
+                          email.
+                        </p>
+                      </div>
 
-                        {/* Save Order Button */}
-                        <div className="border-b pb-4">
-                          <button
-                            onClick={sendOrder}
-                            disabled={
-                              (!usingNetworkShop && !usingGoogleShop) ||
-                              !logistics.deliveryDate ||
-                              sendingOrder ||
-                              (usingNetworkShop && selectedProducts.length === 0)
-                            }
-                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
-                            title="Save Order"
-                          >
-                            Save Order
-                          </button>
-                        </div>
+                      {/* Save Order Button */}
+                      <div className="border-b pb-4">
+                        <button
+                          onClick={sendOrder}
+                          disabled={
+                            (!usingNetworkShop && !usingGoogleShop) ||
+                            !logistics.deliveryDate ||
+                            sendingOrder ||
+                            (usingNetworkShop && selectedProducts.length === 0)
+                          }
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
+                          title="Save Order"
+                        >
+                          Save Order
+                        </button>
+                      </div>
 
-                        {/* Card Message */}
-                        <div className="border-b pb-4 flex flex-col gap-2">
-                          <button
-                            onClick={() => setAddCard(true)}
-                            className={
-                              (addCard ? "hidden" : "block") +
-                              " bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
-                            }
-                            title="Add Card Message"
-                          >
-                            Add Card Message
-                          </button>
+                      {/* Card Message */}
+                      <div className="border-b pb-4 flex flex-col gap-2">
+                        <button
+                          onClick={() => setAddCard(true)}
+                          className={
+                            (addCard ? "hidden" : "block") +
+                            " bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
+                          }
+                          title="Add Card Message"
+                        >
+                          Add Card Message
+                        </button>
 
-                          <button
-                            onClick={() => {
-                              setAddCard(false);
-                            }}
+                        <button
+                          onClick={() => {
+                            setAddCard(false);
+                          }}
+                          className={
+                            (addCard ? "block" : "hidden") +
+                            " self-end mr-4 rounded-full bg-red-500 hover:bg-red-600 py-1 px-[0.6rem] text-white text-sm transition-all"
+                          }
+                          title="Remove Card Message"
+                        >
+                          X
+                        </button>
+
+                        <label
+                          className={
+                            (addCard ? "block" : "hidden") +
+                            " text-xs text-gray-500 uppercase"
+                          }
+                        >
+                          Card Message
+                          <textarea
+                            placeholder="I love you mom..."
+                            onChange={(e) => setCardMessage(e.target.value)}
                             className={
                               (addCard ? "block" : "hidden") +
-                              " self-end mr-4 rounded-full bg-red-500 hover:bg-red-600 py-1 px-[0.6rem] text-white text-sm transition-all"
+                              " w-full border rounded-lg p-2 text-base text-black"
                             }
-                            title="Remove Card Message"
-                          >
-                            X
-                          </button>
+                          ></textarea>
+                        </label>
+                      </div>
 
-                          <label
-                            className={
-                              (addCard ? "block" : "hidden") +
-                              " text-xs text-gray-500 uppercase"
-                            }
-                          >
-                            Card Message
-                            <textarea
-                              placeholder="I love you mom..."
-                              onChange={(e) => setCardMessage(e.target.value)}
-                              className={
-                                (addCard ? "block" : "hidden") +
-                                " w-full border rounded-lg p-2 text-base text-black"
-                              }
-                            ></textarea>
-                          </label>
-                        </div>
+                      {/* Totals */}
+                      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-6 text-center flex flex-col justify-evenly">
+                        <h2 className="text-4xl md:text-3xl 2xl:text-4xl font-black mb-4">
+                          Customer Pays
+                        </h2>
 
-                        {/* Totals */}
-                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-3xl shadow-2xl p-6 text-center flex flex-col justify-evenly">
-                          <h2 className="text-4xl md:text-3xl 2xl:text-4xl font-black mb-4">
-                            Customer Pays
-                          </h2>
+                        <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
+                          {/* Products Total */}
+                          <div>
+                            <label className="block text-xl opacity-90">
+                              Product Total
+                            </label>
 
-                          <div className="grid md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
-                            {/* Products Total */}
-                            <div>
-                              <label className="block text-xl opacity-90">
-                                Product Total
-                              </label>
-
-                              <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
+                            <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
                               ${roundToHundredth(outsideTotals.productsTotal)}
+                            </p>
+                          </div>
+
+                          {/* Delivery Fee */}
+                          <div className="mt-3 flex items-center justify-between rounded-xl bg-white/20 px-4 py-3">
+                            <div>
+                              <p className="font-semibold">Tax Delivery Fee</p>
+                              <p className="text-sm opacity-80">
+                                Turn off if delivery should not be taxed.
                               </p>
                             </div>
 
-                            {/* Delivery Fee */}
-                            <div className="mt-3 flex items-center justify-between rounded-xl bg-white/20 px-4 py-3">
-                              <div>
-                                <p className="font-semibold">Tax Delivery Fee</p>
-                                <p className="text-sm opacity-80">
-                                  Turn off if delivery should not be taxed.
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setOutsideNetwork((prev) => ({
-                                    ...prev,
-                                    deliveryTaxed: !prev.deliveryTaxed,
-                                  }))
-                                }
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOutsideNetwork((prev) => ({
+                                  ...prev,
+                                  deliveryTaxed: !prev.deliveryTaxed,
+                                }))
+                              }
+                              className={
+                                "relative inline-flex h-7 w-12 items-center rounded-full transition " +
+                                (outsideNetwork.deliveryTaxed
+                                  ? "bg-emerald-600"
+                                  : "bg-gray-300")
+                              }
+                            >
+                              <span
                                 className={
-                                  "relative inline-flex h-7 w-12 items-center rounded-full transition " +
-                                  (outsideNetwork.deliveryTaxed ? "bg-emerald-600" : "bg-gray-300")
+                                  "inline-block h-5 w-5 transform rounded-full bg-white transition " +
+                                  (outsideNetwork.deliveryTaxed
+                                    ? "translate-x-6"
+                                    : "translate-x-1")
+                                }
+                              />
+                            </button>
+                          </div>
+                          <div>
+                            <div className="relative">
+                              <label className="block text-xl opacity-90">
+                                Delivery fee
+                              </label>
+
+                              <div
+                                className={
+                                  (shops.length < 1 ? "block" : "hidden") +
+                                  " absolute top-1 right-2"
                                 }
                               >
-                                <span
-                                  className={
-                                    "inline-block h-5 w-5 transform rounded-full bg-white transition " +
-                                    (outsideNetwork.deliveryTaxed ? "translate-x-6" : "translate-x-1")
-                                  }
-                                />
-                              </button>
-                            </div>
-                            <div>
-                              <div className="relative">
-                                <label className="block text-xl opacity-90">
-                                  Delivery fee
-                                </label>
-
-                                <div
-                                  className={
-                                    (shops.length < 1 ? "block" : "hidden") +
-                                    " absolute top-1 right-2"
-                                  }
+                                <button
+                                  onClick={() => {
+                                    if (editDeliveryFee) {
+                                      editOutsideDeliveryFee();
+                                    } else {
+                                      setEditDeliveryFee(true);
+                                    }
+                                  }}
+                                  title="Edit Delivery Fee"
                                 >
-                                  <button
-                                    onClick={() => {
-                                      if (editDeliveryFee) {
-                                        editOutsideDeliveryFee();
-                                      } else {
-                                        setEditDeliveryFee(true);
-                                      }
-                                    }}
-                                    title="Edit Delivery Fee"
-                                  >
-                                    {editDeliveryFee ? (
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                        stroke="currentColor"
-                                        className="size-6 text-emerald-500"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                        />
-                                      </svg>
-                                    ) : (
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                        stroke="currentColor"
-                                        className="size-6"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                        />
-                                      </svg>
-                                    )}
-                                  </button>
-                                </div>
+                                  {editDeliveryFee ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6 text-emerald-500"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
                               </div>
+                            </div>
 
-                              <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold">
-                                  $
-                                </span>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold">
+                                $
+                              </span>
 
-                                <input
-                                  type="number"
-                                  value={outsideNetwork.deliveryFee}
-                                  readOnly={!editDeliveryFee}
-                                  onChange={(e) =>
-                                    setOutsideNetwork({
-                                      ...outsideNetwork,
-                                      deliveryFee: Number(e.target.value),
-                                    })
-                                  }
-                                  className={
+                              <input
+                                type="number"
+                                value={outsideNetwork.deliveryFee}
+                                readOnly={!editDeliveryFee}
+                                onChange={(e) =>
+                                  setOutsideNetwork({
+                                    ...outsideNetwork,
+                                    deliveryFee: Number(e.target.value),
+                                  })
+                                }
+                                className={
                                   (editDeliveryFee
                                     ? "border-2 border-emerald-500"
                                     : "border-none") +
                                   " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl"
                                 }
-                                />
-                              </div>
+                              />
                             </div>
+                          </div>
 
-                            {/* Sales Tax */}
+                          {/* Sales Tax */}
+                          <div>
                             <div>
-                              <div>
-                                <label className="flex justify-center items-center gap-1 text-xl opacity-90">
-                                  <span className="mr-2">Tax</span>
+                              <label className="flex justify-center items-center gap-1 text-xl opacity-90">
+                                <span className="mr-2">Tax</span>
 
-                                  <input 
-                                    type="number"
-                                    value={outsideNetwork.taxPercent}
-                                    readOnly={!editOutsideTax}
-                                    onChange={(e) =>
-                                      setOutsideNetwork({
-                                        ...outsideNetwork,
-                                        taxPercent: Number(e.target.value),
-                                      })
-                                    }
-                                    className={
-                                      (editOutsideTax
-                                        ? "border-2 border-emerald-500"
-                                        : "border-none") +
-                                      " max-w-24 font-bold text-center bg-white/20 rounded-2xl"
-                                    }
-                                    placeholder="0"
-                                  />
-
-                                  <button
-                                    onClick={() => {
-                                      if (editOutsideTax) {
-                                        editOutsideTaxPercentage();
-                                      } else {
-                                        setEditOutsideTax(true);
-                                      }
-                                    }}
-                                    className="ml-2"
-                                  >
-                                    {editOutsideTax ? (
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                        stroke="currentColor"
-                                        className="size-6 text-emerald-500"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                        />
-                                      </svg>
-                                    ) : (
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                        stroke="currentColor"
-                                        className="size-6"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                        />
-                                      </svg>
-                                    )}
-                                  </button>
-                                </label>
-                              </div>
-
-                              <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
-                                ${roundToHundredth(outsideTotals.taxAmount)}
-                              </p>
-                            </div>
-
-                            {/* Sending Shop's Fee */}
-                            <div>
-                              <div className="relative">
-                                <label className="block text-xl opacity-90">
-                                  Your profit (fee){" "}
-                                  <span className="text-white text-xl font-bold">
-                                    {sendingShop.feeType === "%" ? "%" : "$"}
-                                  </span>                   
-                                </label>
-
-                                <div className="absolute top-1 right-2">
-                                  <button
-                                    onClick={() => {
-                                      if (editOriginatingFee) {
-                                        editOutsideOriginatingFee();
-                                      } else {
-                                        setEditOriginatingFee(true);
-                                      }
-                                    }}
-                                    title="Edit Originating Fee"
-                                  >
-                                    {editOriginatingFee ? (
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                        stroke="currentColor"
-                                        className="size-6 text-emerald-500"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                        />
-                                      </svg>
-                                    ) : (
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        strokeWidth="1.5"
-                                        stroke="currentColor"
-                                        className="size-6"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                                        />
-                                      </svg>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2">
                                 <input
                                   type="number"
-                                  value={originatingFeeValue}
-                                  readOnly={!editOriginatingFee}
+                                  value={outsideNetwork.taxPercent}
+                                  readOnly={!editOutsideTax}
                                   onChange={(e) =>
-                                    setOriginatingFeeValue(Number(e.target.value))
+                                    setOutsideNetwork({
+                                      ...outsideNetwork,
+                                      taxPercent: Number(e.target.value),
+                                    })
                                   }
                                   className={
-                                    (editOriginatingFee
+                                    (editOutsideTax
                                       ? "border-2 border-emerald-500"
                                       : "border-none") +
-                                    " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
+                                    " max-w-24 font-bold text-center bg-white/20 rounded-2xl"
                                   }
-                                  placeholder={
-                                    sendingShop.feeType === "%" ? "15" : "25"
-                                  }
-                                  step={
-                                    sendingShop.feeType === "%" ? "0.01" : "0.01"
-                                  }
+                                  placeholder="0"
                                 />
+
+                                <button
+                                  onClick={() => {
+                                    if (editOutsideTax) {
+                                      editOutsideTaxPercentage();
+                                    } else {
+                                      setEditOutsideTax(true);
+                                    }
+                                  }}
+                                  className="ml-2"
+                                >
+                                  {editOutsideTax ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6 text-emerald-500"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              </label>
+                            </div>
+
+                            <p className="w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl">
+                              ${roundToHundredth(outsideTotals.taxAmount)}
+                            </p>
+                          </div>
+
+                          {/* Sending Shop's Fee */}
+                          <div>
+                            <div className="relative">
+                              <label className="block text-xl opacity-90">
+                                Your profit (fee){" "}
+                                <span className="text-white text-xl font-bold">
+                                  {sendingShop.feeType === "%" ? "%" : "$"}
+                                </span>
+                              </label>
+
+                              <div className="absolute top-1 right-2">
+                                <button
+                                  onClick={() => {
+                                    if (editOriginatingFee) {
+                                      editOutsideOriginatingFee();
+                                    } else {
+                                      setEditOriginatingFee(true);
+                                    }
+                                  }}
+                                  title="Edit Originating Fee"
+                                >
+                                  {editOriginatingFee ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6 text-emerald-500"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                      className="size-6"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Customer Pays + Fee Charge + Fulfilling Shop Gets */}
-                          <div>
-                            {/* Customer Pays */}
-                            <p className="text-7xl font-black mb-4">
-                              ${roundToHundredth(outsideTotals.customerPays)}
-                            </p>
-
-                            {/* Fee Charge + Fulfilling Shop Gets */}
-                            <p className="text-3xl opacity-90">
-                              You keep{" "}
-                              <span className="text-yellow-300 font-black">
-                                ${roundToHundredth(outsideTotals.feeCharge)}
-                              </span>{" "}
-                              • Fulfilling shop gets $
-                              {roundToHundredth(outsideTotals.fulfillingShopGets)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mb-4 rounded-2xl border-2 border-purple-400 bg-purple-50 p-4 text-purple-900 flex flex-col gap-2">
-                          <h2 className="text-lg font-semibold">Send Order Via Email</h2>
-
-                          {outsideNetworkOrderSent ? (
-                            <div>
-                              <p>
-                                The order has been sent to the florist you have chosen. You can now save the order to your account!
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="flex gap-4">
+                            <div className="flex items-center gap-2">
                               <input
-                                type="email"
-                                placeholder="Florist's email address"
-                                value={toEmail}
-                                onChange={(e) => setToEmail(e.target.value)}
-                                className="order-input"
+                                type="number"
+                                value={originatingFeeValue}
+                                readOnly={!editOriginatingFee}
+                                onChange={(e) =>
+                                  setOriginatingFeeValue(Number(e.target.value))
+                                }
+                                className={
+                                  (editOriginatingFee
+                                    ? "border-2 border-emerald-500"
+                                    : "border-none") +
+                                  " w-full mt-2 px-6 py-4 text-3xl font-bold text-center bg-white/20 rounded-2xl text-yellow-300"
+                                }
+                                placeholder={
+                                  sendingShop.feeType === "%" ? "15" : "25"
+                                }
+                                step={
+                                  sendingShop.feeType === "%" ? "0.01" : "0.01"
+                                }
                               />
-  
-                              <button
-                                type="button"
-                                onClick={emailOutsideNetworkOrder}
-                                className="border border-purple-400 bg-purple-50 rounded-2xl p-2"
-                              >
-                                Send Order
-                              </button>
                             </div>
-                          )}
-
+                          </div>
                         </div>
-                    </div>                    
+
+                        {/* Customer Pays + Fee Charge + Fulfilling Shop Gets */}
+                        <div>
+                          {/* Customer Pays */}
+                          <p className="text-7xl font-black mb-4">
+                            ${roundToHundredth(outsideTotals.customerPays)}
+                          </p>
+
+                          {/* Fee Charge + Fulfilling Shop Gets */}
+                          <p className="text-3xl opacity-90">
+                            You keep{" "}
+                            <span className="text-yellow-300 font-black">
+                              ${roundToHundredth(outsideTotals.feeCharge)}
+                            </span>{" "}
+                            • Fulfilling shop gets $
+                            {roundToHundredth(outsideTotals.fulfillingShopGets)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mb-4 rounded-2xl border-2 border-purple-400 bg-purple-50 p-4 text-purple-900 flex flex-col gap-2">
+                        <h2 className="text-lg font-semibold">
+                          Send Order Via Email
+                        </h2>
+
+                        {outsideNetworkOrderSent ? (
+                          <div>
+                            <p>
+                              The order has been sent to the florist you have
+                              chosen. You can now save the order to your
+                              account!
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex gap-4">
+                            <input
+                              type="email"
+                              placeholder="Florist's email address"
+                              value={toEmail}
+                              onChange={(e) => setToEmail(e.target.value)}
+                              className="order-input"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={emailOutsideNetworkOrder}
+                              className="border border-purple-400 bg-purple-50 rounded-2xl p-2"
+                            >
+                              Send Order
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                ) 
-                : 
-                (
+                ) : (
                   <div className="p-4 rounded-2xl shadow-lg bg-white">
                     {/* Order Overview */}
                     <div className="flex flex-col gap-4">
@@ -3429,7 +3725,9 @@ export default function NewOrderClient() {
 
                       {/* Products */}
                       <div>
-                        <h2 className="text-xl font-semi-bold mb-4">Products</h2>
+                        <h2 className="text-xl font-semi-bold mb-4">
+                          Products
+                        </h2>
                         {selectedProducts.map((product, index) => (
                           <div
                             className="flex flex-col gap-4 border-b pb-4 mb-4"
@@ -3459,9 +3757,13 @@ export default function NewOrderClient() {
                                   {product.name}
                                 </p>
                                 {/* product description */}
-                                <p className="max-w-sm">{product.description}</p>
+                                <p className="max-w-sm">
+                                  {product.description}
+                                </p>
                                 {/* product price */}
-                                <p className="font-semibold">${product.price}</p>
+                                <p className="font-semibold">
+                                  ${product.price}
+                                </p>
                               </div>
                             </div>
                             <button
@@ -3508,7 +3810,3 @@ export default function NewOrderClient() {
     </>
   );
 }
-
-
-
-

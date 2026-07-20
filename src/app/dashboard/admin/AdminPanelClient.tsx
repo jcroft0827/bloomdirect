@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 type WebsiteVerificationRequest = {
   _id: string;
@@ -154,7 +155,7 @@ export default function AdminPanelClient() {
       });
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Something went wrong.");
+      toast.error(error.message || "Something went wrong.");
     } finally {
       setActionLoading(false);
     }

@@ -1,5 +1,5 @@
 // /app/api-docs/external/v1/examples/orders
-export const getOrdersRequest = `curl -X GET https://api.getbloomdirect.com/v1/orders \\
+export const getOrdersRequest = `curl -X GET "https://api.getbloomdirect.com/v1/orders?since=2026-07-15T12:00:00.000Z&limit=100" \\
   -H "x-api-key: YOUR_API_KEY"`;
 
 export const getOrdersResponse = `{
@@ -10,6 +10,8 @@ export const getOrdersResponse = `{
         "id": "ord_123",
         "orderNumber": "1001",
         "status": "PENDING_ACCEPTANCE",
+        "paid": false,
+        "paidAt": null,
         "recipient": {
           "fullName": "Jane Doe",
           "address": "123 Main St",
@@ -80,6 +82,8 @@ export const acceptOrderResponse = `{
       "id": "ord_123",
       "orderNumber": "1001",
       "status": "ACCEPTED_AWAITING_PAYMENT",
+      "paid": false,
+      "paidAt": null,
       "recipient": {
         "fullName": "Jane Doe",
         "address": "123 Main St",
@@ -154,6 +158,8 @@ export const declineOrderResponse = `{
       "id": "ord_123",
       "orderNumber": "1001",
       "status": "DECLINED",
+      "paid": false,
+      "paidAt": null,
       "recipient": {
         "fullName": "Jane Doe",
         "address": "123 Main St",
@@ -223,6 +229,8 @@ export const completeOrderResponse = `{
       "id": "ord_123",
       "orderNumber": "1001",
       "status": "COMPLETED",
+      "paid": true,
+      "paidAt": "2026-04-15T14:30:00.000Z",
       "recipient": {
         "fullName": "Jane Doe",
         "address": "123 Main St",

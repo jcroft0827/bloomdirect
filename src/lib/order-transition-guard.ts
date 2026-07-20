@@ -52,6 +52,16 @@ export function assertOrderTransition({
 
   const allowedNext = TRANSITIONS[currentStatus];
 
+  if (
+    nextStatus === OrderStatus.COMPLETED &&
+    currentStatus === OrderStatus.ACCEPTED_AWAITING_PAYMENT
+  ) {
+    throw new ApiError(
+      "ORDER_NOT_PAID",
+      "This order must be marked paid before it can be completed.",
+    );
+  }
+
   if (!allowedNext.includes(nextStatus)) {
     throw new ApiError(
         "INVALID_TRANSITION",

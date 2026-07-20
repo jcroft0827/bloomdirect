@@ -1,20 +1,6 @@
 // lib/api-response.ts
 
-type ApiErrorCode =
-  | "UNAUTHORIZED"
-  | "INVALID_API_KEY"
-  | "MISSING_API_KEY"
-  | "PRO_REQUIRED"
-  | "ACCOUNT_SUSPENDED"
-  | "ORDER_NOT_FOUND"
-  | "INVALID_REQUEST"
-  | "MISSING_FIELDS"
-  | "READ_ONLY_MODE"
-  | "MISSING_DECLINE_REASON"
-  | "MISSING_DECLINE_MESSAGE"
-  | "INVALID_PAYMENT_METHOD"
-  | "PAYMENT_METHOD_NOT_AVAILABLE"
-  | "FORBIDDEN";
+import type { ApiErrorCode } from "./api-error";
 
 const API_VERSION = "1.0";
 

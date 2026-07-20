@@ -13,7 +13,7 @@ const faqs = [
   },
   {
     q: "What is included with Bloom Free?",
-    a: "Bloom Free includes 20 sent orders per month, unlimited received orders, a public profile, reviews, messaging, basic notifications, and two fulfillment offerings.",
+    a: "Bloom Free includes 15 sent orders per month, unlimited received orders, a public profile, reviews, messaging, basic notifications, and two fulfillment offerings.",
   },
   {
     q: "What is Bloom Pro?",
