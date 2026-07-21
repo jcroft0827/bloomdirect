@@ -13,8 +13,8 @@ export default async function ReportsPage() {
 
   const shop = await getAuthenticatedShop(session.user.id);
 
-  if (!shop || !shop.onboardingComplete) {
-    redirect("/dashboard/setup");
+  if (!shop) {
+    redirect("/login");
   }
 
   if (shop.isSuspended) {

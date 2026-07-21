@@ -27,7 +27,6 @@ interface Shop {
   businessName: string;
   isPro: boolean;
   proSince: string | null;
-  onboardingComplete?: boolean;
   apiAccess?: ApiAccess | null;
 }
 
@@ -104,13 +103,8 @@ export default function ApiAccessClient() {
         }
 
         if (data?.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-            return;
-          }
-
           if (!data.shop.isPro) {
-            router.push("/dashboard");
+            router.push("/dashboard/upgrade");
             return;
           }
 

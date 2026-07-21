@@ -4,7 +4,6 @@
 
 import VerificationProgressBar from "@/components/verification/ProgressBar";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import VerificationTasks from "@/components/verification/VerificationTasks";
@@ -126,7 +125,6 @@ interface Shop {
   suspensionReason?: string;
   isPublic: boolean;
   reviews: Reviews[];
-  onboardingComplete: boolean;
   networkJoinDate: Date;
   isPro: boolean;
   proSince: Date;
@@ -156,8 +154,6 @@ export default function VerificationClient() {
   const [websiteInput, setWebsiteInput] = useState("");
   const [websiteLoading, setWebsiteLoading] = useState(false);
 
-  const router = useRouter();
-
   // ------------------------------
   // Fetch Verification data
   // ------------------------------
@@ -169,10 +165,7 @@ export default function VerificationClient() {
         const res = await fetch("/api/shops/me");
         const data = await res.json();
 
-        if (data && data.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-          }
+        if (data?.shop) {
           setShop(data.shop);
         }
       } catch (err) {
@@ -428,10 +421,6 @@ export default function VerificationClient() {
       actionLabel: emailVerifyLoading ? "Sending..." : "Verify Email",
       onActionClick: handleVerifyEmail,
       disabled: emailVerifyLoading,
-    },
-    {
-      label: "Onboarding Finished",
-      completed: !!shop?.onboardingComplete,
     },
     {
       label: "Website Verified",

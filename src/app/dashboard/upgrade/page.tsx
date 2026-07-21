@@ -14,8 +14,8 @@ export default async function UpgradePage() {
 
   const shop = await getAuthenticatedShop(session.user.id);
 
-  if (!shop || !shop.onboardingComplete) {
-    redirect("/dashboard/setup");
+  if (!shop) {
+    redirect("/login");
   }
 
   if (shop.isSuspended) {

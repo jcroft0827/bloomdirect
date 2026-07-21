@@ -2,7 +2,6 @@ import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
-import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
@@ -11,59 +10,110 @@ export async function PATCH(req: Request) {
     await connectToDB();
 
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id)
+
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { section, data } = await req.json();
 
     const shop = await getAuthenticatedShop(session.user.id);
-    
-    if (!shop)
+
+    if (!shop) {
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+    }
 
     switch (section) {
-      case "shopInfo":
-        // // Handle root fields + nested data
+      case "shopInfo": {
         shop.businessName = data.businessName;
         shop.slug = data.slug;
-        shop.contact = { ...shop.contact, ...data.contact };
-        shop.address = { ...shop.address, ...data.address };
+        shop.contact = {
+          ...shop.contact,
+          ...data.contact,
+        };
+        shop.address = {
+          ...shop.address,
+          ...data.address,
+        };
+
+        /*
+         * Saving this section means the florist has intentionally completed
+         * the Business Information step.
+         */
+        shop.set("setupProgress.businessInfo", true);
 
         try {
+          const address = `${data.address.street}, ${data.address.city}, ${data.address.state}, ${data.address.zip}, ${data.address.country}`;
+
           const geoRes = await fetch(
-            `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(`${data.address.street}, ${data.address.city}, ${data.address.state}, ${data.address.zip}, ${data.address.country}`)}&key=${process.env.OPENCAGE_API_KEY}`,
+            `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${process.env.OPENCAGE_API_KEY}`,
           );
+
           const geoData = await geoRes.json();
+
           if (geoData.results?.length > 0) {
             const { lat, lng } = geoData.results[0].geometry;
+
             shop.address.geoLocation = {
               type: "Point",
               coordinates: [lng, lat],
             };
           }
-        } catch (err) {
-          console.warn("Geocoding failed", err);
+        } catch (error) {
+          console.warn("Geocoding failed", error);
         }
 
         break;
+      }
 
-      case "paymentMethods":
+      case "paymentMethods": {
         shop.paymentMethods = {
           ...shop.paymentMethods,
           ...data.paymentMethods,
         };
-        break;
 
-      case "delivery":
+        /*
+         * The readiness helper will still verify that at least one real
+         * payment method exists. This flag records that the section was saved.
+         */
+        shop.set("setupProgress.paymentMethods", true);
+
+        break;
+      }
+
+      case "delivery": {
         const existingDelivery = shop.delivery ? shop.delivery.toObject() : {};
-        shop.delivery = { ...existingDelivery, ...data };
-        break;
 
-      case "financials":
-        shop.financials = { ...shop.financials, ...data.financials };
-        break;
+        shop.delivery = {
+          ...existingDelivery,
+          ...data,
+        };
 
-      case "branding":
+        /*
+         * The readiness helper separately confirms that real delivery
+         * coverage exists before making the shop searchable.
+         */
+        shop.set("setupProgress.deliverySettings", true);
+
+        break;
+      }
+
+      case "financials": {
+        shop.financials = {
+          ...shop.financials,
+          ...data.financials,
+        };
+
+        /*
+         * An explicit completion flag is required here because 0% tax and
+         * $0 fees are valid choices and may also match schema defaults.
+         */
+        shop.set("setupProgress.financialSettings", true);
+
+        break;
+      }
+
+      case "branding": {
         const existingBranding = shop.branding ? shop.branding.toObject() : {};
 
         shop.branding = {
@@ -74,31 +124,44 @@ export async function PATCH(req: Request) {
             ...(data.socialLinks || {}),
           },
         };
-        break;
 
-      case "featuredBouquet":
+        break;
+      }
+
+      case "featuredBouquet": {
         return NextResponse.json(
-          { error: "Featured arrangement settings have moved to FulfillmentOfferings."},
+          {
+            error:
+              "Featured arrangement settings have moved to FulfillmentOfferings.",
+          },
           { status: 400 },
         );
+      }
 
-      case "securityCode":
+      case "securityCode": {
         shop.securityCode = data.securityCode;
         break;
+      }
+
+      default: {
+        return NextResponse.json(
+          { error: "Invalid settings section" },
+          { status: 400 },
+        );
+      }
     }
 
-    // Save Changes
     await shop.save();
 
     await ensureDefaultDesignerChoice(shop._id.toString());
 
-    // Return a success response
     return NextResponse.json({
       message: "Settings updated successfully",
       shop,
     });
   } catch (error) {
-    console.error("UPDATE ERROR: ", error);
+    console.error("UPDATE ERROR:", error);
+
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }

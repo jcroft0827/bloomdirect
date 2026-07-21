@@ -24,7 +24,7 @@ export default async function MessagesPage({
   const shop = await Shop.findById(session.user.id).lean();
 
   if (!shop) {
-    redirect("/onboarding");
+    redirect("/login");
   }
 
   const order = await Order.findById(id);

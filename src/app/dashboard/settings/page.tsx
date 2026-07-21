@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import SettingsClient from "./SettingsClient";
-import Shop from "@/models/Shop";
 import { connectToDB } from "@/lib/mongoose";
 import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
 
@@ -17,8 +16,7 @@ export default async function SettingsPage() {
   const shop = await getAuthenticatedShop(session.user.id);
 
   if (!shop) {
-    // If somehow no shop exists, redirect them to shop creation
-    redirect("/onboarding");
+    redirect("/login");
   }
 
   return <SettingsClient initialShop={JSON.parse(JSON.stringify(shop))} />;

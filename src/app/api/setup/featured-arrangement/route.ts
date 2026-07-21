@@ -96,8 +96,6 @@ export async function POST(req: Request) {
       featuredBouquet: true,
     };
 
-    shop.onboardingComplete = true;
-
     await shop.save();
 
     return NextResponse.json({ success: true });

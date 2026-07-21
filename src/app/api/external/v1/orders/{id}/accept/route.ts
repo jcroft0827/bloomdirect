@@ -12,6 +12,7 @@ import { OrderActivityActions } from "@/lib/order-activity-actions";
 import { sendOrderEvent } from "@/lib/send-order-event";
 import { ApiError } from "@/lib/api-error";
 import { checkPosApiRateLimit } from "@/lib/pos-api-rate-limit";
+import { getShopReadiness } from "@/lib/shops/getShopReadiness";
 
 export async function POST(req: Request, { params }: any) {
   try {
@@ -40,6 +41,16 @@ export async function POST(req: Request, { params }: any) {
 
     if (order.fulfillingShop.toString() !== shop._id.toString()) {
       return apiError("UNAUTHORIZED", "Not authorized", 403);
+    }
+
+    const readiness = getShopReadiness(shop.toObject());
+
+    if (!readiness.capabilities.canAcceptOrders) {
+      return apiError(
+        "SHOP_NOT_READY_TO_ACCEPT",
+        "Your shop must verify its email and configure at least one payment method before accepting an order.",
+        403,
+      );
     }
 
     // Idempotency

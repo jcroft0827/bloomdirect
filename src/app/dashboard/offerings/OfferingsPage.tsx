@@ -7,13 +7,12 @@ import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import { DragControls } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 export default function OfferingsClient() {
   const { data: session, status } = useSession();
-  const router = useRouter();
+  const bloomProUpgradePath = "/dashboard/billing";
 
   const [shopId, setShopId] = useState<string | null>(null);
   const [shopProStatus, setShopProStatus] = useState(false);
@@ -42,11 +41,6 @@ export default function OfferingsClient() {
         }
 
         if (data?.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-            return;
-          }
-
           setShopId(data.shop._id);
           setShopProStatus(!!data.shop.isPro);
           setShopSlug(data.shop.slug);
@@ -292,7 +286,7 @@ export default function OfferingsClient() {
       ) : (
         <div className="mx-auto max-w-5xl space-y-6">
           <div>
-            <Link 
+            <Link
               href={`/dashboard/shops/${shopSlug}`}
               className="text-xl text-gray-700 border border-gray-700 rounded-full px-4 py-1 flex items-center gap-1 w-full sm:w-48 hover:bg-gray-100"
             >
@@ -318,13 +312,17 @@ export default function OfferingsClient() {
               <h2 className="text-2xl font-black">Upgrade to Bloom Pro</h2>
               <p className="mt-2 text-white/90">
                 Free shops can manage Designer&apos;s Choice and one Featured
-                Arrangement. Bloom Pro unlocks additional offerings like
-                sympathy, funeral, wedding, holiday, and everyday arrangements.
+                Arrangement. Bloom Pro unlocks up to 10 total offerings,
+                additional arrangement categories, featured offerings, and
+                active or inactive controls.
               </p>
 
-              <AppButton type="button" variant="pro" className="mt-4">
-                Bloom Pro coming Soon
-              </AppButton>
+              <Link
+                href={bloomProUpgradePath}
+                className="mt-4 inline-flex rounded-xl bg-white px-5 py-3 font-bold text-purple-700 transition hover:bg-purple-50"
+              >
+                Upgrade to Bloom Pro
+              </Link>
             </div>
           )}
 
@@ -738,21 +736,19 @@ export default function OfferingsClient() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <AppButton
               type="button"
-              variant="primary"
-              fullWidth
-              onClick={() => setShowProModal(false)}
-            >
-              Got It
-            </AppButton>
-
-            <AppButton
-              type="button"
               variant="outline"
               fullWidth
               onClick={() => setShowProModal(false)}
             >
-              Bloom Pro Coming Soon
+              Not Right Now
             </AppButton>
+
+            <Link
+              href={bloomProUpgradePath}
+              className="flex w-full items-center justify-center rounded-xl bg-purple-600 px-5 py-3 font-bold text-white transition hover:bg-purple-700"
+            >
+              Upgrade to Bloom Pro
+            </Link>
           </div>
         }
       >

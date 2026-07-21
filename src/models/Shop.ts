@@ -100,7 +100,7 @@ const shopSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-
+    
     networkJoinDate: Date,
 
     isPro: {

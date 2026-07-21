@@ -11,6 +11,7 @@ import OutsideNetworkFlorists from "@/models/OutsideNetworkFlorists";
 import { OrderStatus } from "@/lib/order-status";
 import ZipDemand from "@/models/ZipDemand";
 import { getMonthlySendUsage } from "@/lib/order-send-usage";
+import { getShopReadiness } from "@/lib/shops/getShopReadiness";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -76,6 +77,19 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Origin shop not found." },
         { status: 404 },
+      );
+    }
+
+    const originShopReadiness = getShopReadiness(originShop.toObject());
+
+    if (!originShopReadiness.capabilities.canSendOrders) {
+      return NextResponse.json(
+        {
+          error: "Complete your required account settings before sending an order.",
+          code: "SHOP_NOT_READY_TO_SEND",
+          requirements: originShopReadiness.requirements,
+        },
+        { status: 403 },
       );
     }
 

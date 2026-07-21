@@ -60,33 +60,25 @@ export async function ensureShopOfferingsInitialized(shopId: string) {
 
   await ensureDefaultDesignerChoice(shopId);
 
-  if (shop.onboardingComplete) {
-    const nonDesignerOffering = await FulfillmentOffering.findOne({
-      shop: shopId,
-      type: { $ne: "designers_choice" },
-      isActive: true,
-    });
+  const nonDesignerOffering = await FulfillmentOffering.findOne({
+    shop: shopId,
+    type: { $ne: "designers_choice" },
+    isActive: true,
+  });
 
-    if (!nonDesignerOffering) {
-      const legacyFeatured = shop.featuredBouquet;
+  if (!nonDesignerOffering) {
+    const legacyFeatured = shop.featuredBouquet;
 
-      if (
-        legacyFeatured?.name ||
-        legacyFeatured?.description ||
-        legacyFeatured?.image
-      ) {
-        const offeringName =
-          legacyFeatured?.name?.trim() || "Featured Arrangement";
-        const price = Number(legacyFeatured?.price || 75);
+    const hasLegacyFeatured =
+      Boolean(legacyFeatured?.name?.trim()) ||
+      Boolean(legacyFeatured?.description?.trim()) ||
+      Boolean(legacyFeatured?.image?.trim()) ||
+      Number(legacyFeatured?.price || 0) > 0;
 
-        await FulfillmentOffering
-          .findOneAndUpdate
-          // existing code
-          ();
-      }
-
+    if (hasLegacyFeatured) {
       const offeringName =
         legacyFeatured?.name?.trim() || "Featured Arrangement";
+
       const price = Number(legacyFeatured?.price || 75);
 
       await FulfillmentOffering.findOneAndUpdate(
@@ -121,7 +113,11 @@ export async function ensureShopOfferingsInitialized(shopId: string) {
             proOnly: false,
           },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
       );
     }
   }

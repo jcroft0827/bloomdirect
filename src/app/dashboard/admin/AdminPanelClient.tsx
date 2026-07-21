@@ -67,14 +67,15 @@ export default function AdminPanelClient() {
         const res = await fetch("/api/shops/me");
         const data = await res.json();
 
-        // protection
-        if (data && data.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-          }
-          if (data.shop.role !== "admin") {
-            router.push("/dashboard");
-          }
+        // Admin Protection
+        if (!data?.shop) {
+          router.replace("/login");
+          return;
+        }
+
+        if (data.shop.role !== "admin") {
+          router.replace("/dashboard");
+          return;
         }
 
         // pull notifications

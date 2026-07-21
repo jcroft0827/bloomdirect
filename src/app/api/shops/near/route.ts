@@ -9,11 +9,19 @@ export async function POST(request: Request) {
     const { street, city, state, zip } = await request.json();
 
     // 1. Get Coordinates for the Search Address (OpenCage)
-    const query = encodeURIComponent(`${street}, ${city}, ${state}, ${zip}, USA`);
-    const geoRes = await fetch(`https://api.opencagedata.com{query}&key=${process.env.OPENCAGE_API_KEY}`);
+    const query = encodeURIComponent(
+      `${street}, ${city}, ${state}, ${zip}, USA`,
+    );
+    const geoRes = await fetch(
+      `https://api.opencagedata.com/geocode/v1/json?q=${query}&key=${process.env.OPENCAGE_API_KEY}`,
+    );
     const geoData = await geoRes.json();
-    
-    if (!geoData.results?.length) return NextResponse.json({ error: "Location not found" }, { status: 400 });
+
+    if (!geoData.results?.length)
+      return NextResponse.json(
+        { error: "Location not found" },
+        { status: 400 },
+      );
     const { lat, lng } = geoData.results[0].geometry;
 
     // 2. The Smart Aggregation Pipeline
@@ -23,14 +31,20 @@ export async function POST(request: Request) {
           near: { type: "Point", coordinates: [lng, lat] },
           distanceField: "calculatedDistance", // Adds this field to the output (in meters)
           spherical: true,
-          query: { onboardingComplete: true } // Filter non-finished shops early
-        }
+          query: {
+            isPublic: true,
+            isSuspended: { $ne: true },
+            "verification.emailVerified": true,
+            "setupProgress.businessInfo": true,
+            "setupProgress.deliverySettings": true,
+          },
+        },
       },
       {
         $addFields: {
           // Convert calculatedDistance from meters to miles
-          distanceInMiles: { $divide: ["$calculatedDistance", 1609.34] }
-        }
+          distanceInMiles: { $divide: ["$calculatedDistance", 1609.34] },
+        },
       },
       {
         $match: {
@@ -41,14 +55,14 @@ export async function POST(request: Request) {
             {
               $or: [
                 { "delivery.method": "distance" }, // If distance method, maxRadius check above is enough
-                { 
-                  "delivery.method": "zip", 
-                  "delivery.zipZones.zip": zip // If zip method, must also match the zip
-                }
-              ]
-            }
-          ]
-        }
+                {
+                  "delivery.method": "zip",
+                  "delivery.zipZones.zip": zip, // If zip method, must also match the zip
+                },
+              ],
+            },
+          ],
+        },
       },
       {
         $project: {
@@ -57,9 +71,9 @@ export async function POST(request: Request) {
           isSuspended: 1,
           verifiedFlorist: 1,
           delivery: 1,
-          distanceInMiles: 1 // Send this to the frontend for the "X miles away" text
-        }
-      }
+          distanceInMiles: 1, // Send this to the frontend for the "X miles away" text
+        },
+      },
     ]);
 
     return NextResponse.json({ shops });
@@ -67,7 +81,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 }
-
 
 // Updated to do exact Zip match for v1, will add real geo + radius search in v2
 // import { NextResponse } from "next/server";

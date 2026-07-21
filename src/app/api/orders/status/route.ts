@@ -14,6 +14,7 @@ import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
 import Notifications from "@/models/Notifications";
+import { getShopReadiness } from "@/lib/shops/getShopReadiness";
 
 export async function POST(req: Request) {
   try {
@@ -65,6 +66,36 @@ export async function POST(req: Request) {
       order.fulfillingShop.toString() !== userShopId
     ) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
+    // ─────────────────────────────────────────────
+    // ACCEPTANCE READINESS
+    // A fulfilling florist must have a configured payment method before
+    // accepting an order.
+    // ─────────────────────────────────────────────
+    if (status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
+      const fulfillingShop = await Shop.findById(userShopId);
+
+      if (!fulfillingShop) {
+        return NextResponse.json(
+          { error: "Fulfilling shop not found" },
+          { status: 404 },
+        );
+      }
+
+      const readiness = getShopReadiness(fulfillingShop.toObject(),);
+
+      if (!readiness.capabilities.canAcceptOrders) {
+        return NextResponse.json(
+          {
+            error:
+              "Your shop must verify its email and configure at least one payment method before accepting an order.",
+            code: "SHOP_NOT_READY_TO_ACCEPT",
+            readiness,
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // ─────────────────────────────────────────────
@@ -129,7 +160,7 @@ export async function POST(req: Request) {
         },
       );
       // Add New Notification for Declined
-      const notificationMessage = "Order Declined!" 
+      const notificationMessage = "Order Declined!";
       const newNotification = new Notifications({
         type: "OrderDeclined",
         receivingShop: order.originatingShop,
@@ -194,7 +225,7 @@ export async function POST(req: Request) {
         },
       );
       // Add New Notification for Accepted
-      const notificationMessage = "Order Accepted!" 
+      const notificationMessage = "Order Accepted!";
       const newNotification = new Notifications({
         type: "OrderAccepted",
         receivingShop: order.originatingShop,
@@ -229,7 +260,7 @@ export async function POST(req: Request) {
         actorShopId: session?.user?.id,
       });
 
-            // Mark Current Notification As READ
+      // Mark Current Notification As READ
       await Notifications.updateMany(
         {
           order: order._id,
@@ -247,7 +278,7 @@ export async function POST(req: Request) {
         },
       );
       // Add New Notification for Completed
-      const notificationMessage = "Order Completed, Rate Florist!" 
+      const notificationMessage = "Order Completed, Rate Florist!";
       const newNotification = new Notifications({
         type: "OrderComplete",
         receivingShop: order.originatingShop,

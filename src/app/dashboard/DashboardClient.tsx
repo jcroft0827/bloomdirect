@@ -3,11 +3,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import BloomSpinner from "@/components/BloomSpinner";
-import { useRouter } from "next/navigation";
 import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
 import VerificationProgressBar from "@/components/verification/ProgressBar";
 
@@ -29,6 +28,37 @@ interface MonthlySendUsage {
   allowed: boolean;
   monthStart: string;
   nextMonthStart: string;
+}
+
+interface ShopReadiness {
+  requirements: {
+    accountCreated: boolean;
+    emailVerified: boolean;
+    businessInfoComplete: boolean;
+    paymentConfigured: boolean;
+    deliveryConfigured: boolean;
+    financialsConfigured: boolean;
+  };
+
+  capabilities: {
+    canAccessDashboard: boolean;
+    canAppearInSearch: boolean;
+    canSendOrders: boolean;
+    canReceiveOrders: boolean;
+    canAcceptOrders: boolean;
+  };
+
+  incompleteRequirements: Array<
+    | "emailVerification"
+    | "businessInformation"
+    | "paymentMethods"
+    | "deliverySettings"
+    | "financialSettings"
+  >;
+
+  completedCount: number;
+  totalCount: number;
+  completionPercentage: number;
 }
 
 interface Stripe {
@@ -151,7 +181,6 @@ interface Shop {
   suspensionReason?: string;
   isPublic: boolean;
   reviews: Reviews[];
-  onboardingComplete: boolean;
   networkJoinDate: Date;
   isPro: boolean;
   proSince: Date;
@@ -168,6 +197,77 @@ interface Shop {
 
 // #endregion
 
+function ReadinessItem({
+  label,
+  description,
+  completed,
+  href,
+}: {
+  label: string;
+  description: string;
+  completed: boolean;
+  href?: string;
+}) {
+  const content = (
+    <div
+      className={`flex h-full gap-4 rounded-2xl border p-4 transition ${
+        completed
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-purple-50"
+      }`}
+    >
+      <div
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+          completed
+            ? "bg-emerald-600 text-white"
+            : "border-2 border-slate-300 bg-white text-slate-400"
+        }`}
+      >
+        {completed ? "✓" : ""}
+      </div>
+
+      <div className="flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p
+            className={`font-bold ${
+              completed ? "text-emerald-900" : "text-slate-800"
+            }`}
+          >
+            {label}
+          </p>
+
+          {!completed && href && (
+            <span className="shrink-0 text-sm font-bold text-purple-700">
+              Complete →
+            </span>
+          )}
+        </div>
+
+        <p
+          className={`mt-1 text-sm ${
+            completed ? "text-emerald-700" : "text-slate-500"
+          }`}
+        >
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+
+  if (!completed && href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-200"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
+}
+
 export default function DashboardClient() {
   const { data: session, status } = useSession();
 
@@ -176,7 +276,7 @@ export default function DashboardClient() {
   // ------------------------------
   const [shop, setShop] = useState<Shop | null>(null);
   const [shopId, setShopId] = useState("");
-
+  const [readiness, setReadiness] = useState<ShopReadiness | null>(null);
   const [profit, setProfit] = useState(0);
   const [ordersSent, setOrdersSent] = useState(0);
   const [ordersReceived, setOrdersReceived] = useState(0);
@@ -205,8 +305,6 @@ export default function DashboardClient() {
     process.env.NEXT_PUBLIC_URL + "/register",
   );
   const [sendingInvite, setSendingInvite] = useState(false);
-
-  const router = useRouter();
 
   // ------------------------------
   // Fetch dashboard data
@@ -238,14 +336,13 @@ export default function DashboardClient() {
         }
 
         if (shopData?.shop) {
-          if (!shopData.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-            return;
-          }
-
           setShop(shopData.shop);
           setShopId(shopData.shop._id || shopData.id || "");
           setIsPro(Boolean(shopData.shop.isPro));
+        }
+
+        if (shopData?.readiness) {
+          setReadiness(shopData.readiness);
         }
 
         setMonthlySendUsage(usageData.usage);
@@ -262,7 +359,7 @@ export default function DashboardClient() {
     }
 
     loadDashboard();
-  }, [status, router]);
+  }, [status]);
 
   useEffect(() => {
     if (!shop?.isPro) {
@@ -376,10 +473,6 @@ export default function DashboardClient() {
       completed: !!shop?.verification?.emailVerified,
     },
     {
-      label: "Onboarding Finished",
-      completed: !!shop?.onboardingComplete,
-    },
-    {
       label: "Website Verified",
       completed: !!shop?.verification?.websiteVerified,
     },
@@ -424,6 +517,114 @@ export default function DashboardClient() {
           steps={verificationSteps}
           isVerified={shop?.isVerified ?? false}
         />
+
+
+        {/* Operational Readiness */}
+        {readiness && readiness.completionPercentage < 100 && (
+          <div className="mb-12 overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-xl">
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-700 px-6 py-6 text-white md:px-8">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-widest text-purple-200">
+                    Account Setup
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-black md:text-3xl">
+                    You&apos;re Almost Ready!
+                  </h2>
+
+                  <p className="mt-2 max-w-2xl text-sm text-purple-100 md:text-base">
+                    Complete the remaining settings below to join the network and
+                    unlock all order features.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl font-black">
+                    {readiness.completionPercentage}%
+                  </span>
+
+                  <span className="text-sm font-semibold text-purple-200">
+                    complete
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-white transition-all duration-500"
+                  style={{
+                    width: `${readiness.completionPercentage}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8">
+              <div className="grid gap-4 md:grid-cols-2">
+                <ReadinessItem
+                  label="Account Created"
+                  description="Your Bloom account has been created."
+                  completed={readiness.requirements.accountCreated}
+                />
+
+                <ReadinessItem
+                  label="Email Verified"
+                  description="Confirm ownership of your email address."
+                  completed={readiness.requirements.emailVerified}
+                  href="/dashboard/verification"
+                />
+
+                <ReadinessItem
+                  label="Business Information"
+                  description="Required: phone number, street address, city, state, and ZIP code."
+                  completed={readiness.requirements.businessInfoComplete}
+                  href="/dashboard/settings#business-information"
+                />
+
+                <ReadinessItem
+                  label="Delivery Settings"
+                  description="Configure the areas your shop can deliver to."
+                  completed={readiness.requirements.deliveryConfigured}
+                  href="/dashboard/settings#delivery-settings"
+                />
+
+                <ReadinessItem
+                  label="Payment Method"
+                  description="Add at least one way other florists can pay you."
+                  completed={readiness.requirements.paymentConfigured}
+                  href="/dashboard/settings#payment-methods"
+                />
+
+                <ReadinessItem
+                  label="Taxes & Fees"
+                  description="Confirm your shop's tax and fee settings."
+                  completed={readiness.requirements.financialsConfigured}
+                  href="/dashboard/settings#financial-settings"
+                />
+              </div>
+
+              <div className="mt-8 flex flex-col gap-4 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-bold text-slate-800">
+                    Estimated time remaining: 3 minutes
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    You can use the dashboard while completing these settings.
+                  </p>
+                </div>
+
+                <Link
+                  href="/dashboard/settings"
+                  className="rounded-xl bg-purple-700 px-6 py-3 text-center font-bold text-white shadow-lg transition hover:bg-purple-800"
+                >
+                  Complete Setup
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Invite A Shop */}
         <div className="mb-12 bg-gradient-to-br from-emerald-400 to-emerald-700 rounded-3xl p-10 text-center text-white shadow-2xl flex flex-col gap-2">

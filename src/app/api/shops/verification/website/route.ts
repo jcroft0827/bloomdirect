@@ -47,7 +47,6 @@ function hasCompletedVerification(shop: any) {
 
   return (
     !!shop.verification?.emailVerified &&
-    !!shop.onboardingComplete &&
     !!shop.verification?.websiteVerified &&
     !!shop.isPublic &&
     completedOrders >= 2 &&

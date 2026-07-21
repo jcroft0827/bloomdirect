@@ -4,6 +4,16 @@ import { connectToDB } from "@/lib/mongoose";
 import { NextResponse } from "next/server";
 import Shop from "@/models/Shop";
 import { ApiError } from "@/lib/api-error";
+import crypto from "crypto";
+import { sendEmailVerificationCode } from "@/lib/email/send-email-verification-code";
+
+function generateVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function hashVerificationCode(code: string) {
+  return crypto.createHash("sha256").update(code).digest("hex");
+}
 
 export async function POST(req: Request) {
   try {
@@ -42,6 +52,12 @@ export async function POST(req: Request) {
       );
     }
 
+    const verificationCode = generateVerificationCode();
+
+    const emailVerificationCodeHash = hashVerificationCode(verificationCode);
+
+    const emailVerificationExpires = new Date(Date.now() + 10 * 60 * 1000);
+
     // Create new shop
     const shop = await Shop.create({
       // Core Identity
@@ -52,6 +68,10 @@ export async function POST(req: Request) {
       // Account state
       onboardingComplete: false,
       networkJoinDate: new Date(),
+
+      // Email Verification
+      emailVerificationCodeHash,
+      emailVerificationExpires,
 
       slug: shopSlug,
 
@@ -73,10 +93,21 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      shopId: shop._id,
+    await sendEmailVerificationCode({
+      to: shop.email,
+      code: verificationCode,
+      businessName: shop.businessName,
     });
+
+    return NextResponse.json(
+      {
+        success: true,
+        verificationRequired: true,
+        email: shop.email,
+        expiresAt: emailVerificationExpires,
+      },
+      { status: 201 },
+    );
   } catch (error: any) {
     console.log("REGISTRATION SHOP ERROR: ", error);
 

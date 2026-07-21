@@ -15,6 +15,7 @@ import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
 import Notifications from "@/models/Notifications";
+import { getShopReadiness } from "@/lib/shops/getShopReadiness";
 
 export async function POST(req: Request) {
   try {
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
     }
 
     const newShop = await Shop.findById(newFulfillingShopId);
+    
     if (!newShop) {
       return NextResponse.json(
         { error: "Fulfilling shop not found" },
@@ -69,9 +71,15 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!newShop.onboardingComplete) {
+    const readiness = getShopReadiness(newShop.toObject());
+
+    if (!readiness.capabilities.canAppearInSearch) {
       return NextResponse.json(
-        { error: "Selected shop is not ready to receive orders" },
+        {
+          error:
+            "The selected shop is no longer available to receive new order requests.",
+          code: "FULFILLING_SHOP_NOT_AVAILABLE",
+        },
         { status: 400 },
       );
     }

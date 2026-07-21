@@ -54,24 +54,6 @@ export default function OrdersDashboard() {
     }
   }, [status, router]);
 
-  useEffect(() => {
-    async function loadShop() {
-      try {
-        const res = await fetch("/api/shops/me");
-        const data = await res.json();
-
-        if (data && data.shop) {
-          if (!data.shop.onboardingComplete) {
-            router.push("/dashboard/setup");
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load shop data", err);
-      }
-    }
-    loadShop();
-  }, []);
-
   const fetchOrders = async () => {
     try {
       setLoading(true);

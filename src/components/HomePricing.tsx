@@ -11,8 +11,8 @@ export default function HomePricing() {
           </h2>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
-            Start with Bloom Free and upgrade to Bloom Pro when you're ready for
-            unlimited sending, advanced tools, and deeper integrations.
+            Start with Bloom Free or choose Bloom Pro for unlimited sending,
+            advanced tools, greater visibility, and POS integrations.
           </p>
         </div>
 
@@ -24,6 +24,7 @@ export default function HomePricing() {
                 <h3 className="text-2xl font-black text-gray-900">
                   Bloom Free
                 </h3>
+
                 <p className="mt-2 text-gray-600">
                   For florists joining the network and sending occasional
                   fulfillment orders.
@@ -31,7 +32,7 @@ export default function HomePricing() {
               </div>
 
               <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700">
-                Available Now
+                Available
               </span>
             </div>
 
@@ -58,20 +59,23 @@ export default function HomePricing() {
 
             <Link
               href="/register"
-              className="mt-10 block rounded-2xl bg-emerald-600 px-6 py-4 text-center font-bold text-white hover:bg-emerald-700"
+              className="mt-10 block rounded-2xl bg-emerald-600 px-6 py-4 text-center font-bold text-white transition hover:bg-emerald-700"
             >
-              Join Free
+              Create Free Account
             </Link>
           </div>
 
           {/* Bloom Pro */}
           <div className="relative rounded-3xl border-2 border-purple-200 bg-white p-8 shadow-2xl">
             <span className="absolute right-6 top-6 rounded-full bg-purple-100 px-4 py-2 text-sm font-bold text-purple-700">
-              Coming Soon
+              Available
             </span>
 
             <div className="pr-32">
-              <h3 className="text-2xl font-black text-gray-900">Bloom Pro</h3>
+              <h3 className="text-2xl font-black text-gray-900">
+                Bloom Pro
+              </h3>
+
               <p className="mt-2 text-gray-600">
                 For florists who rely on GetBloomDirect every day and want more
                 automation, visibility, and control.
@@ -85,8 +89,9 @@ export default function HomePricing() {
                   /month
                 </span>
               </p>
+
               <p className="mt-2 text-sm font-semibold text-gray-500">
-                Or $490/year — save two months with annual billing.
+                Or $450/year — save $138 with annual billing.
               </p>
             </div>
 
@@ -98,13 +103,22 @@ export default function HomePricing() {
               <li>✓ Activate and deactivate offerings</li>
               <li>✓ POS API access</li>
               <li>✓ Advanced reporting</li>
+              <li>✓ Favorite Florists</li>
+              <li>✓ Priority search placement</li>
               <li>✓ Bloom Pro badge</li>
-              <li>✓ Priority support</li>
             </ul>
 
-            <div className="mt-10 rounded-2xl bg-purple-50 px-6 py-4 text-center font-semibold text-purple-700">
-              Bloom Pro is being finalized now.
-            </div>
+            <Link
+              href="/register?plan=pro"
+              className="mt-10 block rounded-2xl bg-purple-600 px-6 py-4 text-center font-bold text-white transition hover:bg-purple-700"
+            >
+              Start Bloom Pro
+            </Link>
+
+            <p className="mt-3 text-center text-sm text-gray-500">
+              Create your florist account before choosing monthly or annual
+              billing.
+            </p>
           </div>
         </div>
       </div>

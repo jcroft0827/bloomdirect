@@ -16,6 +16,37 @@ import PreviousMap_ from "postcss/lib/previous-map";
 
 // #region Interfaces
 
+interface ShopReadiness {
+  requirements: {
+    accountCreated: boolean;
+    emailVerified: boolean;
+    businessInfoComplete: boolean;
+    paymentConfigured: boolean;
+    deliveryConfigured: boolean;
+    financialsConfigured: boolean;
+  };
+
+  capabilities: {
+    canAccessDashboard: boolean;
+    canAppearInSearch: boolean;
+    canSendOrders: boolean;
+    canReceiveOrders: boolean;
+    canAcceptOrders: boolean;
+  };
+
+  incompleteRequirements: Array<
+    | "emailVerification"
+    | "businessInformation"
+    | "paymentMethods"
+    | "deliverySettings"
+    | "financialSettings"
+  >;
+
+  completedCount: number;
+  totalCount: number;
+  completionPercentage: number;
+}
+
 interface MonthlySendUsage {
   isPro: boolean;
   allowed: boolean;
@@ -195,7 +226,6 @@ interface FulfillingShop {
   isSuspended: boolean;
   suspensionReason?: string;
   isPublic: boolean;
-  onboardingComplete: boolean;
   networkJoinDate: Date;
   contact: FulfillingContact;
   address: FulfillingAddress;
@@ -208,6 +238,77 @@ interface FulfillingShop {
 // #endregion
 
 // #endregion
+
+function SendRequirement({
+  label,
+  description,
+  completed,
+  href,
+}: {
+  label: string;
+  description: string;
+  completed: boolean;
+  href: string;
+}) {
+  const content = (
+    <div
+      className={`flex items-start gap-4 rounded-2xl border p-5 transition ${
+        completed
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-purple-50"
+      }`}
+    >
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-black ${
+          completed
+            ? "bg-emerald-600 text-white"
+            : "border-2 border-slate-300 bg-white text-slate-400"
+        }`}
+      >
+        {completed ? "✓" : ""}
+      </div>
+
+      <div className="flex-1">
+        <div className="flex items-start justify-between gap-4">
+          <p
+            className={`font-bold ${
+              completed ? "text-emerald-900" : "text-slate-900"
+            }`}
+          >
+            {label}
+          </p>
+
+          {!completed && (
+            <span className="shrink-0 text-sm font-bold text-purple-700">
+              Complete →
+            </span>
+          )}
+        </div>
+
+        <p
+          className={`mt-1 text-sm ${
+            completed ? "text-emerald-700" : "text-slate-500"
+          }`}
+        >
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+
+  if (completed) {
+    return content;
+  }
+
+  return (
+    <Link
+      href={href}
+      className="block rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-200"
+    >
+      {content}
+    </Link>
+  );
+}
 
 export default function NewOrderClient() {
   const { data: session, status } = useSession();
@@ -362,6 +463,7 @@ export default function NewOrderClient() {
   // Monthly Usage
   const [monthlySendUsage, setMonthlySendUsage] =
     useState<MonthlySendUsage | null>(null);
+  const [readiness, setReadiness] = useState<ShopReadiness | null>(null);
   const [checkingSendUsage, setCheckingSendUsage] = useState(true);
 
   // Variables
@@ -395,19 +497,18 @@ export default function NewOrderClient() {
         }
 
         if (!usageRes.ok) {
-          throw new Error(
-            usageData.error || "Failed to load sending usage.",
-          );
+          throw new Error(usageData.error || "Failed to load sending usage.");
         }
 
         if (!shopData?.shop) {
           throw new Error("Shop information was not returned.");
         }
 
-        if (!shopData.shop.onboardingComplete) {
-          router.push("/dashboard/setup");
-          return;
+        if (!shopData?.readiness) {
+          throw new Error("Shop readiness information was not returned.");
         }
+
+        setReadiness(shopData.readiness);
 
         setSendingShop({
           shopId: shopData.shop._id,
@@ -844,7 +945,7 @@ export default function NewOrderClient() {
           return;
         }
 
-        throw new Error(data.error || "Failed to create order.",);
+        throw new Error(data.error || "Failed to create order.");
       }
 
       toast.success("Order sent successfully!");
@@ -1444,6 +1545,74 @@ export default function NewOrderClient() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <BloomSpinner size={64} />
+      </div>
+    );
+  }
+
+  if (readiness && !readiness.capabilities.canSendOrders) {
+    const needsEmailVerification = !readiness.requirements.emailVerified;
+
+    const needsBusinessInformation =
+      !readiness.requirements.businessInfoComplete;
+
+    const needsFinancialSettings = !readiness.requirements.financialsConfigured;
+
+    return (
+      <div className="mx-auto max-w-3xl py-12">
+        <div className="overflow-hidden rounded-3xl border border-amber-200 bg-white shadow-2xl">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-10 text-center text-white">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-3xl font-black">
+              !
+            </div>
+
+            <h1 className="text-3xl font-black sm:text-4xl">
+              Finish Setting Up Before Sending
+            </h1>
+
+            <p className="mx-auto mt-3 max-w-xl text-lg text-amber-50">
+              We need a few details before your shop can create its first order.
+            </p>
+          </div>
+
+          <div className="p-8 sm:p-10">
+            <div className="space-y-4">
+              <SendRequirement
+                label="Verify Email"
+                description="Confirm ownership of your shop email address."
+                completed={!needsEmailVerification}
+                href="/dashboard/verification"
+              />
+
+              <SendRequirement
+                label="Business Information"
+                description="Complete your shop contact and address information."
+                completed={!needsBusinessInformation}
+                href="/dashboard/settings#business-information"
+              />
+
+              <SendRequirement
+                label="Taxes & Fees"
+                description="Confirm how taxes and originating-shop fees should be calculated."
+                completed={!needsFinancialSettings}
+                href="/dashboard/settings#financial-settings"
+              />
+            </div>
+
+            <div className="mt-8 border-t border-slate-200 pt-6 text-center">
+              <p className="text-sm text-slate-500">
+                Delivery settings and payment methods are not required to send
+                an order.
+              </p>
+
+              <Link
+                href="/dashboard"
+                className="mt-5 inline-flex rounded-xl border border-slate-300 px-6 py-3 font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Return to Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

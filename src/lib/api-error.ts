@@ -22,7 +22,8 @@ export type ApiErrorCode =
   | "INVALID_DECLINE_REASON"
   | "DECLINE_MESSAGE_TOO_LONG"
   | "RATE_LIMIT_EXCEEDED"
-  | "NOT_IMPLEMENTED";
+  | "NOT_IMPLEMENTED"
+  | "SHOP_NOT_READY_TO_ACCEPT";
 
 
 export class ApiError extends Error {

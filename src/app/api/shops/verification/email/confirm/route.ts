@@ -13,12 +13,10 @@ function hashCode(code: string) {
 
 function hasCompletedVerification(shop: any) {
   const completedOrders = shop.stats?.ordersCompleted ?? 0;
-
   const reviewCount = shop.reviews?.length ?? 0;
 
   return (
     !!shop.verification?.emailVerified &&
-    !!shop.onboardingComplete &&
     !!shop.verification?.websiteVerified &&
     !!shop.isPublic &&
     completedOrders >= 2 &&

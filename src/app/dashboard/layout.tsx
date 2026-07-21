@@ -1,19 +1,18 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { NavLinks } from "@/components/NavLinks";
 import { Bell, Menu, X } from "lucide-react";
-import { useSession } from "next-auth/react";
 
 interface Branding {
   logo: string;
 }
+
 interface Shop {
   _id: string;
   businessName: string;
   branding: Branding;
   slug: string;
-  onboardingComplete: boolean;
   isPro: boolean;
   role: string;
 }
@@ -21,7 +20,6 @@ interface Shop {
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const hasRefreshed = useRef(false);
 
   const [shop, setShop] = useState<Shop | null>(null);
   const today = new Intl.DateTimeFormat("en-US", {
@@ -49,14 +47,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // load notifications
   async function loadNotifications() {
-    if (!shop?._id) return;
-
     try {
-      const res = await fetch(`/api/notifications/${shop?._id}/pull`);
+      const res = await fetch("/api/notifications/pull");
+
+      if (!res.ok) {
+        const errorText = await res.text();
+
+        throw new Error(
+          `Failed to load notifications (${res.status}): ${errorText}`,
+        );
+      }
+
       const data = await res.json();
-      setNotifications(data);
+
+      setNotifications(data.notifications || []);
     } catch (err) {
       console.error("Failed to load notifications", err);
+      setNotifications([]);
     }
   }
 
@@ -76,7 +83,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         handleRefreshNotifications,
       );
     };
-  }, [shop?._id]);
+  }, []);
 
   // Click Notification
   const handleClickNotification = async (notification: any) => {
@@ -85,9 +92,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         router.push(
           `/dashboard/orders/messages/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
         );
-      } else if (notification.type === "NewOrder" || notification.type === "OrderAccepted" || notification.type === "OrderDeclined" || notification.type === "OrderPaid" || notification.type === "OrderComplete" || notification.type === "Rated") {
+      } else if (
+        notification.type === "NewOrder" ||
+        notification.type === "OrderAccepted" ||
+        notification.type === "OrderDeclined" ||
+        notification.type === "OrderPaid" ||
+        notification.type === "OrderComplete" ||
+        notification.type === "Rated"
+      ) {
         // Mark notification as read
-        
+
         // For order update notifications, navigate to the order details page
         router.push(
           `/orders/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
@@ -97,9 +111,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
       await loadNotifications();
       setShowNotifications(false);
-    } catch (error) {
-      
-    }
+    } catch (error) {}
   };
 
   useEffect(() => {
@@ -107,19 +119,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (shop?._id) {
-      loadNotifications();
-    }
-  }, [shop?._id]);
+    loadNotifications();
+  }, []);
 
   return (
     <div className="flex h-screen bg-emerald-50 md:p-4 lg:gap-10 lg:p-10 overflow-hidden">
       {/* Desktop Sidebar (Static) */}
-      {shop?.onboardingComplete && (
+      {shop && (
         <aside className="w-64 bg-white border-r flex-col justify-between rounded-2xl shadow-lg hidden lg:flex p-6">
           <div>
             <h2 className="text-xl font-bold mb-8">GetBloomDirect</h2>
-            <NavLinks slug={shop.slug} pro={shop.isPro} pathname={pathname} role={shop.role} />
+            <NavLinks
+              slug={shop.slug}
+              pro={shop.isPro}
+              pathname={pathname}
+              role={shop.role}
+            />
           </div>
         </aside>
       )}
@@ -143,6 +158,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <X size={24} />
           </button>
         </div>
+
         <NavLinks
           slug={shop?.slug || ""}
           pro={shop?.isPro || false}
@@ -158,35 +174,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             {/* Logo + Greeting */}
             <div>
               {/* Greeting */}
-              {shop?.onboardingComplete ? (
-                <div>
-                  <h1 className="font-semibold text-gray-700 capitalize md:text-xl lg:text-start lg:text-base xl:text-xl">
-                    Welcome back,{" "}
-                    <span className="text-purple-600">
-                      {shop?.businessName}
-                    </span>
-                    !
-                  </h1>
-                  <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
-                    You're saving thousands by skipping wire services
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <h1 className="font-semibold text-gray-700 capitalize md:text-xl lg:text-start lg:text-base xl:text-xl">
-                    Welcome{" "}
-                    <span className="text-purple-600">
-                      {shop?.businessName}
-                    </span>
-                    !
-                  </h1>
-                  <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
-                    Please finish your account setup to start sending &
-                    receiving orders!
-                  </p>
-                </div>
-              )}
+              <div>
+                <h1 className="font-semibold text-gray-700 capitalize md:text-xl lg:text-start lg:text-base xl:text-xl">
+                  Welcome back,{" "}
+                  <span className="text-purple-600">{shop?.businessName}</span>!
+                </h1>
+
+                <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
+                  Manage your shop, orders, and Bloom services
+                </p>
+              </div>
             </div>
+
             {/* Path */}
             <div className="hidden lg:block">
               <h2 className="text-2xl font-bold text-purple-600 lg:text-xl xl:text-2xl">
@@ -228,9 +227,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 {shop?.role === "admin" && (
                   <span
                     className={
-                      pathname === "/dashboard/admin"
-                        ? "block"
-                        : "hidden"
+                      pathname === "/dashboard/admin" ? "block" : "hidden"
                     }
                   >
                     Admin Panel
