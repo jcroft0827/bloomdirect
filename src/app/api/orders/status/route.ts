@@ -83,15 +83,14 @@ export async function POST(req: Request) {
         );
       }
 
-      const readiness = getShopReadiness(fulfillingShop.toObject(),);
+      const readiness = getShopReadiness(fulfillingShop.toObject());
 
       if (!readiness.capabilities.canAcceptOrders) {
         return NextResponse.json(
           {
             error:
-              "Your shop must verify its email and configure at least one payment method before accepting an order.",
-            code: "SHOP_NOT_READY_TO_ACCEPT",
-            readiness,
+              "You must set up at least one payment method before accepting an order.",
+            code: "PAYMENT_METHOD_REQUIRED",
           },
           { status: 403 },
         );

@@ -1,6 +1,7 @@
+// /api/shops/settings/route.ts
+
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
-import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -128,16 +129,6 @@ export async function PATCH(req: Request) {
         break;
       }
 
-      case "featuredBouquet": {
-        return NextResponse.json(
-          {
-            error:
-              "Featured arrangement settings have moved to FulfillmentOfferings.",
-          },
-          { status: 400 },
-        );
-      }
-
       case "securityCode": {
         shop.securityCode = data.securityCode;
         break;
@@ -152,8 +143,6 @@ export async function PATCH(req: Request) {
     }
 
     await shop.save();
-
-    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({
       message: "Settings updated successfully",

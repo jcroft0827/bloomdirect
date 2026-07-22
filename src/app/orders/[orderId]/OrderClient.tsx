@@ -15,6 +15,7 @@ import StarRating from "@/components/ui/StarRating";
 import { sendInvite } from "@/lib/client/sendInvite";
 import DeclineOrderModal from "@/components/orders/DeclineOrderModal";
 import type { DeclineReason } from "@/lib/decline-reasons";
+import PaymentMethodRequiredModal from "@/components/orders/PaymentMethodRequiredModal";
 
 interface OrderClientProps {
   order: OrderLean;
@@ -36,6 +37,8 @@ export default function OrderClient({
   const role = isOriginating ? "ORIGINATING" : "FULFILLING";
   const [actionOrderId, setActionOrderId] = useState<string | null>(null);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [showPaymentRequiredModal, setShowPaymentRequiredModal] =
+    useState(false);
   const [decliningOrder, setDecliningOrder] = useState(false);
   const [handlingStatus, setHandlingStatus] = useState(false);
   const [availableShops, setAvailableShops] = useState<Shop[]>([]);
@@ -98,23 +101,16 @@ export default function OrderClient({
   const formatTimeString = (timeStr: any) => {
     if (!timeStr || typeof timeStr !== "string") return "";
 
-    // Split the hours and minutes
-    let [hours, minutes] = timeStr.split(":").map(Number);
+    const [hour24, minutes] = timeStr.split(":").map(Number);
 
-    const ampm = hours >= 12 ? "PM" : "AM";
+    const ampm = hour24 >= 12 ? "PM" : "AM";
+    const hours = hour24 % 12 || 12;
 
-    // Convert 24h to 12h
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-
-    // Ensure minutes always have two digits (e.g., :05 instead of :5)
-    const strMinutes = minutes < 10 ? "0" + minutes : minutes;
-
-    return `${hours}:${strMinutes} ${ampm}`;
+    return `${hours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
   };
 
   const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
-    if (actionOrderId === orderId) return; // Prevent duplicate actions
+    if (actionOrderId === orderId) return;
 
     try {
       setActionOrderId(orderId);
@@ -122,27 +118,38 @@ export default function OrderClient({
 
       const res = await fetch("/api/orders/status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: newStatus }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId,
+          status: newStatus,
+        }),
       });
 
-      setActionOrderId(null);
+      const data = await res.json();
 
       if (res.ok) {
         toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
+
         router.refresh();
-      } else {
-        setHandlingStatus(false);
-        const error = await res.json();
-        toast.error(error.error || "Failed to update order");
+        return;
       }
+
+      if (data.code === "PAYMENT_METHOD_REQUIRED") {
+        setShowPaymentRequiredModal(true);
+        return;
+      }
+
+      toast.error(data.error || "Failed to update order");
     } catch (error) {
-      setHandlingStatus(false);
       console.error("Failed to update order", error);
+
       toast.error(
         "Failed to update order. Please try again. If the problem persists, contact GetBloomDirect support.",
       );
     } finally {
+      setActionOrderId(null);
       setHandlingStatus(false);
     }
   };
@@ -1172,9 +1179,9 @@ export default function OrderClient({
                   ) : (
                     <div className="space-y-4 border-t pt-6">
                       <p className="text-lg mt-4 text-center sm:text-start md:max-w-lg">
-                        GetBloomDirect is expanding quickly. We don't currently
-                        have another partner florist available to service this
-                        order - but we'd love to change that!
+                        GetBloomDirect is expanding quickly. We don&apos;t
+                        currently have another partner florist available to
+                        service this order - but we&apos;d love to change that!
                       </p>
                       <Link
                         href={"/dashboard"}
@@ -1251,7 +1258,8 @@ export default function OrderClient({
               </h2>
 
               <p className="text-sm text-gray-600">
-                Enter the florist's email address to send the order details.
+                Enter the florist&apos;s email address to send the order
+                details.
               </p>
 
               <input
@@ -1292,7 +1300,7 @@ export default function OrderClient({
               </h2>
 
               <p className="text-sm text-gray-600">
-                Enter the florist's email address to invite this florist.
+                Enter the florist&apos;s email address to invite this florist.
               </p>
 
               <input
@@ -1333,6 +1341,11 @@ export default function OrderClient({
             }
           }}
           onConfirm={handleDeclineOrder}
+        />
+
+        <PaymentMethodRequiredModal
+          open={showPaymentRequiredModal}
+          onClose={() => setShowPaymentRequiredModal(false)}
         />
       </div>
     </>

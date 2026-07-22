@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { OrderStatus } from "@/lib/order-status";
 import OrderFlowHelper from "@/components/OrderFlowHelper";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
+import PaymentMethodRequiredModal from "@/components/orders/PaymentMethodRequiredModal";
 
 import {
   getAvailablePaymentMethods,
@@ -44,6 +45,9 @@ export default function OrdersDashboard() {
 
   const [totalOrders, setTotalOrders] = useState(0);
   const [filtersInitialized, setFiltersInitialized] = useState(false);
+
+  const [showPaymentRequiredModal, setShowPaymentRequiredModal] =
+    useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -171,31 +175,45 @@ export default function OrdersDashboard() {
   }, [searchParams]);
 
   const handleStatus = async (orderId: string, newStatus: OrderStatus) => {
-    if (actionOrderId === orderId) return; // Prevent duplicate actions
+    if (actionOrderId === orderId) return;
 
     try {
       setActionOrderId(orderId);
 
       const res = await fetch("/api/orders/status", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: newStatus }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId,
+          status: newStatus,
+        }),
       });
 
-      setActionOrderId(null);
+      const data = await res.json();
 
       if (res.ok) {
         toast.success(`Order updated: ${newStatus.replaceAll("_", " ")}`);
-        fetchOrders();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || "Failed to update order");
+
+        await fetchOrders();
+        return;
       }
+
+      if (data.code === "PAYMENT_METHOD_REQUIRED") {
+        setShowPaymentRequiredModal(true);
+        return;
+      }
+
+      toast.error(data.error || "Failed to update order");
     } catch (error) {
       console.error("Failed to update order", error);
+
       toast.error(
         "Failed to update order. Please try again. If the problem persists, contact GetBloomDirect support.",
       );
+    } finally {
+      setActionOrderId(null);
     }
   };
 
@@ -244,14 +262,6 @@ export default function OrdersDashboard() {
     setDesktopFilters(false);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-3xl text-gray-600">Loading orders…</p>
-      </div>
-    );
-  }
-
   const getButtonStyle = (presetName: string) => {
     const isActive = draftFilters.preset === presetName;
     return `w-full border rounded-lg p-2 lg:p-1 shadow-md font-medium transition-colors ${
@@ -288,6 +298,14 @@ export default function OrdersDashboard() {
     COMPLETED: "bg-emerald-100 text-emerald-800",
     DECLINED: "bg-red-100 text-red-700",
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-3xl text-gray-600">Loading orders…</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1323,6 +1341,11 @@ export default function OrdersDashboard() {
           </div>
         </div>
       )}
+
+      <PaymentMethodRequiredModal
+        open={showPaymentRequiredModal}
+        onClose={() => setShowPaymentRequiredModal(false)}
+      />
     </>
   );
 }

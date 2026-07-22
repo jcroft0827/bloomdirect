@@ -1,27 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ChevronDown, ChevronUp, X, HelpCircle } from "lucide-react";
+
+const STORAGE_KEY = "hideOrderFlowHelper";
+const STORAGE_EVENT = "order-flow-helper-storage-change";
+
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(STORAGE_EVENT, callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(STORAGE_EVENT, callback);
+  };
+}
+
+function getSnapshot() {
+  return localStorage.getItem(STORAGE_KEY) === "true";
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+function notifyStorageChanged() {
+  window.dispatchEvent(new Event(STORAGE_EVENT));
+}
 
 export default function OrderFlowHelper() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isHidden, setIsHidden] = useState(false);
 
-  useEffect(() => {
-    const dismissed = localStorage.getItem("hideOrderFlowHelper");
-    if (dismissed === "true") {
-      setIsHidden(true);
-    }
-  }, []);
+  const isHidden = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const dismiss = () => {
-    localStorage.setItem("hideOrderFlowHelper", "true");
-    setIsHidden(true);
+    localStorage.setItem(STORAGE_KEY, "true");
+    notifyStorageChanged();
   };
 
   const restore = () => {
-    localStorage.removeItem("hideOrderFlowHelper");
-    setIsHidden(false);
+    localStorage.removeItem(STORAGE_KEY);
+    notifyStorageChanged();
     setIsOpen(true);
   };
 
@@ -29,6 +52,7 @@ export default function OrderFlowHelper() {
     return (
       <div className="mb-4 flex justify-end">
         <button
+          type="button"
           onClick={restore}
           className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
         >
@@ -42,22 +66,25 @@ export default function OrderFlowHelper() {
   return (
     <div className="mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-5">
       <div className="flex items-center justify-between">
-        <div
-          className="flex items-center gap-3 cursor-pointer"
-          onClick={() => setIsOpen(!isOpen)}
+        <button
+          type="button"
+          className="flex cursor-pointer items-center gap-3 text-left"
+          onClick={() => setIsOpen((current) => !current)}
         >
           <span className="text-lg font-black">📦 How orders work</span>
+
           {isOpen ? (
             <ChevronUp className="h-5 w-5" />
           ) : (
             <ChevronDown className="h-5 w-5" />
           )}
-        </div>
+        </button>
 
         <button
+          type="button"
           onClick={dismiss}
           className="text-gray-400 hover:text-gray-600"
-          aria-label="Dismiss"
+          aria-label="Dismiss order flow helper"
         >
           <X className="h-5 w-5" />
         </button>
@@ -83,7 +110,7 @@ export default function OrderFlowHelper() {
             </span>
           </div>
 
-          <ul className="list-disc pl-5 text-sm space-y-1">
+          <ul className="list-disc space-y-1 pl-5 text-sm">
             <li>The fulfilling shop accepts or declines the order</li>
             <li>The originating shop marks the order as paid</li>
             <li>The fulfilling shop marks it as delivered</li>

@@ -590,7 +590,7 @@ export default function VerificationClient() {
                   <p>
                     This code expires in{" "}
                     <span className="font-semibold">10 minutes</span>. If it
-                    expires, simply click "Resend Code" to get a new one.
+                    expires, simply click &quot;Resend Code&quot; to get a new one.
                   </p>
                 </div>
               </div>

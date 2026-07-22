@@ -1,3 +1,5 @@
+// /lib/shops/getShopReadiness.ts
+
 type ShopReadinessInput = {
   businessName?: string | null;
   email?: string | null;
@@ -147,7 +149,6 @@ export function getShopReadiness(shop: ShopReadinessInput): ShopReadiness {
   const emailVerified = shop.verification?.emailVerified === true;
 
   const businessInfoComplete =
-    shop.setupProgress?.businessInfo === true &&
     hasText(shop.contact?.phone) &&
     hasText(shop.address?.street) &&
     hasText(shop.address?.city) &&
@@ -160,9 +161,7 @@ export function getShopReadiness(shop: ShopReadinessInput): ShopReadiness {
    * Existing shops may already contain valid payment information even if an
    * older workflow failed to save the setup flag correctly.
    */
-  const paymentConfigured =
-    shop.setupProgress?.paymentMethods === true &&
-    hasConfiguredPaymentMethod(shop.paymentMethods);
+  const paymentConfigured = hasConfiguredPaymentMethod(shop.paymentMethods);
 
   /*
    * Delivery readiness must be based on real delivery coverage.
@@ -170,9 +169,7 @@ export function getShopReadiness(shop: ShopReadinessInput): ShopReadiness {
    * Merely opening and saving the delivery form should not make a shop
    * searchable if it still has no ZIP zones, distance zones, or radius.
    */
-  const deliveryConfigured =
-    shop.setupProgress?.deliverySettings === true &&
-    hasConfiguredDelivery(shop.delivery);
+  const deliveryConfigured = hasConfiguredDelivery(shop.delivery);
 
   /*
    * Financial settings need an explicit setup flag because a 0% tax rate and

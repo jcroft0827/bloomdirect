@@ -115,7 +115,7 @@ export default function AdminPanelClient() {
   }, []);
   // #endregion
 
-  // #region Functions
+  // #region functions
   function goToPreviousRequest() {
     setCurrentRequestIndex((prev) =>
       prev === 0 ? websiteRequests.length - 1 : prev - 1,

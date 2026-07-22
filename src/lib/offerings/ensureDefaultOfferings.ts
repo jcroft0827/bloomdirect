@@ -54,11 +54,11 @@ export async function ensureShopOfferingsInitialized(shopId: string) {
 
   if (!shop) return;
 
+  await ensureDefaultDesignerChoice(shopId);
+
   if (shop.offeringsInitialized) {
     return;
   }
-
-  await ensureDefaultDesignerChoice(shopId);
 
   const nonDesignerOffering = await FulfillmentOffering.findOne({
     shop: shopId,

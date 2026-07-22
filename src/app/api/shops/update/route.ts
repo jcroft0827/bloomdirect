@@ -4,8 +4,10 @@ import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import { ApiError } from "@/lib/api-error";
-import { geoCodeAddress } from "@/lib/geocode";
-import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
+
+type UpdateShopBody = {
+  logo?: string;
+};
 
 export async function POST(req: Request) {
   try {
@@ -18,49 +20,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as UpdateShopBody;
 
-    // Check for P.O. Box in address (not supported by geocoding)
-    function isPOBox(address: string) {
-      if (!address) return false;
-      const lower = address.toLowerCase().replace(/\s+/g, ""); // remove spaces to catch tricky formatting
-      const patterns = [
-        "pobox",
-        "p.o.box",
-        "po.box",
-        "p.o.b",
-        "p.o",
-        "box", // catches "Box 123"
-        "mailingaddress",
-      ];
-
-      // Return true if any pattern matches at the start of the address
-      return patterns.some((pattern) => lower.startsWith(pattern));
-    }
-
-    if (isPOBox(body.address)) {
+    if (!body.logo) {
       return NextResponse.json(
-        {
-          error:
-            "P.O. Box addresses are not supported. Please provide a physical address.",
-        },
+        { error: "No supported fields were provided." },
         { status: 400 },
       );
     }
-
-    // 🔒 Whitelist allowed fields
-    const allowedFields = [
-      "shopName",
-      "phone",
-      "address",
-      "city",
-      "state",
-      "zip",
-      "logo",
-      "acceptsWalkIns",
-      "weddingConsultations",
-      "securityCode",
-    ];
 
     const shop = await Shop.findById(shopId);
 
@@ -68,32 +35,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
-    // Only update defined + allowed fields
-    for (const key of allowedFields) {
-      if (body[key] !== undefined) {
-        // @ts-ignore
-        shop[key] = body[key];
-      }
-    }
-
-    // Update geoLocation if address changed
-    if (body.address || body.city || body.state || body.zip) {
-      const fullAddress = `${shop.address}, ${shop.city}, ${shop.state} ${shop.zip}`;
-      const geoLocation = await geoCodeAddress(fullAddress);
-      if (geoLocation) shop.geoLocation = geoLocation;
-    }
-
-    console.log(shop);
+    shop.set("branding.logo", body.logo);
 
     await shop.save();
 
-    await ensureDefaultDesignerChoice(shop._id.toString());
-
     return NextResponse.json({
       success: true,
-      shop,
+      logo: shop.branding?.logo,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("UPDATE SHOP ERROR:", error);
 
     if (error instanceof ApiError) {
@@ -106,7 +56,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
+          "Something went wrong. Please try again. If the issue persists, contact GetBloomDirect Support.",
         code: "SERVER_ERROR",
       },
       { status: 500 },

@@ -662,7 +662,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
       console.log("Starting upload...");
       setUploadingImg(true);
 
-      // 1️⃣ Request signed upload URL from backend
       const uploadRes = await fetch("/api/s3/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -674,12 +673,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
 
       if (!uploadRes.ok) {
         throw new Error("Failed to get upload URL");
-        setUploadingImg(false);
       }
 
       const { uploadUrl, fileKey } = await uploadRes.json();
 
-      // 2️⃣ Upload the file directly to S3
       const s3Upload = await fetch(uploadUrl, {
         method: "PUT",
         headers: {
@@ -690,29 +687,34 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
 
       if (!s3Upload.ok) {
         throw new Error("Failed to upload file to S3");
-        setUploadingImg(false);
       }
 
       console.log("Uploaded to S3");
 
-      // 4️⃣ Save fileKey to database
-      await fetch("/api/shops/update", {
+      const saveRes = await fetch("/api/shops/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: fileKey }),
+        body: JSON.stringify({ logo: fileKey }),
       });
+
+      if (!saveRes.ok) {
+        const data = await saveRes.json().catch(() => null);
+
+        throw new Error(data?.error || "Failed to save logo");
+      }
 
       const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
       const cloudFrontUrl = `${cfBase}/${fileKey}`;
 
-      // 6️⃣ Update UI with signed URL
       setShop((prev) => ({
         ...prev,
-        branding: { ...prev.branding, logo: cloudFrontUrl },
+        branding: {
+          ...prev.branding,
+          logo: cloudFrontUrl,
+        },
       }));
-    } catch (err) {
-      console.error("Logo upload error:", err);
-      setUploadingImg(false);
+    } catch (error: unknown) {
+      console.error("Logo upload error:", error);
     } finally {
       setUploadingImg(false);
     }
@@ -970,7 +972,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
 
       setShop((prev) => {
         // 1. Create the new filtered list
-        let updatedList = (prev.delivery[listKey] as any[]).filter(
+        const updatedList = (prev.delivery[listKey] as any[]).filter(
           (_, i) => i !== index,
         );
 
@@ -2210,7 +2212,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 ) : (
                   <div>
                     <p className={previewP + " text-red-500"}>
-                      Don't Allow Same Day Delivery
+                      Don&apos;t Allow Same Day Delivery
                     </p>
                   </div>
                 )}

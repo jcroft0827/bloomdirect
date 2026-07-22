@@ -1,7 +1,7 @@
 // app/dashboard/new-order/NewOrderClient.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, type Dispatch, type SetStateAction } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -12,9 +12,28 @@ import BloomSpinner from "@/components/BloomSpinner";
 import { sendInvite } from "@/lib/client/sendInvite";
 import { Star } from "lucide-react";
 import Link from "next/link";
-import PreviousMap_ from "postcss/lib/previous-map";
 
 // #region Interfaces
+type PhoneFormState = {
+  phone: string;
+};
+
+interface NetworkShop {
+  _id: string;
+  businessName: string;
+  slug: string;
+  deliveryCharge: number;
+  verifiedFlorist?: boolean;
+  isPro?: boolean;
+  contact?: {
+    phone?: string;
+  };
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+  };
+}
 
 interface ShopReadiness {
   requirements: {
@@ -443,8 +462,8 @@ export default function NewOrderClient() {
   const [originatingFeeValue, setOriginatingFeeValue] = useState<number>(0);
 
   // Shops
-  const [shops, setShops] = useState<any[]>([]);
-  const [selectedShop, setSelectedShop] = useState<any>(null);
+  const [shops, setShops] = useState<NetworkShop[]>([]);
+  const [selectedShop, setSelectedShop] = useState<NetworkShop | null>(null);
   const [searching, setSearching] = useState(false);
   const [findShopSuccess, setFindShopSuccess] = useState(false);
   const [noShopsInArea, setNoShopsInArea] = useState(false);
@@ -732,6 +751,13 @@ export default function NewOrderClient() {
         return toast.error("Select a fulfilling shop!");
       }
 
+      const selectedShopId = selectedShop?._id;
+
+      if (!usingGoogleShop && !selectedShopId) {
+        toast.error("Select a fulfilling shop!");
+        return;
+      }
+
       if (!logistics.deliveryDate) {
         return toast.error("Select delivery date!");
       }
@@ -902,7 +928,7 @@ export default function NewOrderClient() {
               feeValue: Number(originatingFeeValue) || 0,
             },
             fulfillmentType: "network",
-            fulfillingShopId: selectedShop._id,
+            fulfillingShopId: selectedShopId,
           };
 
       const endpoint = usingGoogleShop
@@ -978,7 +1004,7 @@ export default function NewOrderClient() {
     setSelectedProducts([]);
   }
 
-  // Offerings Toggle Function
+  // Offerings Toggle function
   function toggleOffering(offering: any, tier?: any) {
     const tierToUse = tier || offering.pricingTiers?.[0];
 
@@ -1019,12 +1045,10 @@ export default function NewOrderClient() {
   }
 
   // Select Shop In Network
-  async function selectShop(shop: any, setter: Function) {
+  async function selectShop(shop: NetworkShop) {
     try {
       setShopChosen(false);
-      setter(shop);
-
-      if (!shop?._id) return;
+      setSelectedShop(shop);
 
       setOfferings([]);
       setSelectedProducts([]);
@@ -1034,16 +1058,17 @@ export default function NewOrderClient() {
 
       setPricing((prev) => ({
         ...prev,
-        deliveryFee: shop.deliveryCharge || 0,
+        deliveryFee: shop.deliveryCharge ?? 0,
       }));
 
       setShopChosen(true);
-    } catch (error: any) {
-      console.error("Error selecting shop: ", error);
+    } catch (error: unknown) {
+      console.error("Error selecting shop:", error);
 
       toast.error(
-        error?.message ||
-          "There was an error when selecting shop, please try again!",
+        error instanceof Error
+          ? error.message
+          : "There was an error when selecting shop, please try again!",
       );
     }
   }
@@ -1240,16 +1265,23 @@ export default function NewOrderClient() {
   };
 
   // Phone Formatting
-  const handlePhoneChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    state: any,
-    setter: Function,
+  const handlePhoneChange = <T extends PhoneFormState>(
+    event: React.ChangeEvent<HTMLInputElement>,
+    state: T,
+    setter: Dispatch<SetStateAction<T>>,
   ) => {
-    const rawValue = e.target.value.replace(/\D/g, "").slice(0, 10);
-    setter({ ...state, phone: rawValue });
+    const rawValue = event.target.value.replace(/\D/g, "").slice(0, 10);
+
+    setter({
+      ...state,
+      phone: rawValue,
+    });
   };
 
-  const handlePhoneBlur = (state: any, setter: Function) => {
+  const handlePhoneBlur = <T extends PhoneFormState>(
+    state: T,
+    setter: Dispatch<SetStateAction<T>>,
+  ) => {
     const digits = state.phone.replace(/\D/g, "");
     let formatted = digits;
 
@@ -1259,11 +1291,16 @@ export default function NewOrderClient() {
       formatted = digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
     }
 
-    setter({ ...state, phone: formatted });
+    setter({
+      ...state,
+      phone: formatted,
+    });
   };
 
-  const handlePhoneFocus = (state: any, setter: Function) => {
-    // Strip dashes back out for clean editing
+  const handlePhoneFocus = <T extends PhoneFormState>(
+    state: T,
+    setter: Dispatch<SetStateAction<T>>,
+  ) => {
     setter({
       ...state,
       phone: state.phone.replace(/\D/g, ""),
@@ -1632,8 +1669,8 @@ export default function NewOrderClient() {
               </h1>
 
               <p className="mx-auto mt-3 max-w-xl text-lg text-purple-100">
-                You've used all {monthlySendUsage.limit} orders including with
-                Bloom Free this month.
+                You&apos;ve used all {monthlySendUsage.limit} orders including
+                with Bloom Free this month.
               </p>
             </div>
 
@@ -1681,7 +1718,7 @@ export default function NewOrderClient() {
                   href="/dashboard/incoming?role=originating&period=current-month"
                   className="rounded-xl border border-gray-200 px-6 py-3 font-bold text-gray-700 transition hover:bg-gray-50"
                 >
-                  View This Month's Orders
+                  View This Month&apos;s Orders
                 </Link>
               </div>
 
@@ -1763,7 +1800,7 @@ export default function NewOrderClient() {
                         " text-2xl font-bold text-red-600 mb-4"
                       }
                     >
-                      We're not in this area yet.
+                      We&apos;re not in this area yet.
                     </p>
 
                     <div
@@ -2031,10 +2068,6 @@ export default function NewOrderClient() {
                             </p>
                           </div>
 
-                          <button onClick={() => console.log(favoriteShopIds)}>
-                            test
-                          </button>
-
                           {shops.map((shop) => {
                             const isFavorite = favoriteShopIds.has(
                               String(shop._id),
@@ -2124,9 +2157,7 @@ export default function NewOrderClient() {
                                     type="radio"
                                     name="shop"
                                     checked={selectedShop?._id === shop._id}
-                                    onChange={() =>
-                                      selectShop(shop, setSelectedShop)
-                                    }
+                                    onChange={() => selectShop(shop)}
                                     className="mt-2 h-7 w-7"
                                   />
                                 </div>

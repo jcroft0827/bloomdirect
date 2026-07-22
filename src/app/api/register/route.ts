@@ -75,15 +75,6 @@ export async function POST(req: Request) {
 
       slug: shopSlug,
 
-      // Setup progress tracker
-      setupProgress: {
-        businessInfo: false,
-        paymentMethods: false,
-        deliverySettings: false,
-        financialSettings: false,
-        featuredBouquet: false,
-      },
-
       // Stats defaults
       stats: {
         ordersSent: 0,
@@ -128,80 +119,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-// export async function POST(req: Request) {
-//   try {
-//     await connectToDB();
-//     const body = await req.json();
-
-//     const existing = await Shop.findOne({ email: body.email });
-//     if (existing) {
-//       return NextResponse.json(
-//         { error: "Email already used" },
-//         { status: 400 },
-//       );
-//     }
-
-//     // Check for P.O. Box in address (not supported by geocoding)
-//     function isPOBox(address: string) {
-//       if (!address) return false;
-//       const lower = address.toLowerCase().replace(/\s+/g, ""); // remove spaces to catch tricky formatting
-//       const patterns = [
-//         "pobox",
-//         "p.o.box",
-//         "po.box",
-//         "p.o.b",
-//         "p.o",
-//         "box", // catches "Box 123"
-//         "mailingaddress",
-//       ];
-
-//       // Return true if any pattern matches at the start of the address
-//       return patterns.some((pattern) => lower.startsWith(pattern));
-//     }
-
-//     if (isPOBox(body.address)) {
-//       return NextResponse.json(
-//         {
-//           error:
-//             "P.O. Box addresses are not supported. Please provide a physical address.",
-//         },
-//         { status: 400 },
-//       );
-//     }
-
-//     // Generate geoLocation if address provided
-//     let geoLocation = null;
-//     if (body.address && body.city && body.state && body.zip) {
-//       const fullAddress = `${body.address}, ${body.city}, ${body.state} ${body.zip}`;
-//       geoLocation = await geoCodeAddress(fullAddress);
-//     }
-
-//     // const shop = await Shop.create(body);
-//     const shop = await Shop.create({
-//       ...body,
-//       securityCode: "0829",
-//       geoLocation, // << save geoLocation
-//     });
-
-//     return NextResponse.json({ success: true, shop }); // << add 'shop' to response, if broken, remove
-//   } catch (error: any) {
-//     console.error("REGISTER SHOP ERROR:", error);
-
-//     if (error instanceof ApiError) {
-//       return NextResponse.json(
-//         { error: error.message, code: error.code },
-//         { status: error.status },
-//       );
-//     }
-
-//     return NextResponse.json(
-//       {
-//         error:
-//           "Something went wrong. Please try again. If the issue persists, Contact GetBloomDirect Support.",
-//         code: "SERVER_ERROR",
-//       },
-//       { status: 500 },
-//     );
-//   }
-// }

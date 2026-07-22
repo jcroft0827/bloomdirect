@@ -33,7 +33,7 @@ export default function VerificationProgressBar({
         </p>
 
         <p className="text-gray-700">
-          Earn trust and let others know you're a verified florist.
+          Earn trust and let others know you&apos;re a verified florist.
         </p>
       </div>
 

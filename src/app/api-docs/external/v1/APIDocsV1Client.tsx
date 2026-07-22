@@ -76,7 +76,7 @@ export default function APIDocsV1Client() {
             </ul>
 
             <p className="mt-3">
-              If <b>declineReason = "OTHER"</b>, then <b>declineMessage</b> is
+              If <b>declineReason = &quot;OTHER&quot;</b>, then <b>declineMessage</b> is
               required.
             </p>
 
@@ -94,7 +94,7 @@ export default function APIDocsV1Client() {
             <h2 className="text-2xl font-semibold">Authentication</h2>
 
             <p className="text-sm text-neutral-700">
-              All external v1 API requests must include your shop's API key.
+              All external v1 API requests must include your shop&apos;s API key.
             </p>
 
             <div className="rounded-xl bg-neutral-950 p-4 text-sm text-white font-mono overflow-x-auto">

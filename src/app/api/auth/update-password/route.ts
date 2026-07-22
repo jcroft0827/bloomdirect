@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth"; // adjust path if needed
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import bcrypt from "bcryptjs";
-import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function POST(req: Request) {
   try {
@@ -45,8 +44,6 @@ export async function POST(req: Request) {
     shop.password = newPassword;
 
     await shop.save(); 
-
-    await ensureDefaultDesignerChoice(shop._id.toString());
 
     return NextResponse.json({ success: true });
   } catch (error) {

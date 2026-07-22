@@ -4,6 +4,8 @@
 // Bloom Pro v1 requires payment to be marked inside GetBloomDirect
 // by the originating florist.
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { getShopFromApiKey } from "@/lib/api-auth";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { mapOrderForPOS } from "@/lib/map-order-for-pos";

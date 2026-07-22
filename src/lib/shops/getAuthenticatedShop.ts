@@ -2,7 +2,7 @@
 
 import Shop from "@/models/Shop";
 import { connectToDB } from "@/lib/mongoose";
-import { ensureShopOfferingsInitialized } from "../offerings/ensureDefaultOfferings";
+import { ensureShopOfferingsInitialized } from "@/lib/offerings/ensureDefaultOfferings";
 
 export async function getAuthenticatedShop(sessionUserId: string) {
   await connectToDB();
@@ -11,7 +11,7 @@ export async function getAuthenticatedShop(sessionUserId: string) {
 
   if (!shop) return null;
 
-  await ensureShopOfferingsInitialized(shop._id.toString(),);
+  await ensureShopOfferingsInitialized(shop._id.toString());
 
   return shop;
 }

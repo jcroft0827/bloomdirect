@@ -115,7 +115,7 @@ const shopSchema = new mongoose.Schema(
     lastActivity: Date,
 
     // ===============================
-    // ACCOUNT SETUP PROGRESS
+    // SETTINGS COMPLETION TRACKING
     // ===============================
 
     setupProgress: {
@@ -123,7 +123,6 @@ const shopSchema = new mongoose.Schema(
       paymentMethods: { type: Boolean, default: false },
       deliverySettings: { type: Boolean, default: false },
       financialSettings: { type: Boolean, default: false },
-      featuredBouquet: { type: Boolean, default: false },
     },
 
     // ===============================

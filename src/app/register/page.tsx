@@ -2,6 +2,7 @@
 
 import BloomSpinner from "@/components/BloomSpinner";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -278,12 +279,12 @@ export default function Register() {
 
               <p className="mt-4 text-center text-sm text-gray-500">
                 Already have a GetBloomDirect account?
-                <a
-                  href="/"
+                <Link
+                  href="/login"
                   className="ml-1 transition hover:text-purple-600"
                 >
                   <b>Log In</b>
-                </a>
+                </Link>
               </p>
             </form>
           </div>
