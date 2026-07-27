@@ -21,7 +21,7 @@ const steps = [
   },
   {
     icon: Star,
-    title: "Build Your Network",
+    title: "Grow Your Trusted Network",
     description:
       "Leave reviews, strengthen trusted florist relationships, and grow your fulfillment network without wire-service fees."
   },

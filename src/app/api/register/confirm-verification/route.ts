@@ -1,3 +1,5 @@
+// api/register/confirm-verification/route.ts
+
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 

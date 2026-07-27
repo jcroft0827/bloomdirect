@@ -18,9 +18,7 @@ export default function HomeHero() {
           No Wire Fees. Ever.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-gray-600">
-          Connect with trusted independent florists, send fulfillment orders
-          directly, and keep control of your customer relationships - without
-          wire-service commissions.
+          Connect with trusted independent florists, send fulfillment orders directly, keep control of your customer relationships, eliminate traditional wire-service commissions, and keep more of every order.
         </p>
 
         <div className="mt-10 flex gap-4">

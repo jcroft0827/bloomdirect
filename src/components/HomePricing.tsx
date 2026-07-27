@@ -121,6 +121,12 @@ export default function HomePricing() {
             </p>
           </div>
         </div>
+
+        <div className="mt-14">
+          <p className="text-center text-lg font-semibold tracking-wide">
+            Start free. Upgrade as your network grows.
+          </p>
+        </div>
       </div>
     </section>
   );

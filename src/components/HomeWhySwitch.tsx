@@ -39,7 +39,7 @@ export default function HomeWhySwitch() {
                             <div className="flex-1">
                                 <div className="mb-2 flex items-center gap-2 text-red-500">
                                     <XCircle className="h-5 w-5" />
-                                    <span className="font-semibold">Old Way</span>
+                                    <span className="font-semibold">Wire Service</span>
                                 </div>
                                 <p className="text-gray-700">{item.old}</p>
                             </div>
@@ -58,7 +58,7 @@ export default function HomeWhySwitch() {
 
                 <div className="mt-16 text-center">
                     <p className="text-lg font-semibold text-gray-700">
-                        Built around florist feedback. Designed for independent shops. No middleman.
+                        Independent florists deserve a better way to work together.
                     </p>
                 </div>
             </div>

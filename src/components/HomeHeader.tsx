@@ -9,7 +9,7 @@ export default function HomeHeader() {
   const [open, setOpen] = useState(false);
   return (
     <header className="w-full border-b border-gray-200 bg-white relative z-50">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-10 pb-2">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-10 pb-2">
         {/* Logo */}
         <Link href="/" className="flex items-center">
           <div className="relative w-32 h-28">
@@ -42,19 +42,26 @@ export default function HomeHeader() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden items-center gap-14 md:flex">
+        <nav className="hidden items-center gap-8 lg:gap-10 md:flex">
           <Link
-            href="#features"
+            href="/#features"
             className="text-xl font-medium text-gray-800 transition hover:text-purple-600"
           >
             Features
           </Link>
 
           <Link
-            href="#pricing"
+            href="/#pricing"
             className="text-xl font-medium text-gray-800 transition hover:text-purple-600"
           >
             Pricing
+          </Link>
+
+          <Link
+            href="/vision"
+            className="text-xl font-medium text-gray-800 transition hover:text-purple-600"
+          >
+            Vision
           </Link>
 
           <Link
@@ -108,17 +115,24 @@ export default function HomeHeader() {
             <nav className="flex flex-col gap-6 px-6 py-8">
               <Link
                 onClick={() => setOpen(false)}
-                href="#features"
+                href="/#features"
                 className="text-lg font-semibold"
               >
                 Features
               </Link>
               <Link
                 onClick={() => setOpen(false)}
-                href="#pricing"
+                href="/#pricing"
                 className="text-lg font-semibold"
               >
                 Pricing
+              </Link>
+              <Link
+                onClick={() => setOpen(false)}
+                href="/vision"
+                className="text-lg font-semibold"
+              >
+                Vision
               </Link>
               <Link
                 onClick={() => setOpen(false)}

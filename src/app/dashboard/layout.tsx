@@ -227,7 +227,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 {shop?.role === "admin" && (
                   <span
                     className={
-                      pathname === "/dashboard/admin" ? "block" : "hidden"
+                      pathname === "/admin" ? "block" : "hidden"
                     }
                   >
                     Admin Panel

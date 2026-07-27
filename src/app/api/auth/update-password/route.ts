@@ -23,6 +23,15 @@ export async function POST(req: Request) {
       );
     }
 
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return NextResponse.json(
+        {
+          error: "Your new password must be at least 8 characters long.",
+        },
+        { status: 400 },
+      );
+    }
+
     const shop = await Shop.findOne({
       email: session.user.email.toLowerCase(),
     }).select("+password");
@@ -43,7 +52,7 @@ export async function POST(req: Request) {
     // 🚨 DO NOT HASH HERE
     shop.password = newPassword;
 
-    await shop.save(); 
+    await shop.save();
 
     return NextResponse.json({ success: true });
   } catch (error) {

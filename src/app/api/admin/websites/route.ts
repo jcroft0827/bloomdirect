@@ -23,7 +23,7 @@ export async function GET() {
     const requests = await WebsiteVerificationRequest.find({
       status: "pending",
     })
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 })
       .lean();
 
     return NextResponse.json({

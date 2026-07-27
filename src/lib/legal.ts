@@ -1,0 +1,5 @@
+export const CURRENT_TERMS_VERSION =
+  "2026-07-24";
+
+export const CURRENT_PRIVACY_VERSION =
+  "2026-07-24";

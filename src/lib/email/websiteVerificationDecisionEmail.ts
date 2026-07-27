@@ -2,17 +2,24 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-type DecisionEmailInput = {
+type WebsiteApprovedEmailParams = {
   to: string;
   shopName: string;
   websiteUrl: string;
+};
+
+type WebsiteDeclinedEmailParams = {
+  to: string;
+  shopName: string;
+  websiteUrl: string;
+  reason: string;
 };
 
 export async function sendWebsiteApprovedEmail({
   to,
   shopName,
   websiteUrl,
-}: DecisionEmailInput) {
+}: WebsiteApprovedEmailParams) {
   return resend.emails.send({
     from: "GetBloomDirect <no-reply@getbloomdirect.com>",
     to,
@@ -45,7 +52,8 @@ export async function sendWebsiteDeclinedEmail({
   to,
   shopName,
   websiteUrl,
-}: DecisionEmailInput) {
+  reason,
+}: WebsiteDeclinedEmailParams) {
   return resend.emails.send({
     from: "GetBloomDirect <no-reply@getbloomdirect.com>",
     to,
@@ -65,6 +73,13 @@ export async function sendWebsiteDeclinedEmail({
             <br />
             <a href="${websiteUrl}" target="_blank" style="color:#6d28d9;font-weight:bold;">${websiteUrl}</a>
           </p>
+
+          <p><strong>Reason:</strong></p>
+
+          <p>${reason}</p>
+
+          <p>Please correct the issue and submit your website again.</p>
+
           <p style="color:#374151;font-size:16px;line-height:1.6;">
             If you have questions, please contact us at
             <strong>716-566-0673</strong>.

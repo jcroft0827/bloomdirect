@@ -1,7 +1,7 @@
+// /app/dashboard/admin/AdminPanelClient.tsx
+
 "use client";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -39,8 +39,6 @@ type AdminCustomer = {
 };
 
 export default function AdminPanelClient() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [websiteRequests, setWebsiteRequests] = useState<
@@ -52,38 +50,6 @@ export default function AdminPanelClient() {
   const [customers, setCustomers] = useState<AdminCustomer[]>([]);
 
   const currentRequest = websiteRequests[currentRequestIndex];
-
-  // #region useEffects
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-      return;
-    }
-
-    async function loadShopData() {
-      try {
-        setLoading(true);
-
-        const res = await fetch("/api/shops/me");
-        const data = await res.json();
-
-        // Admin Protection
-        if (!data?.shop) {
-          router.replace("/login");
-          return;
-        }
-
-        if (data.shop.role !== "admin") {
-          router.replace("/dashboard");
-          return;
-        }
-
-        // pull notifications
-      } catch (error) {}
-    }
-
-    loadShopData();
-  }, [status]);
 
   useEffect(() => {
     async function loadWebsiteVerificationRequests() {

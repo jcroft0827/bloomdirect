@@ -60,6 +60,12 @@ const websiteVerificationRequestSchema = new mongoose.Schema(
       index: true,
     },
 
+    declineReason: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Shop",

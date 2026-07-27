@@ -1,60 +1,119 @@
+// app/api/auth/reset-password/route.ts
+
+import crypto from "crypto";
 import { NextResponse } from "next/server";
+
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
+
+function hashResetToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function isValidPassword(password: string) {
+  return password.length >= 8;
+}
 
 export async function POST(req: Request) {
   try {
     await connectToDB();
 
-    const { email, securityCode } = await req.json();
+    const body = await req.json();
 
+    const { email, token, newPassword, confirmPassword } = body;
 
-
-    if (!email || !securityCode) {
+    if (
+      typeof email !== "string" ||
+      typeof token !== "string" ||
+      typeof newPassword !== "string" ||
+      typeof confirmPassword !== "string" ||
+      !email.trim() ||
+      !token.trim() ||
+      !newPassword ||
+      !confirmPassword
+    ) {
       return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
+        {
+          error: "All password-reset fields are required.",
+        },
+        { status: 400 },
       );
     }
+
+    if (newPassword !== confirmPassword) {
+      return NextResponse.json(
+        {
+          error: "Passwords do not match.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!isValidPassword(newPassword)) {
+      return NextResponse.json(
+        {
+          error: "Your new password must be at least 8 characters long.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const tokenHash = hashResetToken(token.trim());
 
     const shop = await Shop.findOne({
-      email: email.toLowerCase(),
-    }).select("+password +securityCode");
-    console.log("DB securityCode:", shop.securityCode);
-console.log("Input securityCode:", securityCode);
-    
+      email: normalizedEmail,
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpires: {
+        $gt: new Date(),
+      },
+    }).select(
+      "+password +passwordResetTokenHash +passwordResetExpires",
+    );
+
+    /*
+     * Use one generic response for:
+     * - invalid token
+     * - expired token
+     * - token belonging to another account
+     * - previously used token
+     */
     if (!shop) {
       return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 400 }
+        {
+          error:
+            "This password reset link is invalid or has expired. Please request a new one.",
+        },
+        { status: 400 },
       );
     }
 
+    /*
+     * The Shop pre-save hook hashes this automatically.
+     * Do not hash it manually here.
+     */
+    shop.password = newPassword;
 
-    if (shop.securityCode?.trim() !== securityCode.trim()) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 400 }
-      );
-    }
+    /*
+     * Removing these fields makes the link one-time use.
+     */
+    shop.passwordResetTokenHash = undefined;
+    shop.passwordResetExpires = undefined;
 
-    const tempPassword = "Flowers123!";
-
-    // 🚨 DO NOT HASH HERE
-    shop.password = tempPassword;
-
-    await shop.save(); 
+    await shop.save();
 
     return NextResponse.json({
       success: true,
-      tempPassword,
+      message: "Your password has been reset successfully.",
     });
-
   } catch (error) {
     console.error("RESET PASSWORD ERROR:", error);
+
     return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
+      {
+        error: "Unable to reset your password. Please try again.",
+      },
+      { status: 500 },
     );
   }
 }

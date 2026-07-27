@@ -33,14 +33,14 @@ export default function HomeNetworkGrowth() {
           </div>
 
           <h2 className="text-4xl font-black text-gray-900">
-            A Network Built for{" "}
-            <span className="text-emerald-600">Real Florist Relationships</span>
+            The Network Starts{" "}
+            <span className="text-emerald-600">Here</span>
           </h2>
 
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
             GetBloomDirect is helping independent florists move away from
             commission-heavy wire services and build direct fulfillment
-            relationships with shops they trust.
+            relationships with shops they trust. Every florist who joins expands the opportunities available to every other florist in the network.
           </p>
         </div>
 

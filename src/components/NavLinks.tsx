@@ -166,9 +166,9 @@ export const NavLinks = ({
         </Link>
         {role === "admin" && (
           <Link
-            href="/dashboard/admin"
+            href="/admin"
             onClick={onClose}
-            className={`block p-3 rounded-lg ${isActive("/dashboard/admin")}`}
+            className={`block p-3 rounded-lg ${isActive("/admin")}`}
           >
             Admin Panel
           </Link>

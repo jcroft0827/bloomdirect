@@ -4,12 +4,11 @@ export default function HomeCTA() {
   return (
     <section className="bg-purple-600 py-20 text-center text-white">
       <h2 className="text-4xl font-black">
-        Join the Direct Florist Network
+        Ready to Change the Way You Send Orders?
       </h2>
 
       <p className="mx-auto mt-4 max-w-xl text-lg text-purple-100">
-        Send florist-to-florist orders directly, keep your customer
-        relationships, and avoid wire-service commissions.
+        Join the growing network of independent florists building a better way to work together-directly and without traditional wire-service commissions.
       </p>
 
       <Link

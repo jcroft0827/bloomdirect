@@ -1,83 +1,222 @@
+// /app/api/admin/websites/[id]/decline/route.ts
+
 import authOptions from "@/lib/auth";
-import { connectToDB } from "@/lib/mongoose";
 import { sendWebsiteDeclinedEmail } from "@/lib/email/websiteVerificationDecisionEmail";
+import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import WebsiteVerificationRequest from "@/models/WebsiteVerificationRequest";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+type DeclineBody = {
+  reason?: unknown;
+};
+
 export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  requestBody: Request,
+  context: RouteContext,
 ) {
   try {
-    await connectToDB();
-
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (session.user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const now = new Date();
-
-    const request = await WebsiteVerificationRequest.findById(id);
-
-    if (!request) {
       return NextResponse.json(
-        { error: "Website verification request not found." },
-        { status: 404 }
+        { error: "Unauthorized" },
+        { status: 401 },
       );
     }
 
-    const shop = await Shop.findById(request.shop);
-
-    if (!shop) {
-      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
+    if (session.user.role !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 },
+      );
     }
 
-    shop.verification.websiteVerified = false;
-    shop.verification.websiteVerifiedAt = undefined;
+    let body: DeclineBody;
 
-    shop.websiteVerifications = {
-      status: "declined",
-      checkedAt: now,
-      failureReason:
-        request.failureReason || "Website was declined after manual review.",
-      matchedSignals: request.matchedSignals || [],
-      riskSignals: request.riskSignals || [],
-    };
+    try {
+      body = (await requestBody.json()) as DeclineBody;
+    } catch {
+      return NextResponse.json(
+        { error: "A decline reason is required." },
+        { status: 400 },
+      );
+    }
 
-    await shop.save();
+    const declineReason =
+      typeof body.reason === "string"
+        ? body.reason.trim()
+        : "";
 
-    request.status = "declined";
-    request.reviewedBy = session.user.id;
-    request.reviewedAt = now;
-    await request.save();
+    if (declineReason.length < 10) {
+      return NextResponse.json(
+        {
+          error:
+            "Please provide a clear decline reason of at least 10 characters.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (declineReason.length > 500) {
+      return NextResponse.json(
+        {
+          error:
+            "The decline reason must be 500 characters or fewer.",
+        },
+        { status: 400 },
+      );
+    }
+
+    await connectToDB();
+
+    const { id } = await context.params;
+    const now = new Date();
+
+    const verificationRequest =
+      await WebsiteVerificationRequest.findOneAndUpdate(
+        {
+          _id: id,
+          status: "pending",
+        },
+        {
+          $set: {
+            status: "declined",
+            reviewedBy: session.user.id,
+            reviewedAt: now,
+            declineReason,
+          },
+        },
+        {
+          new: true,
+        },
+      );
+
+    if (!verificationRequest) {
+      const existingRequest =
+        await WebsiteVerificationRequest.findById(id)
+          .select("status");
+
+      if (!existingRequest) {
+        return NextResponse.json(
+          {
+            error:
+              "Website verification request not found.",
+          },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error: `This request has already been ${existingRequest.status}.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const shop = await Shop.findByIdAndUpdate(
+      verificationRequest.shop,
+      {
+        $set: {
+          "verification.websiteVerified": false,
+
+          websiteVerifications: {
+            status: "declined",
+            checkedAt: now,
+            failureReason: declineReason,
+            matchedSignals:
+              verificationRequest.matchedSignals || [],
+            riskSignals:
+              verificationRequest.riskSignals || [],
+          },
+        },
+
+        $unset: {
+          "verification.websiteVerifiedAt": 1,
+        },
+      },
+      {
+        new: true,
+      },
+    );
+
+    if (!shop) {
+      await WebsiteVerificationRequest.findByIdAndUpdate(
+        verificationRequest._id,
+        {
+          $set: {
+            status: "pending",
+          },
+          $unset: {
+            reviewedBy: 1,
+            reviewedAt: 1,
+            declineReason: 1,
+          },
+        },
+      );
+
+      return NextResponse.json(
+        { error: "Shop not found." },
+        { status: 404 },
+      );
+    }
+
+    let emailSent = false;
+    let emailWarning: string | null = null;
 
     if (shop.email) {
-      await sendWebsiteDeclinedEmail({
-        to: shop.email,
-        shopName: shop.businessName || request.shopName,
-        websiteUrl: request.websiteUrl,
-      });
+      try {
+        await sendWebsiteDeclinedEmail({
+          to: shop.email,
+          shopName:
+            shop.businessName ||
+            verificationRequest.shopName ||
+            "Your Shop",
+          websiteUrl:
+            verificationRequest.websiteUrl,
+
+          // Add this argument if your helper supports it.
+          reason: declineReason,
+        });
+
+        emailSent = true;
+      } catch (emailError: unknown) {
+        console.error(
+          "Website decline email failed:",
+          emailError,
+        );
+
+        emailWarning =
+          "The website was declined, but the notification email could not be sent.";
+      }
     }
 
     return NextResponse.json({
       success: true,
       message: "Website verification declined.",
+      emailSent,
+      warning: emailWarning,
     });
-  } catch (error) {
-    console.error("Decline website verification failed:", error);
+  } catch (error: unknown) {
+    console.error(
+      "Decline website verification failed:",
+      error,
+    );
 
     return NextResponse.json(
-      { error: "Failed to decline website verification." },
-      { status: 500 }
+      {
+        error:
+          "Failed to decline website verification.",
+      },
+      { status: 500 },
     );
   }
 }

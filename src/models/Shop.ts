@@ -31,6 +31,40 @@ const shopSchema = new mongoose.Schema(
       required: true,
     },
 
+    passwordResetTokenHash: {
+      type: String,
+      select: false,
+    },
+
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+    },
+
+    privacyPolicy: {
+      acceptedAt: {
+        type: Date,
+      },
+      version: {
+        type: String,
+      },
+    },
+
+    termsOfService: {
+      acceptedAt: {
+        type: Date,
+      },
+      version: {
+        type: String,
+      },
+    },
+
+    realRetailFlorist: {
+      confirmedAt: {
+        type: Date,
+      },
+    },
+
     role: {
       type: String,
       enum: ["shop", "admin"],
@@ -100,7 +134,7 @@ const shopSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    
+
     networkJoinDate: Date,
 
     isPro: {

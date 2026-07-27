@@ -602,12 +602,22 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
 
   // Update Password
   const handlePasswordUpdate = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Complete all password fields");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast.error("Your new password must be at least 8 characters long");
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
     }
 
-    setIsUpdatingPw(true); // Start loading indicator
+    setIsUpdatingPw(true);
 
     try {
       const res = await fetch("/api/auth/update-password", {
@@ -625,6 +635,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
         toast.error(err.error || "Failed to update password");
       }
     } catch (error) {
+      console.error("Password update error:", error);
       toast.error("A network error occurred");
     } finally {
       setIsUpdatingPw(false);
