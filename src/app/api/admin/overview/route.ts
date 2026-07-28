@@ -6,6 +6,7 @@ import WebsiteVerificationRequest from "@/models/WebsiteVerificationRequest";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { getShopReadiness } from "@/lib/shops/getShopReadiness";
+import { AdminAuditLog } from "@/models/AdminAuditLog";
 
 type LeanShop = {
   _id: unknown;
@@ -84,6 +85,7 @@ export async function GET() {
       recentShops,
       recentOrders,
       recentWebsiteDecisions,
+      recentAdminActions,
     ] = await Promise.all([
       Shop.find({
         role: {
@@ -170,6 +172,16 @@ export async function GET() {
         })
         .limit(5)
         .lean(),
+
+      AdminAuditLog.find({})
+        .select("adminShop targetShop action reason createdAt")
+        .sort({
+          createdAt: -1,
+        })
+        .limit(8)
+        .populate("adminShop", "businessName shopName email")
+        .populate("targetShop", "businessName shopName email")
+        .lean(),
     ]);
 
     const shopSummaries = shops.map((shop) => {
@@ -190,7 +202,7 @@ export async function GET() {
       };
     });
 
-    const shopsNeedingAttention = shopSummaries
+    const allShopsNeedingAttention = shopSummaries
       .filter((shop) => {
         if (shop.isSuspended) {
           return false;
@@ -205,10 +217,25 @@ export async function GET() {
           !capabilities.canAcceptOrders
         );
       })
-      .sort((a, b) => a.readinessPercentage - b.readinessPercentage)
-      .slice(0, 5);
+      .sort((a, b) => a.readinessPercentage - b.readinessPercentage);
+
+    const shopsNeedingAttention = allShopsNeedingAttention.slice(0, 5);
 
     const totalProShops = shopSummaries.filter((shop) => shop.isPro).length;
+
+    function getPopulatedShopName(value: unknown, fallback: string) {
+      if (!value || typeof value !== "object") {
+        return fallback;
+      }
+
+      const shop = value as {
+        businessName?: string;
+        shopName?: string;
+        email?: string;
+      };
+
+      return shop.businessName || shop.shopName || shop.email || fallback;
+    }
 
     const recentActivity = [
       ...recentShops.map((shop) => ({
@@ -271,6 +298,100 @@ export async function GET() {
 
         occurredAt: request.reviewedAt || request.createdAt,
       })),
+
+      ...recentAdminActions.map((audit) => {
+        const adminName = getPopulatedShopName(
+          audit.adminShop,
+          "An administrator",
+        );
+
+        const targetName = getPopulatedShopName(
+          audit.targetShop,
+          "a shop account",
+        );
+
+        let activityDetails:
+          | {
+              type:
+                | "shop_suspended"
+                | "shop_unsuspended"
+                | "shop_marked_spam"
+                | "shop_marked_legitimate"
+                | "shop_archived"
+                | "shop_archive_restored"
+                | "admin_action";
+              title: string;
+              description: string;
+            }
+          | undefined;
+
+        switch (audit.action) {
+          case "SHOP_SUSPENDED":
+            activityDetails = {
+              type: "shop_suspended",
+              title: "Shop suspended",
+              description: `${adminName} suspended ${targetName}`,
+            };
+            break;
+
+          case "SHOP_UNSUSPENDED":
+            activityDetails = {
+              type: "shop_unsuspended",
+              title: "Shop restored",
+              description: `${adminName} restored access for ${targetName}`,
+            };
+            break;
+
+          case "SHOP_MARKED_SPAM":
+            activityDetails = {
+              type: "shop_marked_spam",
+              title: "Shop marked as spam",
+              description: `${adminName} marked ${targetName} as spam`,
+            };
+            break;
+
+          case "SHOP_MARKED_LEGITIMATE":
+            activityDetails = {
+              type: "shop_marked_legitimate",
+              title: "Shop marked legitimate",
+              description: `${adminName} marked ${targetName} as legitimate`,
+            };
+            break;
+
+          case "SHOP_ARCHIVED":
+            activityDetails = {
+              type: "shop_archived",
+              title: "Shop archived",
+              description: `${adminName} archived ${targetName}`,
+            };
+            break;
+
+          case "SHOP_RESTORED":
+            activityDetails = {
+              type: "shop_archive_restored",
+              title: "Archived shop restored",
+              description: `${adminName} restored ${targetName} from the archive`,
+            };
+            break;
+
+          default:
+            activityDetails = {
+              type: "admin_action",
+              title: "Admin action recorded",
+              description: `${adminName} updated ${targetName}`,
+            };
+            break;
+        }
+
+        return {
+          id: `audit-${String(audit._id)}`,
+          ...activityDetails,
+          occurredAt: audit.createdAt,
+          metadata: {
+            reason: audit.reason || null,
+          },
+        };
+      }),
     ]
       .filter((activity) => activity.occurredAt)
       .sort(
@@ -285,7 +406,7 @@ export async function GET() {
       metrics: {
         totalShops: shopSummaries.length,
         proShops: totalProShops,
-        shopsNeedingAttention: shopsNeedingAttention.length,
+        shopsNeedingAttention: allShopsNeedingAttention.length,
         pendingWebsiteReviews: pendingWebsiteReviewCount,
         ordersThisMonth,
         totalOrders,

@@ -125,6 +125,42 @@ const shopSchema = new mongoose.Schema(
 
     suspensionReason: String,
 
+    isMarkedSpam: {
+      type: Boolean,
+      default: false,
+    },
+
+    spamReviewReason: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+
+    markedSpamAt: Date,
+
+    markedSpamBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+    },
+
+    isArchived: {
+      type: Boolean,
+      default: false,
+    },
+
+    archivedReason: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+
+    archivedAt: Date,
+
+    archivedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+    },
+
     isPublic: {
       type: Boolean,
       default: true,

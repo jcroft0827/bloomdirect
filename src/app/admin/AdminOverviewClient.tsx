@@ -2,7 +2,11 @@
 
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   ArrowRight,
+  BadgeCheck,
+  Ban,
   CheckCircle2,
   Clock3,
   Crown,
@@ -11,17 +15,14 @@ import {
   Loader2,
   PackageCheck,
   RefreshCw,
+  ShieldAlert,
   ShieldCheck,
   Store,
   UserPlus,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 type CapabilitySet = {
@@ -63,13 +64,21 @@ type RecentActivity = {
     | "shop_registered"
     | "order_created"
     | "website_approved"
-    | "website_declined";
+    | "website_declined"
+    | "shop_suspended"
+    | "shop_unsuspended"
+    | "shop_marked_spam"
+    | "shop_marked_legitimate"
+    | "shop_archived"
+    | "shop_archive_restored"
+    | "admin_action";
   title: string;
   description: string;
   occurredAt: string;
   metadata?: {
     status?: string | null;
     orderNumber?: string | null;
+    reason?: string | null;
   };
 };
 
@@ -92,9 +101,7 @@ type AdminOverviewResponse = {
 };
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Something went wrong.";
+  return error instanceof Error ? error.message : "Something went wrong.";
 }
 
 function formatDateTime(value: string) {
@@ -120,12 +127,9 @@ function formatRelativeDate(value: string) {
     return "Unknown date";
   }
 
-  const difference =
-    Date.now() - date.getTime();
+  const difference = Date.now() - date.getTime();
 
-  const minutes = Math.floor(
-    difference / (1000 * 60),
-  );
+  const minutes = Math.floor(difference / (1000 * 60));
 
   if (minutes < 1) {
     return "Just now";
@@ -150,9 +154,7 @@ function formatRelativeDate(value: string) {
   return formatDateTime(value);
 }
 
-function getActivityIcon(
-  activity: RecentActivity,
-) {
+function getActivityIcon(activity: RecentActivity) {
   switch (activity.type) {
     case "shop_registered":
       return UserPlus;
@@ -166,6 +168,25 @@ function getActivityIcon(
     case "website_declined":
       return XCircle;
 
+    case "shop_suspended":
+      return Ban;
+
+    case "shop_unsuspended":
+      return ShieldCheck;
+
+    case "shop_marked_spam":
+      return ShieldAlert;
+
+    case "shop_marked_legitimate":
+      return BadgeCheck;
+
+    case "shop_archived":
+      return Archive;
+
+    case "shop_archive_restored":
+      return ArchiveRestore;
+
+    case "admin_action":
     default:
       return Clock3;
   }
@@ -187,11 +208,7 @@ function CapabilityRow({
       )}
 
       <span
-        className={
-          enabled
-            ? "text-slate-400"
-            : "font-semibold text-slate-200"
-        }
+        className={enabled ? "text-slate-400" : "font-semibold text-slate-200"}
       >
         {label}
       </span>
@@ -200,55 +217,40 @@ function CapabilityRow({
 }
 
 export default function AdminOverviewClient() {
-  const [data, setData] =
-    useState<AdminOverviewResponse | null>(null);
+  const [data, setData] = useState<AdminOverviewResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadOverview = useCallback(
-    async (showRefreshState = false) => {
-      try {
-        if (showRefreshState) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        const response = await fetch(
-          "/api/admin/overview",
-          {
-            method: "GET",
-            cache: "no-store",
-          },
-        );
-
-        const responseData =
-          (await response.json()) as AdminOverviewResponse;
-
-        if (!response.ok) {
-          throw new Error(
-            responseData.error ||
-              "Failed to load Admin overview.",
-          );
-        }
-
-        setData(responseData);
-      } catch (error: unknown) {
-        console.error(
-          "Failed to load Admin overview:",
-          error,
-        );
-
-        toast.error(getErrorMessage(error));
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+  const loadOverview = useCallback(async (showRefreshState = false) => {
+    try {
+      if (showRefreshState) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
-    },
-    [],
-  );
+
+      const response = await fetch("/api/admin/overview", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const responseData = (await response.json()) as AdminOverviewResponse;
+
+      if (!response.ok) {
+        throw new Error(responseData.error || "Failed to load Admin overview.");
+      }
+
+      setData(responseData);
+    } catch (error: unknown) {
+      console.error("Failed to load Admin overview:", error);
+
+      toast.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     void loadOverview();
@@ -281,48 +283,42 @@ export default function AdminOverviewClient() {
     {
       label: "Total Shops",
       value: metrics.totalShops,
-      description:
-        "Florist accounts on the platform.",
+      description: "Florist accounts on the platform.",
       icon: Store,
       href: "/admin/shops",
     },
     {
       label: "Bloom Pro",
       value: metrics.proShops,
-      description:
-        "Active shops with Bloom Pro.",
+      description: "Active shops with Bloom Pro.",
       icon: Crown,
-      href: "/admin/shops?plan=pro",
+      href: "/admin/shops?filter=pro",
     },
     {
       label: "Needs Attention",
       value: metrics.shopsNeedingAttention,
-      description:
-        "Shops missing readiness requirements.",
+      description: "Shops missing readiness requirements.",
       icon: AlertTriangle,
-      href: "/admin/shops?readiness=incomplete",
+      href: "/admin/shops?filter=needs_attention",
     },
     {
       label: "Website Reviews",
       value: metrics.pendingWebsiteReviews,
-      description:
-        "Requests waiting for manual review.",
+      description: "Requests waiting for manual review.",
       icon: Globe2,
       href: "/admin/websites",
     },
     {
       label: "Orders This Month",
       value: metrics.ordersThisMonth,
-      description:
-        "Orders created during this month.",
+      description: "Orders created during this month.",
       icon: PackageCheck,
       href: "/admin/orders",
     },
     {
       label: "Total Orders",
       value: metrics.totalOrders,
-      description:
-        "Orders handled across the network.",
+      description: "Orders handled across the network.",
       icon: ShieldCheck,
       href: "/admin/orders",
     },
@@ -337,9 +333,8 @@ export default function AdminOverviewClient() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-            Monitor florist readiness, website reviews,
-            order activity, and the items that need your
-            attention.
+            Monitor florist readiness, website reviews, order activity, and the
+            items that need your attention.
           </p>
         </div>
 
@@ -350,11 +345,8 @@ export default function AdminOverviewClient() {
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw
-            className={`h-4 w-4 ${
-              refreshing ? "animate-spin" : ""
-            }`}
+            className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
           />
-
           Refresh
         </button>
       </div>
@@ -397,9 +389,7 @@ export default function AdminOverviewClient() {
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
             <div>
-              <h2 className="font-bold text-white">
-                Shops Needing Attention
-              </h2>
+              <h2 className="font-bold text-white">Shops Needing Attention</h2>
 
               <p className="mt-1 text-xs text-slate-500">
                 Lowest-readiness active shops.
@@ -417,93 +407,74 @@ export default function AdminOverviewClient() {
 
           {data?.shopsNeedingAttention?.length ? (
             <div className="divide-y divide-white/10">
-              {data.shopsNeedingAttention.map(
-                (shop) => (
-                  <div
-                    key={shop._id}
-                    className="p-5 sm:p-6"
-                  >
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-bold text-white">
-                            {shop.businessName}
-                          </h3>
+              {data.shopsNeedingAttention.map((shop) => (
+                <div key={shop._id} className="p-5 sm:p-6">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-white">
+                          {shop.businessName}
+                        </h3>
 
-                          {shop.isPro && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-300">
-                              <Crown className="h-3 w-3" />
-                              Pro
-                            </span>
-                          )}
-                        </div>
-
-                        {shop.email && (
-                          <p className="mt-1 truncate text-sm text-slate-500">
-                            {shop.email}
-                          </p>
+                        {shop.isPro && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-300">
+                            <Crown className="h-3 w-3" />
+                            Pro
+                          </span>
                         )}
-
-                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                          <CapabilityRow
-                            enabled={
-                              shop.readiness
-                                .capabilities
-                                .canAppearInSearch
-                            }
-                            label="Search visibility"
-                          />
-
-                          <CapabilityRow
-                            enabled={
-                              shop.readiness
-                                .capabilities
-                                .canReceiveOrders
-                            }
-                            label="Receive orders"
-                          />
-
-                          <CapabilityRow
-                            enabled={
-                              shop.readiness
-                                .capabilities
-                                .canSendOrders
-                            }
-                            label="Send orders"
-                          />
-
-                          <CapabilityRow
-                            enabled={
-                              shop.readiness
-                                .capabilities
-                                .canAcceptOrders
-                            }
-                            label="Accept orders"
-                          />
-                        </div>
                       </div>
 
-                      <div className="shrink-0 lg:text-right">
-                        <p className="text-2xl font-black text-white">
-                          {shop.readinessPercentage}%
+                      {shop.email && (
+                        <p className="mt-1 truncate text-sm text-slate-500">
+                          {shop.email}
                         </p>
+                      )}
 
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          Ready
-                        </p>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <CapabilityRow
+                          enabled={
+                            shop.readiness.capabilities.canAppearInSearch
+                          }
+                          label="Search visibility"
+                        />
 
-                        <Link
-                          href={`/admin/shops?shopId=${shop._id}`}
-                          className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-violet-300 hover:text-violet-200"
-                        >
-                          View shop
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
+                        <CapabilityRow
+                          enabled={shop.readiness.capabilities.canReceiveOrders}
+                          label="Receive orders"
+                        />
+
+                        <CapabilityRow
+                          enabled={shop.readiness.capabilities.canSendOrders}
+                          label="Send orders"
+                        />
+
+                        <CapabilityRow
+                          enabled={shop.readiness.capabilities.canAcceptOrders}
+                          label="Accept orders"
+                        />
                       </div>
                     </div>
+
+                    <div className="shrink-0 lg:text-right">
+                      <p className="text-2xl font-black text-white">
+                        {shop.readinessPercentage}%
+                      </p>
+
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Ready
+                      </p>
+
+                      <Link
+                        href="/admin/shops?filter=needs_attention"
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-violet-300 hover:text-violet-200"
+                      >
+                        View shop
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
-                ),
-              )}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="px-6 py-14 text-center">
@@ -514,8 +485,7 @@ export default function AdminOverviewClient() {
               </h3>
 
               <p className="mt-2 text-sm text-slate-500">
-                No florist accounts currently require
-                setup assistance.
+                No florist accounts currently require setup assistance.
               </p>
             </div>
           )}
@@ -524,9 +494,7 @@ export default function AdminOverviewClient() {
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
             <div>
-              <h2 className="font-bold text-white">
-                Website Review Queue
-              </h2>
+              <h2 className="font-bold text-white">Website Review Queue</h2>
 
               <p className="mt-1 text-xs text-slate-500">
                 Oldest pending requests first.
@@ -544,66 +512,52 @@ export default function AdminOverviewClient() {
 
           {data?.pendingWebsiteRequests?.length ? (
             <div className="divide-y divide-white/10">
-              {data.pendingWebsiteRequests.map(
-                (request) => (
-                  <div
-                    key={request._id}
-                    className="p-5"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-white">
-                          {request.shopName}
+              {data.pendingWebsiteRequests.map((request) => (
+                <div key={request._id} className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white">
+                        {request.shopName}
+                      </p>
+
+                      <p
+                        className="mt-1 text-xs text-slate-500"
+                        title={formatDateTime(request.createdAt)}
+                      >
+                        Submitted {formatRelativeDate(request.createdAt)}
+                      </p>
+
+                      {request.failureReason && (
+                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
+                          {request.failureReason}
                         </p>
-
-                        <p
-                          className="mt-1 text-xs text-slate-500"
-                          title={formatDateTime(
-                            request.createdAt,
-                          )}
-                        >
-                          Submitted{" "}
-                          {formatRelativeDate(
-                            request.createdAt,
-                          )}
-                        </p>
-
-                        {request.failureReason && (
-                          <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
-                            {request.failureReason}
-                          </p>
-                        )}
-                      </div>
-
-                      {request.websiteUrl && (
-                        <a
-                          href={
-                            request.websiteUrl.startsWith(
-                              "http",
-                            )
-                              ? request.websiteUrl
-                              : `https://${request.websiteUrl}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
-                          aria-label={`Open ${request.shopName} website`}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
                       )}
                     </div>
+
+                    {request.websiteUrl && (
+                      <a
+                        href={
+                          request.websiteUrl.startsWith("http")
+                            ? request.websiteUrl
+                            : `https://${request.websiteUrl}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                        aria-label={`Open ${request.shopName} website`}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
                   </div>
-                ),
-              )}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="px-6 py-14 text-center">
               <ShieldCheck className="mx-auto h-8 w-8 text-emerald-400" />
 
-              <h3 className="mt-4 font-bold text-white">
-                Queue clear
-              </h3>
+              <h3 className="mt-4 font-bold text-white">Queue clear</h3>
 
               <p className="mt-2 text-sm text-slate-500">
                 No websites are waiting for review.
@@ -615,21 +569,17 @@ export default function AdminOverviewClient() {
 
       <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
         <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-          <h2 className="font-bold text-white">
-            Recent Platform Activity
-          </h2>
+          <h2 className="font-bold text-white">Recent Platform Activity</h2>
 
           <p className="mt-1 text-xs text-slate-500">
-            Recent shop registrations, orders, and
-            website decisions.
+            Recent registrations, orders, website decisions, and administrative actions.
           </p>
         </div>
 
         {data?.recentActivity?.length ? (
           <div className="divide-y divide-white/10">
             {data.recentActivity.map((activity) => {
-              const Icon =
-                getActivityIcon(activity);
+              const Icon = getActivityIcon(activity);
 
               return (
                 <div
@@ -648,13 +598,9 @@ export default function AdminOverviewClient() {
 
                       <p
                         className="text-xs text-slate-500"
-                        title={formatDateTime(
-                          activity.occurredAt,
-                        )}
+                        title={formatDateTime(activity.occurredAt)}
                       >
-                        {formatRelativeDate(
-                          activity.occurredAt,
-                        )}
+                        {formatRelativeDate(activity.occurredAt)}
                       </p>
                     </div>
 
@@ -664,11 +610,17 @@ export default function AdminOverviewClient() {
 
                     {activity.metadata?.status && (
                       <span className="mt-2 inline-flex rounded-full bg-white/[0.05] px-2.5 py-1 text-[11px] font-semibold text-slate-400">
-                        {activity.metadata.status.replaceAll(
-                          "_",
-                          " ",
-                        )}
+                        {activity.metadata.status.replaceAll("_", " ")}
                       </span>
+                    )}
+
+                    {activity.metadata?.reason && (
+                      <p className="mt-2 rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2 text-xs leading-5 text-slate-500">
+                        <span className="font-semibold text-slate-400">
+                          Reason:
+                        </span>{" "}
+                        {activity.metadata.reason}
+                      </p>
                     )}
                   </div>
                 </div>

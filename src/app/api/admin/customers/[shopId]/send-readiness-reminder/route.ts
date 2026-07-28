@@ -1,3 +1,5 @@
+// /api/admin/customers/[shopId]/send-readiness-reminder/route.ts
+
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import {
