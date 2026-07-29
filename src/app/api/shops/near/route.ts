@@ -3,7 +3,9 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
-import { getShopReadiness } from "@/lib/shops/getShopReadiness";
+import authOptions from "@/lib/auth";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
+import { getServerSession } from "next-auth";
 
 type NearbyShopRequest = {
   street?: string;
@@ -23,6 +25,22 @@ function normalizeZip(value: string): string {
 export async function POST(request: Request) {
   try {
     await connectToDB();
+
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sendingShop = await Shop.findById(session.user.id)
+      .select("_id blockedFlorists");
+
+    if (!sendingShop) {
+      return NextResponse.json(
+        { error: "Sending shop not found" },
+        { status: 404 },
+      );
+    }
 
     const body = (await request.json()) as NearbyShopRequest;
 
@@ -110,10 +128,7 @@ export async function POST(request: Request) {
     const latitude = Number(geoData.results[0]?.geometry?.lat);
     const longitude = Number(geoData.results[0]?.geometry?.lng);
 
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       return NextResponse.json(
         { error: "The address returned invalid location information." },
         { status: 400 },
@@ -258,16 +273,19 @@ export async function POST(request: Request) {
     ]);
 
     /*
-     * Apply the centralized readiness policy.
+     * Apply the centralized receiving-eligibility policy.
      *
-     * This protects the search results if readiness requirements change later,
-     * without rebuilding those rules inside this API.
+     * This ensures nearby search, manual order selection, future auto-selection,
+     * and POS directory search can share the same account and relationship rules.
      */
     const shops = candidateShops
       .filter((shop) => {
-        const readiness = getShopReadiness(shop);
+        const eligibility = getShopReceivingEligibility({
+          receivingShop: shop,
+          sendingShop: sendingShop.toObject(),
+        });
 
-        return readiness.capabilities.canAppearInSearch;
+        return eligibility.eligible;
       })
       .map((shop) => ({
         _id: shop._id,

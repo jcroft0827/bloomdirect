@@ -2,7 +2,6 @@
 
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-import { unique } from "next/dist/build/utils";
 
 const shopSchema = new mongoose.Schema(
   {
@@ -394,9 +393,21 @@ const shopSchema = new mongoose.Schema(
         shopId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Shop",
+          required: true,
         },
 
-        reason: String,
+        blockedAt: {
+          type: Date,
+          default: Date.now,
+        },
+
+        reason: {
+          type: String,
+          trim: true,
+          maxlength: 500,
+        },
+
+        _id: false,
       },
     ],
 

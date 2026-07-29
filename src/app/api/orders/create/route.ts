@@ -17,6 +17,7 @@ import Notifications from "@/models/Notifications";
 import ZipDemand from "@/models/ZipDemand";
 import { getMonthlySendUsage } from "@/lib/order-send-usage";
 import { getShopReadiness } from "@/lib/shops/getShopReadiness";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -76,7 +77,8 @@ export async function POST(req: Request) {
     if (!originShopReadiness.capabilities.canSendOrders) {
       return NextResponse.json(
         {
-          error: "Complete your required account settings before sending an order.",
+          error:
+            "Complete your required account settings before sending an order.",
           code: "SHOP_NOT_READY_TO_SEND",
           requirements: originShopReadiness.requirements,
         },
@@ -88,6 +90,22 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Fulfilling shop not found" },
         { status: 404 },
+      );
+    }
+
+    const receivingEligibility = getShopReceivingEligibility({
+      receivingShop: fulfillShop.toObject(),
+      sendingShop: originShop.toObject(),
+    });
+
+    if (!receivingEligibility.eligible) {
+      return NextResponse.json(
+        {
+          error: "This florist is not currently eligible to receive orders.",
+          code: "FULFILLING_SHOP_NOT_ELIGIBLE",
+          reasons: receivingEligibility.reasons,
+        },
+        { status: 409 },
       );
     }
 
@@ -238,7 +256,7 @@ export async function POST(req: Request) {
         read: false,
         readAt: null,
       }),
-      
+
       await ZipDemand.findOneAndUpdate(
         { zip: recipient.zip },
         {
@@ -438,7 +456,8 @@ export async function POST(req: Request) {
 
     for (const result of postCreationSideEffects) {
       if (result.status === "rejected") {
-        console.error("Post-order-creation side effect failed after order was saved:",
+        console.error(
+          "Post-order-creation side effect failed after order was saved:",
           result.reason,
         );
       }

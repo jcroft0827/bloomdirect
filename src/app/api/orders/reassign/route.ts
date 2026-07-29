@@ -15,7 +15,7 @@ import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
 import Notifications from "@/models/Notifications";
-import { getShopReadiness } from "@/lib/shops/getShopReadiness";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
 
 export async function POST(req: Request) {
   try {
@@ -62,8 +62,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const newShop = await Shop.findById(newFulfillingShopId);
-    
+    const [newShop, sendingShop] = await Promise.all([
+      Shop.findById(newFulfillingShopId),
+      Shop.findById(session.user.id),
+    ]);
+
+    if (!sendingShop) {
+      return NextResponse.json(
+        { error: "Sending shop not found" },
+        { status: 404 },
+      );
+    }
+
     if (!newShop) {
       return NextResponse.json(
         { error: "Fulfilling shop not found" },
@@ -71,16 +81,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const readiness = getShopReadiness(newShop.toObject());
+    const receivingEligibility = getShopReceivingEligibility({
+      receivingShop: newShop.toObject(),
+      sendingShop: sendingShop.toObject(),
+    });
 
-    if (!readiness.capabilities.canAppearInSearch) {
+    if (!receivingEligibility.eligible) {
       return NextResponse.json(
         {
           error:
-            "The selected shop is no longer available to receive new order requests.",
-          code: "FULFILLING_SHOP_NOT_AVAILABLE",
+            "The selected florist is not currently eligible to receive orders.",
+          code: "FULFILLING_SHOP_NOT_ELIGIBLE",
+          reasons: receivingEligibility.reasons,
         },
-        { status: 400 },
+        { status: 409 },
       );
     }
 

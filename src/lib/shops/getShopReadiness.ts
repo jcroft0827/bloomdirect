@@ -1,5 +1,7 @@
 // /lib/shops/getShopReadiness.ts
 
+import { hasValidReceivingPaymentMethod } from "./getShopPaymentMethods";
+
 type ShopReadinessInput = {
   businessName?: string | null;
   email?: string | null;
@@ -97,19 +99,6 @@ function hasText(value?: string | null): boolean {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function hasConfiguredPaymentMethod(
-  paymentMethods?: ShopReadinessInput["paymentMethods"],
-): boolean {
-  if (!paymentMethods) return false;
-
-  return [
-    paymentMethods.venmoHandle,
-    paymentMethods.cashAppTag,
-    paymentMethods.zellePhoneOrEmail,
-    paymentMethods.paypalEmail,
-  ].some(hasText);
-}
-
 function hasConfiguredDelivery(
   delivery?: ShopReadinessInput["delivery"],
 ): boolean {
@@ -161,7 +150,7 @@ export function getShopReadiness(shop: ShopReadinessInput): ShopReadiness {
    * Existing shops may already contain valid payment information even if an
    * older workflow failed to save the setup flag correctly.
    */
-  const paymentConfigured = hasConfiguredPaymentMethod(shop.paymentMethods);
+  const paymentConfigured = hasValidReceivingPaymentMethod(shop.paymentMethods);
 
   /*
    * Delivery readiness must be based on real delivery coverage.

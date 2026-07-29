@@ -3,9 +3,17 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
-import FulfillmentOffering from "@/models/FulfillmentOffering";
 import moment from "moment";
 import { Types } from "mongoose";
+import authOptions from "@/lib/auth";
+import { getServerSession } from "next-auth";
+
+type LeanSendingShop = {
+  _id: Types.ObjectId;
+  blockedFlorists?: Array<{
+    shopId?: Types.ObjectId | string | null;
+  }>;
+};
 
 interface BlackoutTime {
   start: string;
@@ -52,6 +60,23 @@ export async function POST(req: Request) {
   try {
     await connectToDB();
 
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sendingShop = await Shop.findById(session.user.id)
+      .select("_id blockedFlorists")
+      .lean<LeanSendingShop>();
+
+    if (!sendingShop) {
+      return NextResponse.json(
+        { error: "Sending shop not found" },
+        { status: 404 },
+      );
+    }
+
     const {
       address,
       city,
@@ -61,13 +86,41 @@ export async function POST(req: Request) {
       delTimeOpt,
       delTimeFrom,
       delTimeTo,
-      currentShopId,
       excludedShopIds = [],
     } = await req.json();
 
+    const blockedShopIds = (sendingShop.blockedFlorists ?? []).flatMap(
+      (entry) => {
+        const shopId = entry.shopId;
+
+        if (!shopId) {
+          return [];
+        }
+
+        const normalizedShopId = shopId.toString();
+
+        if (!Types.ObjectId.isValid(normalizedShopId)) {
+          return [];
+        }
+
+        return [new Types.ObjectId(normalizedShopId)];
+      },
+    );
+
+    const validExcludedShopIds = (
+      Array.isArray(excludedShopIds) ? excludedShopIds : []
+    ).flatMap((id: unknown) => {
+      if (typeof id !== "string" || !Types.ObjectId.isValid(id)) {
+        return [];
+      }
+
+      return [new Types.ObjectId(id)];
+    });
+
     const idsToExclude = [
-      ...(currentShopId ? [new Types.ObjectId(currentShopId)] : []),
-      ...excludedShopIds.map((id: string) => new Types.ObjectId(id)),
+      new Types.ObjectId(session.user.id),
+      ...blockedShopIds,
+      ...validExcludedShopIds,
     ];
 
     // 1. Geocode Destination (OpenCage)
@@ -101,8 +154,75 @@ export async function POST(req: Request) {
       {
         $match: {
           _id: { $nin: idsToExclude },
-          isSuspended: false,
+
+          isSuspended: { $ne: true },
+          isArchived: { $ne: true },
+          isMarkedSpam: { $ne: true },
           isPublic: true,
+
+          "verification.emailVerified": true,
+
+          businessName: {
+            $type: "string",
+            $ne: "",
+          },
+
+          email: {
+            $type: "string",
+            $ne: "",
+          },
+
+          "contact.phone": {
+            $type: "string",
+            $ne: "",
+          },
+
+          "address.street": {
+            $type: "string",
+            $ne: "",
+          },
+
+          "address.city": {
+            $type: "string",
+            $ne: "",
+          },
+
+          "address.state": {
+            $type: "string",
+            $ne: "",
+          },
+
+          "address.zip": {
+            $type: "string",
+            $ne: "",
+          },
+
+          $or: [
+            {
+              "paymentMethods.venmoHandle": {
+                $type: "string",
+                $ne: "",
+              },
+            },
+            {
+              "paymentMethods.cashAppTag": {
+                $type: "string",
+                $ne: "",
+              },
+            },
+            {
+              "paymentMethods.zellePhoneOrEmail": {
+                $type: "string",
+                $ne: "",
+              },
+            },
+            {
+              "paymentMethods.paypalEmail": {
+                $type: "string",
+                $ne: "",
+              },
+            },
+          ],
           "delivery.blackoutDates": { $ne: deliveryDate.toDate() },
           "delivery.noMoreOrdersForDate": { $ne: deliveryDate.toDate() },
           ...(isToday
