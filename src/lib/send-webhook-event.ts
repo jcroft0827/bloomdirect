@@ -36,10 +36,17 @@ export async function sendWebhookEvent({
   data: any;
 }) {
   const shop = await Shop.findById(shopId).select(
-    "isPro isSuspended apiAccess.enabled",
+    "isPro isSuspended isArchived isMarkedSpam apiAccess.enabled",
   );
 
-  if (!shop || !shop.isPro || shop.isSuspended || !shop.apiAccess?.enabled) {
+  if (
+    !shop ||
+    !shop.isPro ||
+    shop.isSuspended ||
+    shop.isArchived ||
+    shop.isMarkedSpam ||
+    !shop.apiAccess?.enabled
+  ) {
     console.log(
       `Skipping POS webhook "${event}" for shop ${shopId}: POS API access is inactive`,
     );

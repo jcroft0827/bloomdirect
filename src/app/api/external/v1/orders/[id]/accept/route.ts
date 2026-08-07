@@ -13,12 +13,17 @@ import { sendOrderEvent } from "@/lib/send-order-event";
 import { ApiError } from "@/lib/api-error";
 import { checkPosApiRateLimit } from "@/lib/pos-api-rate-limit";
 import { getShopReadiness } from "@/lib/shops/getShopReadiness";
+import mongoose from "mongoose";
 
 export async function POST(req: Request, { params }: any) {
+  let authenticatedShopId = "";
+
   try {
     await connectToDB();
 
     const shop = await getShopFromApiKey(req);
+
+    authenticatedShopId = shop._id.toString();
 
     const rateLimit = checkPosApiRateLimit({
       key: `pos-accept:${shop._id.toString()}`,
@@ -40,7 +45,11 @@ export async function POST(req: Request, { params }: any) {
     }
 
     if (order.fulfillingShop.toString() !== shop._id.toString()) {
-      return apiError("UNAUTHORIZED", "Not authorized", 403);
+      return apiError(
+        "FORBIDDEN",
+        "This order is assigned to a different fulfilling shop.",
+        403,
+      );
     }
 
     const readiness = getShopReadiness(shop.toObject());
@@ -53,9 +62,10 @@ export async function POST(req: Request, { params }: any) {
       );
     }
 
-    // Idempotency
     if (
-      order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT &&
+      [OrderStatus.ACCEPTED, OrderStatus.ACCEPTED_AWAITING_PAYMENT].includes(
+        order.status,
+      ) &&
       order.acceptedAt
     ) {
       return apiSuccess({ order: mapOrderForPOS(order) });
@@ -63,11 +73,11 @@ export async function POST(req: Request, { params }: any) {
 
     await assertOrderTransition({
       order,
-      nextStatus: OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+      nextStatus: OrderStatus.ACCEPTED,
       actorShopId: shop._id,
     });
 
-    order.status = OrderStatus.ACCEPTED_AWAITING_PAYMENT;
+    order.status = OrderStatus.ACCEPTED;
     order.acceptedAt = new Date();
 
     await order.save();
@@ -107,8 +117,33 @@ export async function POST(req: Request, { params }: any) {
       return apiError(err.code, err.message, err.status);
     }
 
-    console.error("External POS order action failed:", err);
+    if (err instanceof mongoose.Error.VersionError && authenticatedShopId) {
+      try {
+        const currentOrder = await Order.findById(params.id);
 
-    return apiError("INVALID_REQUEST", "Something went wrong", 500);
+        if (
+          currentOrder &&
+          currentOrder.fulfillingShop.toString() === authenticatedShopId &&
+          [
+            OrderStatus.ACCEPTED,
+            OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+          ].includes(currentOrder.status) &&
+          currentOrder.acceptedAt
+        ) {
+          return apiSuccess({
+            order: mapOrderForPOS(currentOrder),
+          });
+        }
+      } catch (recoveryError) {
+        console.error(
+          "Failed to reconcile concurrent POS accept request:",
+          recoveryError,
+        );
+      }
+    }
+
+    console.error("External POS accept order failed:", err);
+
+    return apiError("SERVER_ERROR", "Unable to accept the order.", 500);
   }
 }

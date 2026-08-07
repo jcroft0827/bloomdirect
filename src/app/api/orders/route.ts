@@ -32,6 +32,15 @@ export async function GET(req: Request) {
         ? rawRoleFilter
         : undefined;
 
+    const rawRefundStatus = query.get("refundStatus");
+
+    const refundStatusFilter =
+      rawRefundStatus === "none" ||
+      rawRefundStatus === "partial" ||
+      rawRefundStatus === "full"
+        ? rawRefundStatus
+        : undefined;
+
     const rawDateType = query.get("dateType");
     const dateType =
       rawDateType === "Delivery Date" || rawDateType === "Order Date"
@@ -77,6 +86,21 @@ export async function GET(req: Request) {
 
     if (statusFilter.length) {
       baseFilter.status = { $in: statusFilter };
+    }
+
+    if (refundStatusFilter === "none") {
+      baseFilter.$and = [
+        ...(baseFilter.$and || []),
+        {
+          $or: [
+            { refundStatus: "none" },
+            { refundStatus: { $exists: false } },
+            { refundStatus: null },
+          ],
+        },
+      ];
+    } else if (refundStatusFilter) {
+      baseFilter.refundStatus = refundStatusFilter;
     }
 
     if (roleFilter === "originating") {

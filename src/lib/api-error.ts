@@ -23,7 +23,9 @@ export type ApiErrorCode =
   | "DECLINE_MESSAGE_TOO_LONG"
   | "RATE_LIMIT_EXCEEDED"
   | "NOT_IMPLEMENTED"
-  | "SHOP_NOT_READY_TO_ACCEPT";
+  | "SHOP_NOT_READY_TO_ACCEPT"
+  | "ACCOUNT_ARCHIVED"
+  | "ACCOUNT_RESTRICTED";
 
 
 export class ApiError extends Error {

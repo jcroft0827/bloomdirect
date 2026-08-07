@@ -7,6 +7,9 @@ export function mapOrderForDashboard(order: any) {
 
     status: order.status as OrderStatus,
 
+    refundStatus: order.refundStatus || "none",
+    totalRefundedCents: Number(order.totalRefundedCents || 0),
+
     originatingShop: String(order.originatingShop),
     originatingShopName: order.originatingShopName,
     fulfillingShop: String(order.fulfillingShop),
@@ -57,8 +60,12 @@ export function mapOrderForDashboard(order: any) {
       orderTotalCents: Number(order.pricing?.orderTotalCents || 0),
       originatingShopFeeType: order.pricing?.originatingShopFeeType,
       originatingShopFeeValue: order.pricing?.originatingShopFeeValue,
-      originatingShopKeepsCents: Number(order.pricing?.originatingShopKeepsCents || 0),
-      fulfillingShopGetsCents: Number(order.pricing?.fulfillingShopGetsCents || 0),
+      originatingShopKeepsCents: Number(
+        order.pricing?.originatingShopKeepsCents || 0,
+      ),
+      fulfillingShopGetsCents: Number(
+        order.pricing?.fulfillingShopGetsCents || 0,
+      ),
     },
 
     paymentMethods: {

@@ -15,7 +15,7 @@ import { assertOrderTransition } from "@/lib/order-transition-guard";
 import { ApiError } from "@/lib/api-error";
 import { sendOrderEvent } from "@/lib/send-order-event";
 import Notifications from "@/models/Notifications";
-import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility";
 
 export async function POST(req: Request) {
   try {

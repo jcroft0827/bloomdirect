@@ -31,17 +31,23 @@ interface SalesTaxSummary {
   grossOrderTotalCents: number;
 }
 
+interface RefundSummary {
+  totalRefundedCents: number;
+  refundedOrders: number;
+  partiallyRefundedOrders: number;
+  fullyRefundedOrders: number;
+  netSentOrderValueCents: number;
+}
+
 interface ReportResponse {
   filters: {
     startDate: string | null;
     endDate: string | null;
   };
-
   summary: ReportSummary;
-
   fulfillmentTypes: FulfillmentTypes;
-
   salesTax: SalesTaxSummary;
+  refunds: RefundSummary;
 }
 
 function formatLocalDate(date: Date) {
@@ -56,17 +62,9 @@ function getPresetDates(preset: ReportPreset) {
   const now = new Date();
 
   if (preset === "month") {
-    const start = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1,
-    );
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const end = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      0,
-    );
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     return {
       startDate: formatLocalDate(start),
@@ -75,17 +73,9 @@ function getPresetDates(preset: ReportPreset) {
   }
 
   if (preset === "year") {
-    const start = new Date(
-      now.getFullYear(),
-      0,
-      1,
-    );
+    const start = new Date(now.getFullYear(), 0, 1);
 
-    const end = new Date(
-      now.getFullYear(),
-      11,
-      31,
-    );
+    const end = new Date(now.getFullYear(), 11, 31);
 
     return {
       startDate: formatLocalDate(start),
@@ -110,31 +100,23 @@ function getPresetLabel(preset: ReportPreset) {
 export default function ReportsClient() {
   const initialDates = getPresetDates("month");
 
-  const [preset, setPreset] =
-    useState<ReportPreset>("month");
+  const [preset, setPreset] = useState<ReportPreset>("month");
 
-  const [startDate, setStartDate] = useState(
+  const [startDate, setStartDate] = useState(initialDates.startDate);
+
+  const [endDate, setEndDate] = useState(initialDates.endDate);
+
+  const [appliedStartDate, setAppliedStartDate] = useState(
     initialDates.startDate,
   );
 
-  const [endDate, setEndDate] = useState(
-    initialDates.endDate,
-  );
+  const [appliedEndDate, setAppliedEndDate] = useState(initialDates.endDate);
 
-  const [appliedStartDate, setAppliedStartDate] =
-    useState(initialDates.startDate);
-
-  const [appliedEndDate, setAppliedEndDate] =
-    useState(initialDates.endDate);
-
-  const [report, setReport] =
-    useState<ReportResponse | null>(null);
+  const [report, setReport] = useState<ReportResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
 
-  const loadReport = async (
-    signal?: AbortSignal,
-  ) => {
+  const loadReport = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
 
@@ -151,9 +133,7 @@ export default function ReportsClient() {
       const queryString = params.toString();
 
       const res = await fetch(
-        `/api/reports/summary${
-          queryString ? `?${queryString}` : ""
-        }`,
+        `/api/reports/summary${queryString ? `?${queryString}` : ""}`,
         {
           signal,
         },
@@ -162,9 +142,7 @@ export default function ReportsClient() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(
-          data.error || "Unable to load reporting data.",
-        );
+        throw new Error(data.error || "Unable to load reporting data.");
       }
 
       setReport(data);
@@ -173,15 +151,9 @@ export default function ReportsClient() {
         return;
       }
 
-      console.error(
-        "Failed to load reporting data:",
-        error,
-      );
+      console.error("Failed to load reporting data:", error);
 
-      toast.error(
-        error?.message ||
-          "Unable to load Bloom Pro reporting.",
-      );
+      toast.error(error?.message || "Unable to load Bloom Pro reporting.");
     } finally {
       if (!signal?.aborted) {
         setLoading(false);
@@ -215,24 +187,16 @@ export default function ReportsClient() {
 
   const applyCustomRange = () => {
     if (!startDate || !endDate) {
-      toast.error(
-        "Choose both a start date and end date.",
-      );
+      toast.error("Choose both a start date and end date.");
       return;
     }
 
-    const start = new Date(
-      `${startDate}T00:00:00`,
-    );
+    const start = new Date(`${startDate}T00:00:00`);
 
-    const end = new Date(
-      `${endDate}T23:59:59`,
-    );
+    const end = new Date(`${endDate}T23:59:59`);
 
     if (start > end) {
-      toast.error(
-        "The start date must be before the end date.",
-      );
+      toast.error("The start date must be before the end date.");
       return;
     }
 
@@ -242,28 +206,22 @@ export default function ReportsClient() {
   };
 
   const summary = report?.summary;
+  const refunds = report?.refunds;
   const fulfillmentTypes = report?.fulfillmentTypes;
   const salesTax = report?.salesTax;
 
   const totalSentOrders =
-    (fulfillmentTypes?.network ?? 0) +
-    (fulfillmentTypes?.outsideNetwork ?? 0);
+    (fulfillmentTypes?.network ?? 0) + (fulfillmentTypes?.outsideNetwork ?? 0);
 
   const networkPercentage =
     totalSentOrders > 0
-      ? Math.round(
-          ((fulfillmentTypes?.network ?? 0) /
-            totalSentOrders) *
-            100,
-        )
+      ? Math.round(((fulfillmentTypes?.network ?? 0) / totalSentOrders) * 100)
       : 0;
 
   const outsideNetworkPercentage =
     totalSentOrders > 0
       ? Math.round(
-          ((fulfillmentTypes?.outsideNetwork ?? 0) /
-            totalSentOrders) *
-            100,
+          ((fulfillmentTypes?.outsideNetwork ?? 0) / totalSentOrders) * 100,
         )
       : 0;
 
@@ -282,8 +240,9 @@ export default function ReportsClient() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-slate-600">
-              Review order activity, fulfillment value,
-              outside-network usage, and sales-tax totals.
+              Review order activity, refund adjustments, net order value,
+              fulfillment performance, outside-network usage, and sales-tax
+              totals.
             </p>
           </div>
 
@@ -320,9 +279,7 @@ export default function ReportsClient() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() =>
-                    applyPreset(option.value)
-                  }
+                  onClick={() => applyPreset(option.value)}
                   className={[
                     "rounded-xl px-4 py-2 text-sm font-bold transition-colors",
                     preset === option.value
@@ -345,9 +302,7 @@ export default function ReportsClient() {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(event) =>
-                      setStartDate(event.target.value)
-                    }
+                    onChange={(event) => setStartDate(event.target.value)}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
                   />
                 </label>
@@ -360,9 +315,7 @@ export default function ReportsClient() {
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(event) =>
-                      setEndDate(event.target.value)
-                    }
+                    onChange={(event) => setEndDate(event.target.value)}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
                   />
                 </label>
@@ -387,13 +340,8 @@ export default function ReportsClient() {
 
           {appliedStartDate && appliedEndDate && (
             <p className="text-sm font-medium text-slate-500">
-              {new Date(
-                `${appliedStartDate}T00:00:00`,
-              ).toLocaleDateString()}{" "}
-              –{" "}
-              {new Date(
-                `${appliedEndDate}T00:00:00`,
-              ).toLocaleDateString()}
+              {new Date(`${appliedStartDate}T00:00:00`).toLocaleDateString()} –{" "}
+              {new Date(`${appliedEndDate}T00:00:00`).toLocaleDateString()}
             </p>
           )}
         </div>
@@ -420,25 +368,20 @@ export default function ReportsClient() {
                 </h2>
 
                 <p className="text-sm text-slate-500">
-                  Sent and received activity for the selected
-                  period.
+                  Sent and received activity for the selected period.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5">
                 <MetricCard
                   label="Orders Sent"
-                  value={String(
-                    summary?.ordersSent ?? 0,
-                  )}
+                  value={String(summary?.ordersSent ?? 0)}
                   description="Network and outside-network orders created."
                 />
 
                 <MetricCard
                   label="Orders Received"
-                  value={String(
-                    summary?.ordersReceived ?? 0,
-                  )}
+                  value={String(summary?.ordersReceived ?? 0)}
                   description="Network orders received for fulfillment."
                 />
 
@@ -451,10 +394,17 @@ export default function ReportsClient() {
                 />
 
                 <MetricCard
+                  label="Net Sent Order Value"
+                  value={formatCurrencyFromCents(
+                    refunds?.netSentOrderValueCents ?? 0,
+                  )}
+                  description="Sent order value after active refunds recorded in this period."
+                />
+
+                <MetricCard
                   label="Fulfillment Value"
                   value={formatCurrencyFromCents(
-                    summary?.fulfillmentValueCents ??
-                      0,
+                    summary?.fulfillmentValueCents ?? 0,
                   )}
                   description="Expected payout from received orders."
                 />
@@ -477,9 +427,7 @@ export default function ReportsClient() {
                 <MetricCard
                   label="Average Sent Order"
                   value={formatCurrencyFromCents(
-                    summary
-                      ?.averageSentOrderValueCents ??
-                      0,
+                    summary?.averageSentOrderValueCents ?? 0,
                   )}
                   description="Average customer-facing value per sent order."
                 />
@@ -487,12 +435,82 @@ export default function ReportsClient() {
                 <MetricCard
                   label="Average Fulfillment Order"
                   value={formatCurrencyFromCents(
-                    summary
-                      ?.averageFulfillmentOrderCents ??
-                      0,
+                    summary?.averageFulfillmentOrderCents ?? 0,
                   )}
                   description="Average expected payout per received order."
                 />
+              </div>
+            </section>
+
+            {/* Refund Summary */}
+            <section className="rounded-3xl border border-red-200 bg-white p-6 shadow-xl md:p-8">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-widest text-red-600">
+                    Financial Adjustments
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-black text-slate-900">
+                    Refund Summary
+                  </h2>
+
+                  <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                    Refund amounts are reported using the date the refund
+                    occurred, not the date the original order was created.
+                  </p>
+                </div>
+
+                {(refunds?.totalRefundedCents ?? 0) > 0 && (
+                  <span className="w-fit rounded-full bg-red-100 px-3 py-1 text-sm font-black text-red-700">
+                    Refund activity recorded
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <RefundMetric
+                  label="Refund Total"
+                  value={`-${formatCurrencyFromCents(
+                    refunds?.totalRefundedCents ?? 0,
+                  )}`}
+                  description="Total active refund value recorded during this period."
+                  emphasized
+                />
+
+                <RefundMetric
+                  label="Refunded Orders"
+                  value={String(refunds?.refundedOrders ?? 0)}
+                  description="Orders with at least one active refund in this period."
+                />
+
+                <RefundMetric
+                  label="Partially Refunded"
+                  value={String(refunds?.partiallyRefundedOrders ?? 0)}
+                  description="Orders currently carrying a partial refund status."
+                />
+
+                <RefundMetric
+                  label="Fully Refunded"
+                  value={String(refunds?.fullyRefundedOrders ?? 0)}
+                  description="Orders currently carrying a full refund status."
+                />
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                <p className="text-sm font-bold uppercase tracking-wider text-emerald-700">
+                  Net Sent Order Value
+                </p>
+
+                <p className="mt-2 text-3xl font-black text-slate-900">
+                  {formatCurrencyFromCents(
+                    refunds?.netSentOrderValueCents ?? 0,
+                  )}
+                </p>
+
+                <p className="mt-2 text-sm text-emerald-800">
+                  Gross sent order value minus active refunds recorded during
+                  the selected report period.
+                </p>
               </div>
             </section>
 
@@ -504,28 +522,22 @@ export default function ReportsClient() {
                 </h2>
 
                 <p className="text-sm text-slate-500">
-                  Compare orders sent through the
-                  GetBloomDirect network with outside-network
-                  orders.
+                  Compare orders sent through the GetBloomDirect network with
+                  outside-network orders.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <BreakdownCard
                   label="In-Network Orders"
-                  count={
-                    fulfillmentTypes?.network ?? 0
-                  }
+                  count={fulfillmentTypes?.network ?? 0}
                   percentage={networkPercentage}
                   badgeClass="bg-emerald-100 text-emerald-700"
                 />
 
                 <BreakdownCard
                   label="Outside-Network Orders"
-                  count={
-                    fulfillmentTypes?.outsideNetwork ??
-                    0
-                  }
+                  count={fulfillmentTypes?.outsideNetwork ?? 0}
                   percentage={outsideNetworkPercentage}
                   badgeClass="bg-amber-100 text-amber-700"
                 />
@@ -540,62 +552,41 @@ export default function ReportsClient() {
                 </h2>
 
                 <p className="text-sm text-slate-500">
-                  Calculated from orders originated by your
-                  shop. Verify figures with your accounting
-                  records before filing.
+                  Calculated from orders originated by your shop. Verify figures
+                  with your accounting records before filing.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <TaxMetric
                   label="Taxable Product Subtotal"
-                  value={
-                    salesTax
-                      ?.taxableProductSubtotalCents ??
-                    0
-                  }
+                  value={salesTax?.taxableProductSubtotalCents ?? 0}
                 />
 
                 <TaxMetric
                   label="Non-Taxable Product Subtotal"
-                  value={
-                    salesTax
-                      ?.nonTaxableProductSubtotalCents ??
-                    0
-                  }
+                  value={salesTax?.nonTaxableProductSubtotalCents ?? 0}
                 />
 
                 <TaxMetric
                   label="Taxable Delivery Fees"
-                  value={
-                    salesTax
-                      ?.taxableDeliveryFeesCents ?? 0
-                  }
+                  value={salesTax?.taxableDeliveryFeesCents ?? 0}
                 />
 
                 <TaxMetric
                   label="Non-Taxable Delivery Fees"
-                  value={
-                    salesTax
-                      ?.nonTaxableDeliveryFeesCents ??
-                    0
-                  }
+                  value={salesTax?.nonTaxableDeliveryFeesCents ?? 0}
                 />
 
                 <TaxMetric
                   label="Tax Collected"
-                  value={
-                    salesTax?.taxCollectedCents ?? 0
-                  }
+                  value={salesTax?.taxCollectedCents ?? 0}
                   emphasized
                 />
 
                 <TaxMetric
                   label="Gross Order Total"
-                  value={
-                    salesTax?.grossOrderTotalCents ??
-                    0
-                  }
+                  value={salesTax?.grossOrderTotalCents ?? 0}
                   emphasized
                 />
               </div>
@@ -663,13 +654,9 @@ function BreakdownCard({
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-bold text-slate-800">
-            {label}
-          </p>
+          <p className="font-bold text-slate-800">{label}</p>
 
-          <p className="mt-2 text-4xl font-black text-slate-900">
-            {count}
-          </p>
+          <p className="mt-2 text-4xl font-black text-slate-900">{count}</p>
         </div>
 
         <span
@@ -683,10 +670,7 @@ function BreakdownCard({
         <div
           className="h-full rounded-full bg-purple-600 transition-all"
           style={{
-            width: `${Math.min(
-              Math.max(percentage, 0),
-              100,
-            )}%`,
+            width: `${Math.min(Math.max(percentage, 0), 100)}%`,
           }}
         />
       </div>
@@ -715,9 +699,7 @@ function TaxMetric({
       <p
         className={[
           "text-sm font-bold",
-          emphasized
-            ? "text-emerald-700"
-            : "text-slate-600",
+          emphasized ? "text-emerald-700" : "text-slate-600",
         ].join(" ")}
       >
         {label}
@@ -726,6 +708,49 @@ function TaxMetric({
       <p className="mt-2 text-2xl font-black text-slate-900">
         {formatCurrencyFromCents(value)}
       </p>
+    </div>
+  );
+}
+
+function RefundMetric({
+  label,
+  value,
+  description,
+  emphasized = false,
+}: {
+  label: string;
+  value: string;
+  description: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-2xl border p-5",
+        emphasized
+          ? "border-red-200 bg-red-50"
+          : "border-slate-200 bg-slate-50",
+      ].join(" ")}
+    >
+      <p
+        className={[
+          "text-sm font-bold uppercase tracking-wide",
+          emphasized ? "text-red-700" : "text-slate-600",
+        ].join(" ")}
+      >
+        {label}
+      </p>
+
+      <p
+        className={[
+          "mt-2 text-3xl font-black",
+          emphasized ? "text-red-700" : "text-slate-900",
+        ].join(" ")}
+      >
+        {value}
+      </p>
+
+      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
     </div>
   );
 }

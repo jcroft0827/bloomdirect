@@ -14,30 +14,12 @@ function getPeriodStart(period: ReportPeriod) {
 
   if (period === "month") {
     return new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        1,
-        0,
-        0,
-        0,
-        0,
-      ),
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
     );
   }
 
   if (period === "year") {
-    return new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-      ),
-    );
+    return new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
   }
 
   return null;
@@ -50,20 +32,15 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const shop = await Shop.findById(session.user.id)
-      .select("_id isPro isSuspended");
+    const shop = await Shop.findById(session.user.id).select(
+      "_id isPro isSuspended",
+    );
 
     if (!shop) {
-      return NextResponse.json(
-        { error: "Shop not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
     }
 
     if (shop.isSuspended) {
@@ -87,9 +64,7 @@ export async function GET(req: Request) {
     const rawPeriod = searchParams.get("period");
 
     const period: ReportPeriod =
-      rawPeriod === "year" || rawPeriod === "all"
-        ? rawPeriod
-        : "month";
+      rawPeriod === "year" || rawPeriod === "all" ? rawPeriod : "month";
 
     const periodStart = getPeriodStart(period);
 
@@ -103,6 +78,7 @@ export async function GET(req: Request) {
       // Count orders that became real fulfillment business.
       status: {
         $in: [
+          OrderStatus.ACCEPTED,
           OrderStatus.ACCEPTED_AWAITING_PAYMENT,
           OrderStatus.PAID_AWAITING_FULFILLMENT,
           OrderStatus.COMPLETED,
@@ -134,14 +110,11 @@ export async function GET(req: Request) {
     ]);
 
     const ordersReceived = result[0]?.ordersReceived ?? 0;
-    const fulfillmentValueCents =
-      result[0]?.fulfillmentValueCents ?? 0;
+    const fulfillmentValueCents = result[0]?.fulfillmentValueCents ?? 0;
 
     const averageFulfillmentOrderCents =
       ordersReceived > 0
-        ? Math.round(
-            fulfillmentValueCents / ordersReceived,
-          )
+        ? Math.round(fulfillmentValueCents / ordersReceived)
         : 0;
 
     return NextResponse.json({
@@ -153,10 +126,7 @@ export async function GET(req: Request) {
       },
     });
   } catch (error) {
-    console.error(
-      "DASHBOARD REPORT SUMMARY ERROR:",
-      error,
-    );
+    console.error("DASHBOARD REPORT SUMMARY ERROR:", error);
 
     return NextResponse.json(
       {

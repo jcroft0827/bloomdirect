@@ -12,6 +12,7 @@ import {
   Menu,
   Send,
   X,
+  Map,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -58,6 +59,11 @@ const navigationItems = [
     name: "Billing",
     href: "/admin/billing",
     icon: CircleDollarSign,
+  },
+  {
+    name: "Admin Roadmap",
+    href: "/admin/roadmap",
+    icon: Map,
   },
 ];
 
@@ -119,11 +125,7 @@ export default function AdminNavigation({
           fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r
           border-white/10 bg-slate-950 transition-transform duration-200
           lg:translate-x-0
-          ${
-            mobileMenuOpen
-              ? "translate-x-0"
-              : "-translate-x-full"
-          }
+          ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
         <div className="flex h-20 items-center border-b border-white/10 px-6">

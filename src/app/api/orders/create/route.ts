@@ -17,7 +17,7 @@ import Notifications from "@/models/Notifications";
 import ZipDemand from "@/models/ZipDemand";
 import { getMonthlySendUsage } from "@/lib/order-send-usage";
 import { getShopReadiness } from "@/lib/shops/getShopReadiness";
-import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility";
 
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");

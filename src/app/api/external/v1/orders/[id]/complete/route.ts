@@ -11,12 +11,17 @@ import { sendOrderEvent } from "@/lib/send-order-event";
 import Order from "@/models/Order";
 import { ApiError } from "@/lib/api-error";
 import { checkPosApiRateLimit } from "@/lib/pos-api-rate-limit";
+import mongoose from "mongoose";
 
 export async function POST(req: Request, { params }: any) {
+  let authenticatedShopId = "";
+
   try {
     await connectToDB();
 
     const shop = await getShopFromApiKey(req);
+
+    authenticatedShopId = shop._id.toString();
 
     const rateLimit = checkPosApiRateLimit({
       key: `pos-complete:${shop._id.toString()}`,
@@ -38,7 +43,11 @@ export async function POST(req: Request, { params }: any) {
     }
 
     if (order.fulfillingShop.toString() !== shop._id.toString()) {
-      return apiError("UNAUTHORIZED", "Not authorized", 403);
+      return apiError(
+        "FORBIDDEN",
+        "This order is assigned to a different fulfilling shop.",
+        403,
+      );
     }
 
     if (order.completedAt) {
@@ -64,7 +73,7 @@ export async function POST(req: Request, { params }: any) {
         message: "Order marked as completed via POS API",
       }),
       sendOrderEvent({
-        event: "order.declined",
+        event: "order.completed",
         order,
         actorShopId: shop._id,
       }),
@@ -91,8 +100,30 @@ export async function POST(req: Request, { params }: any) {
       return apiError(err.code, err.message, err.status);
     }
 
-    console.error("External POS order action failed:", err);
+    if (err instanceof mongoose.Error.VersionError && authenticatedShopId) {
+      try {
+        const currentOrder = await Order.findById(params.id);
 
-    return apiError("INVALID_REQUEST", "Something went wrong", 500);
+        if (
+          currentOrder &&
+          currentOrder.fulfillingShop.toString() === authenticatedShopId &&
+          currentOrder.status === OrderStatus.COMPLETED &&
+          currentOrder.completedAt
+        ) {
+          return apiSuccess({
+            order: mapOrderForPOS(currentOrder),
+          });
+        }
+      } catch (recoveryError) {
+        console.error(
+          "Failed to reconcile concurrent POS complete request:",
+          recoveryError,
+        );
+      }
+    }
+
+    console.error("External POS complete order failed:", err);
+
+    return apiError("SERVER_ERROR", "Unable to complete the order.", 500);
   }
 }

@@ -4,10 +4,6 @@ import { OrderStatus } from "@/lib/order-status";
 import type { Types } from "mongoose";
 import { ApiError } from "./api-error";
 
-/**
- * Minimal shape required for transition validation
- * (no need to import full Mongoose document type)
- */
 type GuardOrder = {
   status: OrderStatus;
   originatingShop: Types.ObjectId | string;
@@ -22,21 +18,21 @@ type GuardParams = {
 
 const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   [OrderStatus.PENDING_ACCEPTANCE]: [
+    OrderStatus.ACCEPTED,
     OrderStatus.ACCEPTED_AWAITING_PAYMENT,
     OrderStatus.DECLINED,
   ],
 
+  [OrderStatus.ACCEPTED]: [OrderStatus.COMPLETED],
+
   [OrderStatus.ACCEPTED_AWAITING_PAYMENT]: [
     OrderStatus.PAID_AWAITING_FULFILLMENT,
-  ],
-
-  [OrderStatus.PAID_AWAITING_FULFILLMENT]: [
     OrderStatus.COMPLETED,
   ],
 
-  [OrderStatus.DECLINED]: [
-    OrderStatus.PENDING_ACCEPTANCE, // via reassignment
-  ],
+  [OrderStatus.PAID_AWAITING_FULFILLMENT]: [OrderStatus.COMPLETED],
+
+  [OrderStatus.DECLINED]: [OrderStatus.PENDING_ACCEPTANCE],
 
   [OrderStatus.COMPLETED]: [],
 
@@ -49,49 +45,43 @@ export function assertOrderTransition({
   actorShopId,
 }: GuardParams) {
   const currentStatus = order.status;
-
   const allowedNext = TRANSITIONS[currentStatus];
-
-  if (
-    nextStatus === OrderStatus.COMPLETED &&
-    currentStatus === OrderStatus.ACCEPTED_AWAITING_PAYMENT
-  ) {
-    throw new ApiError(
-      "ORDER_NOT_PAID",
-      "This order must be marked paid before it can be completed.",
-    );
-  }
 
   if (!allowedNext.includes(nextStatus)) {
     throw new ApiError(
-        "INVALID_TRANSITION",
-        `Illegal order transition: ${currentStatus} → ${nextStatus}`
+      "INVALID_TRANSITION",
+      `Illegal order transition: ${currentStatus} → ${nextStatus}`,
+      409,
     );
   }
 
-  // Fulfillment-side actions
+  const fulfillingActions: OrderStatus[] = [
+    OrderStatus.ACCEPTED,
+    OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+    OrderStatus.DECLINED,
+    OrderStatus.COMPLETED,
+  ];
+
   if (
-    [
-      OrderStatus.ACCEPTED_AWAITING_PAYMENT,
-      OrderStatus.DECLINED,
-      OrderStatus.COMPLETED,
-    ].includes(nextStatus) &&
+    fulfillingActions.includes(nextStatus) &&
     order.fulfillingShop.toString() !== actorShopId.toString()
   ) {
     throw new ApiError(
-        "INVALID_TRANSITION",
-        "Only fulfilling shop can perform this action."
+      "INVALID_TRANSITION",
+      "Only the fulfilling shop can perform this action.",
+      409,
     );
   }
 
-  // Originating shop payment action
+  // Legacy payment transition support.
   if (
     nextStatus === OrderStatus.PAID_AWAITING_FULFILLMENT &&
     order.originatingShop.toString() !== actorShopId.toString()
   ) {
     throw new ApiError(
-        "INVALID_TRANSITION",
-        "Only originating shop can mark payment."
+      "INVALID_TRANSITION",
+      "Only the originating shop can record payment.",
+      409,
     );
   }
 }

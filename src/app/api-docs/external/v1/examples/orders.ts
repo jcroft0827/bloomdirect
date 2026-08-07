@@ -1,5 +1,6 @@
-// /app/api-docs/external/v1/examples/orders
-export const getOrdersRequest = `curl -X GET "https://api.getbloomdirect.com/v1/orders?since=2026-07-15T12:00:00.000Z&limit=100" \\
+// src/app/api-docs/external/v1/examples/orders.ts
+
+export const getOrdersRequest = `curl -X GET "https://www.getbloomdirect.com/api/external/v1/orders?since=2026-08-05T12:00:00.000Z&limit=100" \\
   -H "x-api-key: YOUR_API_KEY"`;
 
 export const getOrdersResponse = `{
@@ -7,11 +8,13 @@ export const getOrdersResponse = `{
   "data": {
     "orders": [
       {
-        "id": "ord_123",
+        "id": "68935f106a9e3d72b872a101",
         "orderNumber": "1001",
         "status": "PENDING_ACCEPTANCE",
-        "paid": false,
-        "paidAt": null,
+        "decline": {
+          "reason": "",
+          "message": ""
+        },
         "recipient": {
           "fullName": "Jane Doe",
           "address": "123 Main St",
@@ -31,7 +34,6 @@ export const getOrdersResponse = `{
         },
         "products": [
           {
-            "id": "prod_1",
             "name": "Red Roses",
             "description": "Dozen premium roses",
             "photo": "https://cdn.getbloomdirect.com/products/roses.jpg",
@@ -44,46 +46,51 @@ export const getOrdersResponse = `{
           "currency": "USD",
           "productsSubtotal": 59.99,
           "deliveryFee": 10,
+          "originatingFee": 0,
           "tax": 4.8,
-          "total": 74.79
+          "orderTotal": 74.79,
+          "fulfillmentAmount": 69.99
         },
         "delivery": {
-          "date": "2026-04-20T00:00:00.000Z",
+          "date": "2026-08-08T00:00:00.000Z",
           "window": {
-            "type": "window",
+            "type": "specific",
             "from": "09:00",
             "to": "13:00"
           },
           "instructions": "Leave at front desk"
         },
+        "paidAt": null,
         "timestamps": {
-          "created": "2026-04-15T12:00:00.000Z",
+          "created": "2026-08-05T12:05:00.000Z",
           "accepted": null,
           "declined": null,
           "completed": null,
-          "updated": "2026-04-15T12:00:00.000Z"
+          "updated": "2026-08-05T12:05:00.000Z"
         }
       }
     ]
   },
   "meta": {
-    "timestamp": "2026-04-16T12:00:00.000Z",
+    "timestamp": "2026-08-06T13:30:00.000Z",
     "version": "1.0"
   }
 }`;
 
-export const acceptOrderRequest = `curl -X POST https://api.getbloomdirect.com/v1/orders/ord_123/accept \\
+export const acceptOrderRequest = `curl -X POST "https://www.getbloomdirect.com/api/external/v1/orders/68935f106a9e3d72b872a101/accept" \\
   -H "x-api-key: YOUR_API_KEY"`;
 
 export const acceptOrderResponse = `{
   "success": true,
   "data": {
     "order": {
-      "id": "ord_123",
+      "id": "68935f106a9e3d72b872a101",
       "orderNumber": "1001",
-      "status": "ACCEPTED_AWAITING_PAYMENT",
-      "paid": false,
-      "paidAt": null,
+      "status": "ACCEPTED",
+      "decline": {
+        "reason": "",
+        "message": ""
+      },
       "recipient": {
         "fullName": "Jane Doe",
         "address": "123 Main St",
@@ -103,7 +110,6 @@ export const acceptOrderResponse = `{
       },
       "products": [
         {
-          "id": "prod_1",
           "name": "Red Roses",
           "description": "Dozen premium roses",
           "photo": "https://cdn.getbloomdirect.com/products/roses.jpg",
@@ -116,34 +122,37 @@ export const acceptOrderResponse = `{
         "currency": "USD",
         "productsSubtotal": 59.99,
         "deliveryFee": 10,
+        "originatingFee": 0,
         "tax": 4.8,
-        "total": 74.79
+        "orderTotal": 74.79,
+        "fulfillmentAmount": 69.99
       },
       "delivery": {
-        "date": "2026-04-20T00:00:00.000Z",
+        "date": "2026-08-08T00:00:00.000Z",
         "window": {
-          "type": "window",
+          "type": "specific",
           "from": "09:00",
           "to": "13:00"
         },
         "instructions": "Leave at front desk"
       },
+      "paidAt": null,
       "timestamps": {
-        "created": "2026-04-15T12:00:00.000Z",
-        "accepted": "2026-04-15T14:12:00.000Z",
+        "created": "2026-08-05T12:05:00.000Z",
+        "accepted": "2026-08-05T14:12:00.000Z",
         "declined": null,
         "completed": null,
-        "updated": "2026-04-15T14:12:00.000Z"
+        "updated": "2026-08-05T14:12:00.000Z"
       }
     }
   },
   "meta": {
-    "timestamp": "2026-04-16T12:00:00.000Z",
+    "timestamp": "2026-08-05T14:12:00.000Z",
     "version": "1.0"
   }
 }`;
 
-export const declineOrderRequest = `curl -X POST https://api.getbloomdirect.com/v1/orders/ord_123/decline \\
+export const declineOrderRequest = `curl -X POST "https://www.getbloomdirect.com/api/external/v1/orders/68935f106a9e3d72b872a101/decline" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -155,11 +164,13 @@ export const declineOrderResponse = `{
   "success": true,
   "data": {
     "order": {
-      "id": "ord_123",
+      "id": "68935f106a9e3d72b872a101",
       "orderNumber": "1001",
       "status": "DECLINED",
-      "paid": false,
-      "paidAt": null,
+      "decline": {
+        "reason": "OTHER",
+        "message": "We are closing early today"
+      },
       "recipient": {
         "fullName": "Jane Doe",
         "address": "123 Main St",
@@ -179,7 +190,6 @@ export const declineOrderResponse = `{
       },
       "products": [
         {
-          "id": "prod_1",
           "name": "Red Roses",
           "description": "Dozen premium roses",
           "photo": "https://cdn.getbloomdirect.com/products/roses.jpg",
@@ -192,45 +202,50 @@ export const declineOrderResponse = `{
         "currency": "USD",
         "productsSubtotal": 59.99,
         "deliveryFee": 10,
+        "originatingFee": 0,
         "tax": 4.8,
-        "total": 74.79
+        "orderTotal": 74.79,
+        "fulfillmentAmount": 69.99
       },
       "delivery": {
-        "date": "2026-04-20T00:00:00.000Z",
+        "date": "2026-08-08T00:00:00.000Z",
         "window": {
-          "type": "window",
+          "type": "specific",
           "from": "09:00",
           "to": "13:00"
         },
         "instructions": "Leave at front desk"
       },
+      "paidAt": null,
       "timestamps": {
-        "created": "2026-04-15T12:00:00.000Z",
+        "created": "2026-08-05T12:05:00.000Z",
         "accepted": null,
-        "declined": "2026-04-15T14:15:00.000Z",
+        "declined": "2026-08-05T14:15:00.000Z",
         "completed": null,
-        "updated": "2026-04-15T14:15:00.000Z"
+        "updated": "2026-08-05T14:15:00.000Z"
       }
     }
   },
   "meta": {
-    "timestamp": "2026-04-16T12:00:00.000Z",
+    "timestamp": "2026-08-05T14:15:00.000Z",
     "version": "1.0"
   }
 }`;
 
-export const completeOrderRequest = `curl -X POST https://api.getbloomdirect.com/v1/orders/ord_123/complete \\
+export const completeOrderRequest = `curl -X POST "https://www.getbloomdirect.com/api/external/v1/orders/68935f106a9e3d72b872a101/complete" \\
   -H "x-api-key: YOUR_API_KEY"`;
 
 export const completeOrderResponse = `{
   "success": true,
   "data": {
     "order": {
-      "id": "ord_123",
+      "id": "68935f106a9e3d72b872a101",
       "orderNumber": "1001",
       "status": "COMPLETED",
-      "paid": true,
-      "paidAt": "2026-04-15T14:30:00.000Z",
+      "decline": {
+        "reason": "",
+        "message": ""
+      },
       "recipient": {
         "fullName": "Jane Doe",
         "address": "123 Main St",
@@ -250,7 +265,6 @@ export const completeOrderResponse = `{
       },
       "products": [
         {
-          "id": "prod_1",
           "name": "Red Roses",
           "description": "Dozen premium roses",
           "photo": "https://cdn.getbloomdirect.com/products/roses.jpg",
@@ -263,29 +277,32 @@ export const completeOrderResponse = `{
         "currency": "USD",
         "productsSubtotal": 59.99,
         "deliveryFee": 10,
+        "originatingFee": 0,
         "tax": 4.8,
-        "total": 74.79
+        "orderTotal": 74.79,
+        "fulfillmentAmount": 69.99
       },
       "delivery": {
-        "date": "2026-04-20T00:00:00.000Z",
+        "date": "2026-08-08T00:00:00.000Z",
         "window": {
-          "type": "window",
+          "type": "specific",
           "from": "09:00",
           "to": "13:00"
         },
         "instructions": "Leave at front desk"
       },
+      "paidAt": null,
       "timestamps": {
-        "created": "2026-04-15T12:00:00.000Z",
-        "accepted": "2026-04-15T14:12:00.000Z",
+        "created": "2026-08-05T12:05:00.000Z",
+        "accepted": "2026-08-05T14:12:00.000Z",
         "declined": null,
-        "completed": "2026-04-15T15:00:00.000Z",
-        "updated": "2026-04-15T15:00:00.000Z"
+        "completed": "2026-08-08T15:00:00.000Z",
+        "updated": "2026-08-08T15:00:00.000Z"
       }
     }
   },
   "meta": {
-    "timestamp": "2026-04-16T12:00:00.000Z",
+    "timestamp": "2026-08-08T15:00:00.000Z",
     "version": "1.0"
   }
 }`;

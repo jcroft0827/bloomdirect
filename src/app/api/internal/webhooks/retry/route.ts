@@ -85,13 +85,15 @@ export async function GET(req: Request) {
 
     try {
       const shop = await Shop.findById(claimedLog.shopId).select(
-        "isPro isSuspended apiAccess.enabled",
+        "isPro isSuspended isArchived isMarkedSpam apiAccess.enabled",
       );
 
       if (
         !shop ||
         !shop.isPro ||
         shop.isSuspended ||
+        shop.isArchived ||
+        shop.isMarkedSpam ||
         !shop.apiAccess?.enabled
       ) {
         claimedLog.status = "failed";

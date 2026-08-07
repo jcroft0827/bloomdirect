@@ -257,6 +257,103 @@ const reviewSchema = new Schema(
   { _id: true },
 );
 
+const refundSchema = new Schema(
+  {
+    amountCents: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: moneyValidator,
+    },
+
+    refundDate: {
+      type: Date,
+      required: true,
+    },
+
+    source: {
+      type: String,
+      required: true,
+      enum: ["manual", "platform"],
+      default: "manual",
+    },
+
+    category: {
+      type: String,
+      required: true,
+      enum: ["delivery_fee", "tax", "full", "custom"],
+      default: "custom",
+    },
+
+    reason: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 2000,
+    },
+
+    status: {
+      type: String,
+      required: true,
+      enum: ["active", "voided"],
+      default: "active",
+    },
+
+    createdByShop: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+      required: true,
+    },
+
+    createdAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+
+    voidedAt: {
+      type: Date,
+      default: null,
+    },
+
+    voidedByShop: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+      default: null,
+    },
+
+    voidReason: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+
+    externalRefundId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    externalPaymentId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  {
+    _id: true,
+    minimize: false,
+  },
+);
+
 const orderSchema = new Schema(
   {
     orderNumber: {
@@ -341,6 +438,25 @@ const orderSchema = new Schema(
       default: [],
     },
 
+    refundStatus: {
+      type: String,
+      enum: ["none", "partial", "full"],
+      default: "none",
+      index: true,
+    },
+
+    totalRefundedCents: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: moneyValidator,
+    },
+
+    refunds: {
+      type: [refundSchema],
+      default: [],
+    },
+
     outsideFlorist: {
       outsideNetworkFlorist: {
         type: Schema.Types.ObjectId,
@@ -400,7 +516,10 @@ orderSchema.pre("validate", function (next) {
     return next(new Error("originatingShopFee is required."));
   }
 
-  if (order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
+  if (
+    order.status === OrderStatus.ACCEPTED ||
+    order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT
+  ) {
     if (!order.acceptedAt) order.acceptedAt = new Date();
   }
 
@@ -410,7 +529,9 @@ orderSchema.pre("validate", function (next) {
         new Error("acceptedAt is required before an order can be marked paid."),
       );
     }
+
     if (!order.paidAt) order.paidAt = new Date();
+
     if (!order.paymentMethodUsed) {
       return next(
         new Error("paymentMethodUsed is required when the order is paid."),
@@ -428,11 +549,12 @@ orderSchema.pre("validate", function (next) {
   }
 
   if (order.status === OrderStatus.COMPLETED) {
-    if (!order.paidAt) {
+    if (!order.acceptedAt) {
       return next(
-        new Error("paidAt is required before an order can be completed."),
+        new Error("acceptedAt is required before an order can be completed."),
       );
     }
+
     if (!order.completedAt) order.completedAt = new Date();
   }
 

@@ -58,10 +58,14 @@ export async function GET(req: Request) {
       query.updatedAt = { $gt: sinceDate };
     }
 
+    const sortDirection = since ? 1 : -1;
+
     const orders = await Order.find(query)
       .select({
         orderNumber: 1,
         status: 1,
+        declineReason: 1,
+        declineMessage: 1,
         recipient: 1,
         customer: 1,
         products: 1,
@@ -75,8 +79,8 @@ export async function GET(req: Request) {
         updatedAt: 1,
       })
       .sort({
-        updatedAt: -1,
-        _id: -1,
+        updatedAt: sortDirection,
+        _id: sortDirection,
       })
       .limit(limit)
       .lean();
@@ -84,11 +88,13 @@ export async function GET(req: Request) {
     return apiSuccess({
       orders: orders.map(mapOrderForPOS),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof Response) {
       return err;
     }
 
-    return apiError("INVALID_REQUEST", "Something went wrong", 500);
+    console.error("POS GET ORDERS ERROR:", err);
+
+    return apiError("SERVER_ERROR", "Unable to retrieve orders.", 500);
   }
 }

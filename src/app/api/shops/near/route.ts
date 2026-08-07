@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import authOptions from "@/lib/auth";
-import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility";
 import { getServerSession } from "next-auth";
 
 type NearbyShopRequest = {

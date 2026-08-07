@@ -3,7 +3,8 @@
 "use client";
 
 import toast, { Toaster } from "react-hot-toast";
-import type { OrderLean } from "@/types/order";
+import type { OrderLean, OrderRefund } from "@/types/order";
+import VoidRefundModal from "@/components/orders/VoidRefundModal";
 import Link from "next/link";
 import { OrderStatus } from "@/lib/order-status";
 import { useRouter } from "next/navigation";
@@ -16,6 +17,8 @@ import { sendInvite } from "@/lib/client/sendInvite";
 import DeclineOrderModal from "@/components/orders/DeclineOrderModal";
 import type { DeclineReason } from "@/lib/decline-reasons";
 import PaymentMethodRequiredModal from "@/components/orders/PaymentMethodRequiredModal";
+import OrderRefundPanel from "@/components/orders/OrderRefundPanel";
+import OrderRefundModal from "@/components/orders/OrderRefundModal";
 
 interface OrderClientProps {
   order: OrderLean;
@@ -58,45 +61,45 @@ export default function OrderClient({
   const [emailingInvite, setEmailingInvite] = useState(false);
   const [emailInviteOpen, setEmailInviteOpen] = useState(false);
 
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundToVoid, setRefundToVoid] = useState<OrderRefund | null>(null);
+  const [voidingRefund, setVoidingRefund] = useState(false);
+
+  const totalRefundedCents = order.totalRefundedCents ?? 0;
+
+  const remainingRefundableCents = Math.max(
+    0,
+    order.pricing.orderTotalCents - totalRefundedCents,
+  );
+
+  const activeRefunds = (order.refunds ?? []).filter(
+    (refund) => refund.status === "active",
+  );
+
+  const deliveryFeeAlreadyRefunded = activeRefunds.some(
+    (refund) => refund.category === "delivery_fee",
+  );
+
+  const taxAlreadyRefunded = activeRefunds.some(
+    (refund) => refund.category === "tax",
+  );
+
+  const canRecordRefund =
+    isOriginating &&
+    order.fulfillmentType !== "outside_network" &&
+    [
+      OrderStatus.ACCEPTED,
+      OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+      OrderStatus.PAID_AWAITING_FULFILLMENT,
+      OrderStatus.COMPLETED,
+    ].includes(order.status);
+
   useEffect(() => {
     if (!order) return;
     if (order.status === "DECLINED") {
       searchShops();
     }
   }, [order.status]);
-
-  const handleMarkPaid = async (
-    orderId: string,
-    method: "venmo" | "cashapp" | "zelle" | "paypal",
-  ) => {
-    if (actionOrderId === orderId) return;
-
-    try {
-      setActionOrderId(orderId);
-
-      const res = await fetch("/api/orders/payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, paymentMethodUsed: method }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success(`Order marked as paid via ${method.toUpperCase()}!`);
-        router.refresh();
-      } else {
-        toast.error(data.error || "Failed to mark order as paid");
-      }
-    } catch (err) {
-      console.error("Failed to mark order as paid", err);
-      toast.error(
-        "Failed to mark order as paid. Please try again. If the problem persists, contact GetBloomDirect support.",
-      );
-    } finally {
-      setActionOrderId(null);
-    }
-  };
 
   const formatTimeString = (timeStr: any) => {
     if (!timeStr || typeof timeStr !== "string") return "";
@@ -308,6 +311,49 @@ export default function OrderClient({
     }
   }
 
+  const handleVoidRefund = async (reason: string) => {
+    if (!refundToVoid?._id || voidingRefund) {
+      return;
+    }
+
+    try {
+      setVoidingRefund(true);
+
+      const response = await fetch(
+        `/api/orders/${order._id}/refunds/${refundToVoid._id}/void`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            reason,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to void refund.");
+      }
+
+      setRefundToVoid(null);
+      toast.success("Refund voided successfully.");
+      router.refresh();
+    } catch (error) {
+      console.error("VOID REFUND ERROR:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to void refund. Please try again.",
+      );
+    } finally {
+      setVoidingRefund(false);
+    }
+  };
+
   const handleEmailOrder = async () => {
     try {
       const emailToUseFinal = emailToUse.trim();
@@ -512,16 +558,18 @@ export default function OrderClient({
           </Link>
 
           {/* HEADER */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 flex flex-col gap-4 text-center">
+          <div
+            className={`rounded-3xl shadow-xl p-8 flex flex-col gap-4 text-center border transition ${
+              order.refundStatus === "partial" || order.refundStatus === "full"
+                ? "bg-red-50 border-red-200"
+                : "bg-white border-transparent"
+            }`}
+          >
             <h1 className="text-xl font-black text-purple-600">
               Order #{order.orderNumber}
             </h1>
 
-            {/* <h2 className="text-sm font-mono text-gray-500">
-              Order ID: {order._id.toString()}
-            </h2> */}
-
-            <div className="flex flex-wrap items-center gap-4 justify-center">
+            <div className="flex flex-wrap items-center gap-3 justify-center">
               <span>
                 {order.status === OrderStatus.DECLINED ? (
                   <span className="px-3 py-1 rounded-full text-xs font-black bg-red-100 text-red-700">
@@ -533,6 +581,18 @@ export default function OrderClient({
                   </span>
                 )}
               </span>
+
+              {order.refundStatus === "partial" && (
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800">
+                  PARTIALLY REFUNDED
+                </span>
+              )}
+
+              {order.refundStatus === "full" && (
+                <span className="px-3 py-1 rounded-full text-xs font-black bg-red-100 text-red-700">
+                  FULLY REFUNDED
+                </span>
+              )}
 
               {order.status === OrderStatus.DECLINED &&
                 role === "ORIGINATING" && (
@@ -565,23 +625,23 @@ export default function OrderClient({
 
           {/* STATUS TIMELINE */}
           {order.fulfillmentType !== "outside_network" && (
-            <div className="bg-white rounded-3xl shadow-xl p-6 grid grid-cols-2 md:flex md:flex-row justify-between gap-6">
+            <div className="grid grid-cols-3 gap-6 rounded-3xl bg-white p-6 shadow-xl">
               {[
                 { label: "Sent", done: true },
                 { label: "Accepted", done: !!order.acceptedAt },
-                { label: "Paid", done: !!order.paidAt },
                 { label: "Delivered", done: !!order.completedAt },
-              ].map((step, i) => (
-                <div key={i} className="flex-1 text-center">
+              ].map((step, index) => (
+                <div key={step.label} className="text-center">
                   <div
-                    className={`mx-auto w-10 h-10 rounded-full flex items-center justify-center font-black ${
+                    className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full font-black ${
                       step.done
                         ? "bg-emerald-600 text-white"
                         : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {i + 1}
+                    {index + 1}
                   </div>
+
                   <p
                     className={`mt-2 text-sm font-semibold ${
                       step.done ? "text-gray-900" : "text-gray-400"
@@ -963,12 +1023,12 @@ export default function OrderClient({
                 <div className="bg-gray-50 border rounded-2xl p-5 space-y-3 col-span-2">
                   <h3 className="font-black text-gray-700">Order Activity</h3>
 
-                  <ul className="space-y-2 text-sm">
+                  <ul className="space-y-2 text-sm max-h-40 overflow-scroll">
                     {order.activityLog
                       .slice()
                       .reverse()
                       .map((log, idx) => (
-                        <li key={idx} className="flex justify-between gap-4">
+                        <li key={idx} className="flex justify-between gap-4 border-b pb-2">
                           <span>{log.message}</span>
                           <span className="text-gray-400">
                             {new Date(log.createdAt).toLocaleString()}
@@ -1011,10 +1071,7 @@ export default function OrderClient({
                       type="button"
                       disabled={handlingStatus}
                       onClick={() =>
-                        handleStatus(
-                          order._id,
-                          OrderStatus.ACCEPTED_AWAITING_PAYMENT,
-                        )
+                        handleStatus(order._id, OrderStatus.ACCEPTED)
                       }
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-4 rounded-2xl"
                     >
@@ -1038,50 +1095,13 @@ export default function OrderClient({
                   </div>
                 )}
 
-              {/* MARK PAID */}
-              {isOriginating &&
-                order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT && (
-                  <div className="space-y-2">
-                    <p className="font-bold text-gray-700">Mark as Paid</p>
-
-                    <p className="text-gray-600 font-semibold">
-                      Preferred Payment Method:{" "}
-                      <span className="text-lg uppercase text-emerald-600">
-                        {order.paymentMethods?.default}
-                      </span>
-                    </p>
-
-                    <div className="flex flex-col gap-2">
-                      {(["venmo", "cashapp", "zelle", "paypal"] as const).map(
-                        (method) => (
-                          <button
-                            disabled={handlingStatus}
-                            key={method}
-                            onClick={() => handleMarkPaid(order._id, method)}
-                            className={`
-                            w-full text-white font-bold py-3 rounded-xl shadow-lg transition-all
-                            ${
-                              method === "venmo"
-                                ? "bg-blue-500 hover:bg-blue-600"
-                                : method === "cashapp"
-                                  ? "bg-green-500 hover:bg-green-600"
-                                  : method === "zelle"
-                                    ? "bg-purple-500 hover:bg-purple-600"
-                                    : "bg-gray-500 hover:bg-gray-600"
-                            }
-                          `}
-                          >
-                            Paid via {method.toUpperCase()}
-                          </button>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
-
               {/* MARK DELIVERED */}
               {isFulfilling &&
-                order.status === OrderStatus.PAID_AWAITING_FULFILLMENT && (
+                [
+                  OrderStatus.ACCEPTED,
+                  OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+                  OrderStatus.PAID_AWAITING_FULFILLMENT,
+                ].includes(order.status) && (
                   <div>
                     <button
                       type="button"
@@ -1235,10 +1255,12 @@ export default function OrderClient({
               {!(
                 (isFulfilling &&
                   order.status === OrderStatus.PENDING_ACCEPTANCE) ||
-                (isOriginating &&
-                  order.status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) ||
                 (isFulfilling &&
-                  order.status === OrderStatus.PAID_AWAITING_FULFILLMENT) ||
+                  [
+                    OrderStatus.ACCEPTED,
+                    OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+                    OrderStatus.PAID_AWAITING_FULFILLMENT,
+                  ].includes(order.status)) ||
                 (isOriginating && order.status === OrderStatus.DECLINED) ||
                 (isOriginating && reviewSet === false)
               ) && (
@@ -1248,6 +1270,19 @@ export default function OrderClient({
               )}
             </div>
           </div>
+
+          {/* Refunds */}
+          <OrderRefundPanel
+            orderTotalCents={order.pricing.orderTotalCents}
+            totalRefundedCents={totalRefundedCents}
+            refundStatus={order.refundStatus}
+            refunds={order.refunds}
+            canRecordRefund={canRecordRefund}
+            onAddRefund={() => setShowRefundModal(true)}
+            onVoidRefund={(refund) => {
+              setRefundToVoid(refund);
+            }}
+          />
         </div>
 
         {emailOrderOpen && (
@@ -1332,6 +1367,33 @@ export default function OrderClient({
             </div>
           </div>
         )}
+
+        <OrderRefundModal
+          isOpen={showRefundModal}
+          orderId={order._id}
+          orderTotalCents={order.pricing.orderTotalCents}
+          deliveryFeeCents={order.pricing.deliveryFeeCents}
+          taxCents={order.pricing.taxCents}
+          remainingRefundableCents={remainingRefundableCents}
+          deliveryFeeAlreadyRefunded={deliveryFeeAlreadyRefunded}
+          taxAlreadyRefunded={taxAlreadyRefunded}
+          onClose={() => setShowRefundModal(false)}
+          onRefundCreated={() => {
+            router.refresh();
+          }}
+        />
+
+        <VoidRefundModal
+          isOpen={refundToVoid !== null}
+          refund={refundToVoid}
+          isSubmitting={voidingRefund}
+          onClose={() => {
+            if (!voidingRefund) {
+              setRefundToVoid(null);
+            }
+          }}
+          onConfirm={handleVoidRefund}
+        />
 
         <DeclineOrderModal
           open={showDeclineModal}

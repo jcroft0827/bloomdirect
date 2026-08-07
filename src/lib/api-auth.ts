@@ -58,7 +58,23 @@ export async function getShopFromApiKey(req: Request) {
   }
 
   if (shop.isSuspended) {
-    throw apiError("ACCOUNT_SUSPENDED", "Account suspended", 403);
+    throw apiError("ACCOUNT_SUSPENDED", "This shop account is suspended.", 403);
+  }
+
+  if (shop.isArchived) {
+    throw apiError(
+      "ACCOUNT_ARCHIVED",
+      "This shop account is no longer active.",
+      403,
+    );
+  }
+
+  if (shop.isMarkedSpam) {
+    throw apiError(
+      "ACCOUNT_RESTRICTED",
+      "This shop account cannot access the API.",
+      403,
+    );
   }
 
   // ===============================
@@ -72,8 +88,7 @@ export async function getShopFromApiKey(req: Request) {
     : null;
 
   const shouldUpdateUsage = 
-    !lastUsedAt ||
-    now.getTime() - lastUsedAt.getTime() >= 5 * 60 * 1000;
+    !lastUsedAt || now.getTime() - lastUsedAt.getTime() >= 5 * 60 * 1000;
 
   if (shouldUpdateUsage) {
     try {

@@ -4,7 +4,7 @@
 import { useState, useEffect, type Dispatch, type SetStateAction } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import "react-datepicker/dist/react-datepicker.css";
 import { searchGoogleFlorists } from "@/app/actions";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
@@ -33,6 +33,14 @@ interface NetworkShop {
     city?: string;
     state?: string;
   };
+}
+
+interface PreferredFloristSummary {
+  _id: string;
+  businessName: string;
+  slug?: string;
+  verifiedFlorist?: boolean;
+  isPro?: boolean;
 }
 
 interface ShopReadiness {
@@ -331,8 +339,12 @@ function SendRequirement({
 
 export default function NewOrderClient() {
   const { data: session, status } = useSession();
-  // const shopId = (session?.user as any)?.shopId;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedFulfillingShopId =
+    searchParams.get("fulfillingShopId")?.trim() || "";
+  const hasRequestedFulfillingShop = Boolean(requestedFulfillingShopId);
+
   const cfBase = process.env.NEXT_PUBLIC_CLOUDFRONT_URL;
 
   useEffect(() => {
@@ -467,6 +479,16 @@ export default function NewOrderClient() {
   const [searching, setSearching] = useState(false);
   const [findShopSuccess, setFindShopSuccess] = useState(false);
   const [noShopsInArea, setNoShopsInArea] = useState(false);
+  const [preferredFloristStatus, setPreferredFloristStatus] = useState<
+    "pending" | "checking" | "eligible" | "unavailable"
+  >("pending");
+
+  const [preferredFlorist, setPreferredFlorist] =
+    useState<PreferredFloristSummary | null>(null);
+
+  const [loadingPreferredFlorist, setLoadingPreferredFlorist] = useState(
+    hasRequestedFulfillingShop,
+  );
 
   // Request Florist
   const [requestFlorist, setRequestFlorist] = useState(false);
@@ -491,6 +513,41 @@ export default function NewOrderClient() {
   )}`;
   const usingGoogleShop = !!googleShop?.name && !selectedShop?._id;
   const usingNetworkShop = !!selectedShop?._id;
+  const recipientIsComplete = Boolean(
+    recipient.firstName.trim() &&
+    recipient.lastName.trim() &&
+    recipient.phone.trim() &&
+    recipient.address.trim() &&
+    recipient.zip.trim() &&
+    recipient.city.trim() &&
+    recipient.state.trim(),
+  );
+
+  const networkFulfillmentIsComplete =
+    usingNetworkShop && selectedProducts.length > 0;
+
+  const outsideFulfillmentIsComplete =
+    usingGoogleShop &&
+    outsideNetwork.items.some(
+      (item) =>
+        item.name.trim() && Number(item.qty) > 0 && Number(item.price) > 0,
+    );
+
+const fulfillmentIsComplete =
+  networkFulfillmentIsComplete || outsideFulfillmentIsComplete;
+
+const deliveryTimeIsComplete =
+  logistics.timeOption === "anytime" ||
+  Boolean(logistics.timeFrom && logistics.timeTo);
+
+const orderDetailsAreComplete = Boolean(
+  shopChosen &&
+    recipientIsComplete &&
+    logistics.deliveryDate &&
+    deliveryTimeIsComplete &&
+    fulfillmentIsComplete,
+);
+
   const favoriteShopIds = new Set(
     sendingShop.preferredFlorists.map((favoriteId) => String(favoriteId)),
   );
@@ -498,6 +555,64 @@ export default function NewOrderClient() {
   // #endregion
 
   // #region useEffects
+
+  useEffect(() => {
+    if (!requestedFulfillingShopId) {
+      setPreferredFlorist(null);
+      setLoadingPreferredFlorist(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPreferredFlorist() {
+      try {
+        setLoadingPreferredFlorist(true);
+
+        const response = await fetch("/api/shops/fulfilling", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fulfillShopId: requestedFulfillingShopId,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to load the selected florist.");
+        }
+
+        if (!cancelled) {
+          setPreferredFlorist({
+            _id: String(data._id),
+            businessName: data.businessName || "Your selected Network florist",
+            slug: data.slug || "",
+            verifiedFlorist: data.verifiedFlorist === true,
+            isPro: data.isPro === true,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load preferred florist:", error);
+
+        if (!cancelled) {
+          setPreferredFlorist(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingPreferredFlorist(false);
+        }
+      }
+    }
+
+    loadPreferredFlorist();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedFulfillingShopId]);
 
   // Load shop info
   useEffect(() => {
@@ -679,6 +794,12 @@ export default function NewOrderClient() {
       return;
     }
 
+    setSearching(true);
+
+    if (hasRequestedFulfillingShop) {
+      setPreferredFloristStatus("checking");
+    }
+
     setGoogleSearch(false);
     setGoogleApiFailed(false);
     setGoogleResults([]);
@@ -722,14 +843,59 @@ export default function NewOrderClient() {
 
       if (!res.ok) throw new Error(data.error || "Search failed");
 
-      setShops(data || []);
-      setFindShopSuccess(data?.length > 0);
+      const availableShops: NetworkShop[] = Array.isArray(data) ? data : [];
 
-      console.log(data);
+      setShops(availableShops);
+      setFindShopSuccess(availableShops.length > 0);
+      setNoShopsInArea(availableShops.length === 0);
 
-      if (!data || data.length === 0) {
+      if (requestedFulfillingShopId) {
+        const requestedShop = availableShops.find(
+          (shop) => String(shop._id) === requestedFulfillingShopId,
+        );
+
+        if (requestedShop) {
+          await selectShop(requestedShop);
+
+          setPreferredFloristStatus("eligible");
+          setOrderPage("order-form");
+
+          toast.success(
+            `${requestedShop.businessName} can fulfill this order.`,
+          );
+
+          return;
+        }
+
+        setPreferredFloristStatus("unavailable");
+
+        if (availableShops.length > 0) {
+          toast(
+            "Your preferred florist cannot fulfill this delivery. We found other Network florists that can.",
+            {
+              icon: "🌸",
+              duration: 5000,
+            },
+          );
+
+          return;
+        }
+
+        toast(
+          "Your preferred florist cannot fulfill this delivery, and no other Network florist is available. We’re checking nearby florists outside the Network.",
+          {
+            icon: "🔎",
+            duration: 6000,
+          },
+        );
+
+        await handleGoogleSearch();
+
+        return;
+      }
+
+      if (availableShops.length === 0) {
         toast.error("No GetBloomDirect shops in that area yet — invite them!");
-        setNoShopsInArea(true);
       }
     } catch (err) {
       console.error("Error finding shops", err);
@@ -982,6 +1148,74 @@ export default function NewOrderClient() {
       toast.error(error.message || "Failed to send order. Please try again.");
     } finally {
       setSendingOrder(false);
+    }
+  };
+
+  const goToPreviousOrderStep = () => {
+    if (orderPage === "order-form") {
+      setOrderPage("shop-lookup");
+      return;
+    }
+
+    if (orderPage === "send-order") {
+      setOrderPage("order-form");
+    }
+  };
+
+  const goToNextOrderStep = async () => {
+    if (orderPage === "shop-lookup") {
+      if (shopChosen) {
+        setOrderPage("order-form");
+        return;
+      }
+
+      await searchShops();
+      return;
+    }
+
+    if (orderPage === "order-form") {
+      if (!shopChosen) {
+        toast.error("Choose a florist before continuing.");
+        return;
+      }
+
+      if (!recipientIsComplete) {
+        toast.error(
+          "Complete the required recipient information before reviewing the order.",
+        );
+        setOrderPageOption("recipient");
+        return;
+      }
+
+      if (!logistics.deliveryDate) {
+        toast.error("Choose a delivery date before reviewing the order.");
+        setOrderPageOption("delivery");
+        return;
+      }
+
+      if (!deliveryTimeIsComplete) {
+  toast.error(
+    "Choose both a start and end time for the specific delivery window.",
+  );
+  setOrderPageOption("delivery");
+  return;
+}
+
+      if (!fulfillmentIsComplete) {
+        toast.error(
+          usingNetworkShop
+            ? "Choose at least one fulfillment offering before reviewing the order."
+            : "Add at least one complete item before reviewing the order.",
+        );
+        setOrderPageOption("products");
+        return;
+      }
+
+      if (usingGoogleShop) {
+        refreshOutsideNetworkTotals();
+      }
+
+      setOrderPage("send-order");
     }
   };
 
@@ -1738,50 +1972,154 @@ export default function NewOrderClient() {
   return (
     <>
       <div>
-        <div className="mx-auto space-y-8 xl:space-y-4">
-          <div className="bg-transparent rounded-2xl shadow-lg">
-            {/* Page Buttons */}
-            <div className="flex sm:gap-2">
-              <button
-                onClick={() => setOrderPage("shop-lookup")}
-                className={
-                  (orderPage === "shop-lookup"
-                    ? "text-white bg-purple-400 border-0"
-                    : "border") + " rounded-t-2xl px-4 py-2"
-                }
-              >
-                Shop Lookup
-              </button>
+        <div className="mx-auto space-y-6">
+          <header className="rounded-3xl border border-slate-200 bg-white px-5 py-6 shadow-sm sm:px-7 lg:flex lg:items-end lg:justify-between lg:px-8">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-purple-600">
+                GetBloomDirect
+              </p>
 
-              <button
-                onClick={() => setOrderPage("order-form")}
-                disabled={!shopChosen}
-                className={
-                  (orderPage === "order-form"
-                    ? "text-white bg-purple-400 border-0"
-                    : "border") + " rounded-t-2xl px-4 py-2"
-                }
-              >
-                Order Form
-              </button>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                New Order
+              </h1>
 
-              <button
-                onClick={() => {
-                  if (usingGoogleShop) {
-                    refreshOutsideNetworkTotals();
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                Choose a florist, complete the order details, and review
+                everything before sending.
+              </p>
+            </div>
+
+            {selectedShop && (
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 lg:mt-0 lg:max-w-sm">
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                  Fulfilling Florist
+                </p>
+
+                <p className="mt-1 font-bold text-slate-900">
+                  {selectedShop.businessName}
+                </p>
+              </div>
+            )}
+          </header>
+
+          <div className="rounded-2xl bg-transparent shadow-lg">
+            {/* Order Progress Navigator */}
+            <div className="rounded-t-2xl border border-b-0 border-slate-200 bg-white p-2 shadow-sm sm:p-3">
+              <nav
+                aria-label="Order progress"
+                className="grid grid-cols-3 gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOrderPage("shop-lookup")}
+                  aria-current={
+                    orderPage === "shop-lookup" ? "step" : undefined
                   }
+                  className={`group flex min-h-16 items-center gap-2 rounded-xl px-2 py-3 text-left transition sm:min-h-20 sm:px-4 ${
+                    orderPage === "shop-lookup"
+                      ? "bg-purple-600 text-white shadow-md"
+                      : "bg-slate-50 text-slate-700 hover:bg-purple-50 hover:text-purple-800"
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black sm:h-9 sm:w-9 ${
+                      orderPage === "shop-lookup"
+                        ? "bg-white text-purple-700"
+                        : shopChosen
+                          ? "bg-emerald-600 text-white"
+                          : "border-2 border-slate-300 bg-white text-slate-500"
+                    }`}
+                  >
+                    {shopChosen ? "✓" : "1"}
+                  </span>
 
-                  setOrderPage("send-order");
-                }}
-                disabled={!shopChosen}
-                className={
-                  (orderPage === "send-order"
-                    ? "text-emerald-50 bg-purple-400 border-0"
-                    : "border") + " rounded-t-2xl px-4 py-2"
-                }
-              >
-                {usingGoogleShop ? "Save Order" : "Send Order"}
-              </button>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide opacity-75 sm:text-[0.7rem]">
+                      Step 1
+                    </span>
+
+                    <span className="block truncate text-sm font-bold sm:text-base">
+                      Florist
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOrderPage("order-form")}
+                  disabled={!shopChosen}
+                  aria-current={orderPage === "order-form" ? "step" : undefined}
+                  className={`group flex min-h-16 items-center gap-2 rounded-xl px-2 py-3 text-left transition sm:min-h-20 sm:px-4 ${
+                    orderPage === "order-form"
+                      ? "bg-purple-600 text-white shadow-md"
+                      : shopChosen
+                        ? "bg-slate-50 text-slate-700 hover:bg-purple-50 hover:text-purple-800"
+                        : "cursor-not-allowed bg-slate-50 text-slate-400 opacity-70"
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black sm:h-9 sm:w-9 ${
+                      orderPage === "order-form"
+                        ? "bg-white text-purple-700"
+                        : orderPage === "send-order"
+                          ? "bg-emerald-600 text-white"
+                          : "border-2 border-slate-300 bg-white text-slate-500"
+                    }`}
+                  >
+                    {orderPage === "send-order" ? "✓" : "2"}
+                  </span>
+
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide opacity-75 sm:text-[0.7rem]">
+                      Step 2
+                    </span>
+
+                    <span className="block truncate text-sm font-bold sm:text-base">
+                      Order
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (usingGoogleShop) {
+                      refreshOutsideNetworkTotals();
+                    }
+
+                    setOrderPage("send-order");
+                  }}
+                  disabled={!orderDetailsAreComplete}
+                  aria-current={orderPage === "send-order" ? "step" : undefined}
+                  className={`group flex min-h-16 items-center gap-2 rounded-xl px-2 py-3 text-left transition sm:min-h-20 sm:px-4 ${
+                    orderPage === "send-order"
+                      ? "bg-purple-600 text-white shadow-md"
+                      : orderDetailsAreComplete
+                        ? "bg-slate-50 text-slate-700 hover:bg-purple-50 hover:text-purple-800"
+                        : "cursor-not-allowed bg-slate-50 text-slate-400 opacity-70"
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black sm:h-9 sm:w-9 ${
+                      orderPage === "send-order"
+                        ? "bg-white text-purple-700"
+                        : "border-2 border-slate-300 bg-white text-slate-500"
+                    }`}
+                  >
+                    3
+                  </span>
+
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide opacity-75 sm:text-[0.7rem]">
+                      Step 3
+                    </span>
+
+                    <span className="block truncate text-sm font-bold sm:text-base">
+                      Review
+                    </span>
+                  </span>
+                </button>
+              </nav>
             </div>
 
             <div>
@@ -1793,6 +2131,89 @@ export default function NewOrderClient() {
                 }
               >
                 <div>
+                  {hasRequestedFulfillingShop && (
+                    <div
+                      className={`mb-6 rounded-2xl border-2 p-5 shadow-lg ${
+                        preferredFloristStatus === "eligible"
+                          ? "border-emerald-300 bg-emerald-50"
+                          : preferredFloristStatus === "unavailable"
+                            ? "border-amber-300 bg-amber-50"
+                            : "border-purple-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold uppercase tracking-wide text-purple-600">
+                            Preferred Florist
+                          </p>
+
+                          <h2 className="mt-1 text-2xl font-bold text-slate-900">
+                            {loadingPreferredFlorist
+                              ? "Loading selected florist..."
+                              : preferredFlorist?.businessName ||
+                                selectedShop?.businessName ||
+                                "Your selected Network florist"}
+                          </h2>
+
+                          {preferredFlorist && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {preferredFlorist.verifiedFlorist && (
+                                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                  ✓ Verified Florist
+                                </span>
+                              )}
+
+                              {preferredFlorist.isPro && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                  <Star className="h-3.5 w-3.5 fill-current" />
+                                  Bloom Pro
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {preferredFloristStatus === "pending" && (
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              Enter the recipient address and delivery details
+                              below. We&apos;ll confirm that this florist can
+                              fulfill the order.
+                            </p>
+                          )}
+
+                          {preferredFloristStatus === "checking" && (
+                            <p className="mt-2 text-sm font-medium text-purple-700">
+                              Checking this florist&apos;s delivery area and
+                              availability...
+                            </p>
+                          )}
+
+                          {preferredFloristStatus === "eligible" && (
+                            <p className="mt-2 text-sm font-semibold text-emerald-700">
+                              This florist can fulfill the delivery. Their
+                              offerings are ready for you.
+                            </p>
+                          )}
+
+                          {preferredFloristStatus === "unavailable" && (
+                            <p className="mt-2 text-sm leading-6 text-amber-800">
+                              This florist cannot fulfill the delivery details
+                              entered. Choose another available florist from the
+                              results.
+                            </p>
+                          )}
+                        </div>
+
+                        {preferredFloristStatus !== "eligible" && (
+                          <Link
+                            href="/dashboard/network"
+                            className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl border border-purple-300 bg-white px-5 text-sm font-bold text-purple-700 transition hover:bg-purple-50"
+                          >
+                            Choose a Different Florist
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="2xl:flex justify-between">
                     <p
                       className={
@@ -1847,7 +2268,7 @@ export default function NewOrderClient() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-2">
                             {/* Del Date */}
                             <div className="col-span-1">
-                              <label className="order-input-label">
+                              <label className="order-input-label-alt text-white">
                                 Delivery Date
                               </label>
                               <input
@@ -1873,7 +2294,7 @@ export default function NewOrderClient() {
 
                             {/* Del Time */}
                             <div className="col-span-1">
-                              <label className="order-input-label">
+                              <label className="order-input-label-alt text-white">
                                 Delivery Time
                               </label>
                               <select
@@ -1940,7 +2361,7 @@ export default function NewOrderClient() {
                       <div className="px-4 grid gap-x-4 gap-y-1 grid-cols-1 md:grid-cols-3">
                         {/* Street Address */}
                         <div className="md:col-span-3">
-                          <label className="order-input-label">
+                          <label className="order-input-label-alt text-white">
                             Recipient Street Address
                           </label>
                           <input
@@ -1959,7 +2380,7 @@ export default function NewOrderClient() {
 
                         {/* Zip */}
                         <div>
-                          <label className="order-input-label">
+                          <label className="order-input-label-alt text-white">
                             Recipient Zip
                           </label>
                           <input
@@ -1979,7 +2400,7 @@ export default function NewOrderClient() {
 
                         {/* City */}
                         <div>
-                          <label className="order-input-label">
+                          <label className="order-input-label-alt text-white">
                             Recipient City
                           </label>
                           <input
@@ -1998,7 +2419,7 @@ export default function NewOrderClient() {
 
                         {/* State */}
                         <div>
-                          <label className="order-input-label">
+                          <label className="order-input-label-alt text-white">
                             Recipient State
                           </label>
                           <input
@@ -2022,7 +2443,11 @@ export default function NewOrderClient() {
                         disabled={searching}
                         className="px-4 py-2 bg-purple-600 text-white text-2xl font-bold hover:bg-purple-700 transition-all"
                       >
-                        {searching ? "Searching..." : "Find Shops"}
+                        {searching
+                          ? "Checking Availability..."
+                          : hasRequestedFulfillingShop
+                            ? "Check Florist Availability"
+                            : "Find Shops"}
                       </button>
                     </div>
 
@@ -2059,12 +2484,17 @@ export default function NewOrderClient() {
                         <div className="space-y-4">
                           <div>
                             <h2 className="text-2xl font-bold text-purple-700">
-                              Available Network Florists
+                              {hasRequestedFulfillingShop &&
+                              preferredFloristStatus === "unavailable"
+                                ? "Other Florists That Can Fulfill This Order"
+                                : "Available Network Florists"}
                             </h2>
 
                             <p className="text-gray-600">
-                              These GetBloomDirect florists can serve this
-                              delivery area.
+                              {hasRequestedFulfillingShop &&
+                              preferredFloristStatus === "unavailable"
+                                ? "Your preferred florist is unavailable for this delivery, but these Network florists can fulfill it."
+                                : "These GetBloomDirect florists can serve this delivery area."}
                             </p>
                           </div>
 
@@ -2169,15 +2599,25 @@ export default function NewOrderClient() {
 
                       {noShopsInArea && (
                         <div className="space-y-5">
-                          <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
-                            <h2 className="text-2xl font-bold text-red-700">
-                              No network florist found
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <h2 className="text-2xl font-bold text-amber-800">
+                              {hasRequestedFulfillingShop
+                                ? "No Network Florist Can Fulfill This Order"
+                                : "No Network Florist Found"}
                             </h2>
 
                             <p className="mt-1 text-gray-700">
-                              GetBloomDirect does not currently have a partner
-                              florist who serves this address.
+                              {hasRequestedFulfillingShop
+                                ? "Your preferred florist is unavailable, and no other GetBloomDirect florist currently serves these delivery details."
+                                : "GetBloomDirect does not currently have a partner florist who serves this address."}
                             </p>
+
+                            {hasRequestedFulfillingShop && (
+                              <p className="mt-2 font-semibold text-amber-800">
+                                We’re automatically checking nearby florists
+                                outside the Network.
+                              </p>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-1 gap-3">
@@ -2234,12 +2674,12 @@ export default function NewOrderClient() {
                               <div className="space-y-4">
                                 <div>
                                   <h2 className="text-xl font-bold text-purple-700">
-                                    Shops pulled from Google Search
+                                    Nearby Florists Outside the Network
                                   </h2>
 
                                   <p className="text-sm text-gray-600">
-                                    These shops are not part of GetBloomDirect
-                                    yet.
+                                    No Network florist could fulfill this order,
+                                    so we found nearby outside florists for you.
                                   </p>
                                 </div>
 
@@ -2419,32 +2859,52 @@ export default function NewOrderClient() {
                 }
               >
                 {/* Main Order Form Screen */}
-                <div>
+                <div className="lg:grid lg:grid-cols-12 lg:gap-x-8 lg:rounded-3xl lg:bg-white lg:p-5 lg:shadow-lg">
                   {/* Recipient + Products */}
                   <div
                     className={`
-                      ${orderPageOption === "recipient" || orderPageOption === "products" ? "grid" : "hidden"} 
-                      grid-cols-1 xl:grid-cols-2 gap-6 w-full
+                      ${
+                        orderPageOption === "recipient" ||
+                        orderPageOption === "products"
+                          ? "grid"
+                          : "hidden"
+                      }
+                      grid-cols-1 gap-6
+                      lg:contents
                     `}
                   >
                     {/* Recipient */}
                     <div
                       className={`
-                        ${orderPageOption === "recipient" ? "block" : "hidden xl:block"} 
-                       order-page-option
+                        ${orderPageOption === "recipient" ? "block" : "hidden"}
+                        order-page-option
+
+                        lg:col-span-7
+                        lg:col-start-1
+                        lg:row-start-1
+                        lg:block
+                        lg:rounded-none
+                        lg:border-0
+                        lg:border-b
+                        lg:border-slate-200
+                        lg:bg-transparent
+                        lg:px-0
+                        lg:pb-4
+                        lg:pt-0
+                        lg:shadow-none
                       `}
                     >
                       <h2 className="order-header">Recipient</h2>
                       <div>
                         {/* First + Last Name + Phone + Company/Event */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-2 xl:gap-2 2xl:grid-cols-2 mb-2">
+                        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-2">
                           {/* First Name */}
                           <div>
                             <label
                               htmlFor="first-name"
                               className="order-input-label"
                             >
-                              First Name
+                              <span className="text-red-500">*</span> First Name
                             </label>
                             <input
                               name="first-name"
@@ -2458,16 +2918,17 @@ export default function NewOrderClient() {
                                   firstName: e.target.value,
                                 })
                               }
-                              className="order-input"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg"
                             />
                           </div>
+
                           {/* Last Name */}
                           <div>
                             <label
                               htmlFor="last-name"
                               className="order-input-label"
                             >
-                              Last Name
+                              <span className="text-red-500">*</span> Last Name
                             </label>
                             <input
                               name="last-name"
@@ -2481,7 +2942,7 @@ export default function NewOrderClient() {
                                   lastName: e.target.value,
                                 })
                               }
-                              className="order-input"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg"
                             />
                           </div>
 
@@ -2491,7 +2952,8 @@ export default function NewOrderClient() {
                               htmlFor="rec-phone"
                               className="order-input-label"
                             >
-                              Phone Number
+                              <span className="text-red-500">*</span> Phone
+                              Number
                             </label>
                             <input
                               name="rec-phone"
@@ -2508,21 +2970,22 @@ export default function NewOrderClient() {
                               onFocus={() =>
                                 handlePhoneFocus(recipient, setRecipient)
                               }
-                              className="order-input"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg"
                             />
                           </div>
+
                           {/* Company / Event */}
-                          <div className="md:col-span-3 xl:col-span-1">
+                          <div>
                             <label
                               htmlFor="company"
                               className="order-input-label"
                             >
-                              Company / Event (optional)
+                              Company / Event
                             </label>
                             <input
                               name="company"
                               id="company"
-                              placeholder="Company / Event (optional)"
+                              placeholder="Company / Event"
                               value={recipient.company}
                               onChange={(e) =>
                                 setRecipient({
@@ -2530,19 +2993,21 @@ export default function NewOrderClient() {
                                   company: e.target.value,
                                 })
                               }
-                              className="order-input xl:text-base xl:py-[0.37rem]"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg"
                             />
                           </div>
                         </div>
+
                         {/* Street Address + City + State + Zip */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:gap-2">
                           {/* Street Address */}
-                          <div className="sm:col-span-3 xl:col-span-3">
+                          <div className="sm:col-span-3">
                             <label
                               htmlFor="street-address"
                               className="order-input-label"
                             >
-                              Street Address
+                              <span className="text-red-500">*</span> Street
+                              Address
                             </label>
                             <input
                               name="street-address"
@@ -2556,9 +3021,10 @@ export default function NewOrderClient() {
                                   address: e.target.value,
                                 })
                               }
-                              className="order-input xl:text-base xl:py-[0.37rem] capitalize"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg capitalize"
                             />
                           </div>
+
                           {/* Zip -- Might need to adjust logic when dealing with Canadian Shops */}
                           {/* Also need to fill City + State when this is changed */}
                           <div>
@@ -2566,7 +3032,7 @@ export default function NewOrderClient() {
                               htmlFor="rec-zip"
                               className="order-input-label"
                             >
-                              ZIP
+                              <span className="text-red-500">*</span> ZIP
                             </label>
                             <input
                               name="rec-zip"
@@ -2581,9 +3047,10 @@ export default function NewOrderClient() {
                                     .slice(0, 5),
                                 })
                               }
-                              className="order-input uppercase"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg uppercase"
                             />
                           </div>
+
                           {/* City */}
                           <div>
                             <label className="order-input-label">City</label>
@@ -2591,9 +3058,10 @@ export default function NewOrderClient() {
                               placeholder="City"
                               value={recipient.city}
                               readOnly
-                              className="order-input uppercase bg-gray-100"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg uppercase bg-gray-100"
                             />
                           </div>
+
                           {/* State */}
                           <div>
                             <label className="order-input-label">State</label>
@@ -2601,7 +3069,7 @@ export default function NewOrderClient() {
                               placeholder="State"
                               value={recipient.state}
                               readOnly
-                              className="order-input uppercase bg-gray-100"
+                              className="order-input-alt text-lg lg:text-base xl:text-lg uppercase bg-gray-100"
                             />
                           </div>
                         </div>
@@ -2612,9 +3080,23 @@ export default function NewOrderClient() {
                     {usingGoogleShop ? (
                       <div
                         className={`
-                          ${orderPageOption === "products" ? "block" : "hidden xl:block"} 
+                          ${orderPageOption === "products" ? "block" : "hidden"}
                           order-page-option
-                          `}
+
+                          lg:col-span-5
+                          lg:col-start-8
+                          lg:row-start-1
+                          lg:row-span-3
+                          lg:block
+                          lg:self-start
+                          lg:rounded-2xl
+                          lg:border
+                          lg:border-slate-200
+                          lg:bg-slate-50
+                          lg:p-2
+                          xl:p-5
+                          lg:shadow-sm
+                        `}
                       >
                         <h2 className="order-header">Outside Network Order</h2>
 
@@ -2838,11 +3320,29 @@ export default function NewOrderClient() {
                     ) : (
                       <div
                         className={`
-                          ${orderPageOption === "products" ? "block" : "hidden xl:block"} 
-                        order-page-option
+                          ${orderPageOption === "products" ? "block" : "hidden"}
+                          order-page-option
+
+                          lg:col-span-5
+                          lg:col-start-8
+                          lg:row-start-1
+                          lg:row-span-3
+                          lg:block
+                          lg:self-start
+                          lg:rounded-2xl
+                          lg:border
+                          lg:border-slate-200
+                          lg:bg-slate-50
+                          lg:p-2
+                          xl:p-5
+                          lg:shadow-sm
+                          lg:max-h-[50rem]
+                          lg:overflow-y-scroll
                         `}
                       >
-                        <h2 className="order-header">Products</h2>
+                        <h2 className="order-header lg:pl-2 xl:p-0">Products</h2>
+
+                        <div className="space-y-3 xl:space-y-4">
                         {offerings.map((offering) => {
                           const isTierSelected = (offering: any, tier: any) =>
                             selectedProducts.some(
@@ -2850,99 +3350,89 @@ export default function NewOrderClient() {
                                 p.productKey ===
                                 `${offering._id}-${tier.label}`,
                             );
+
                           const isSelected = selectedProducts.some(
                             (p) => p.offeringId === offering._id,
                           );
+
                           return (
-                            <div
-                              key={offering._id}
-                              className="relative p-4 border border-gray-300 rounded-2xl"
-                            >
-                              {isSelected && (
-                                <CheckBadgeIcon className="h-6 w-6 text-green-500 absolute top-4 right-4" />
-                              )}
-                              <p className="font-bold">{offering.name}</p>
-                              <p>{offering.description}</p>
+<div
+  key={offering._id}
+  className={`relative overflow-hidden rounded-2xl border bg-white transition ${
+    isSelected
+      ? "border-emerald-400 shadow-md ring-2 ring-emerald-100"
+      : "border-slate-200 shadow-sm hover:border-purple-300 hover:shadow-md"
+  }`}
+>
+  {isSelected && (
+    <div className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white shadow">
+      <CheckBadgeIcon className="h-6 w-6" />
+    </div>
+  )}
 
-                              <div className="flex flex-wrap gap-2">
-                                {offering.pricingTiers?.map((tier: any) => (
-                                  <button
-                                    key={tier.label}
-                                    type="button"
-                                    onClick={() =>
-                                      toggleOffering(offering, tier)
-                                    }
-                                    className="mt-2 rounded-lg bg-purple-500 px-4 py-2 text-white"
-                                  >
-                                    {isTierSelected(offering, tier) && (
-                                      <CheckBadgeIcon className="h-6 w-6 text-green-300" />
-                                    )}
-                                    Select {tier.label} - ${tier.price}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+  <div className="flex flex-col sm:flex-row lg:flex-col 2xl:flex-row">
+<div className="h-48 w-full shrink-0 bg-white sm:h-auto sm:w-40 lg:h-48 lg:w-full 2xl:h-auto 2xl:w-44">
+      {offering.image ? (
+        <button
+          type="button"
+          onClick={() => setZoomedImage(offering.image)}
+          className="h-full w-full cursor-zoom-in"
+          aria-label={`View larger image of ${offering.name}`}
+        >
+          <img
+            src={offering.image}
+            alt={offering.name}
+            className="h-full w-full object-contain p-3 transition hover:scale-[1.02]"
+          />
+        </button>
+      ) : (
+        <div className="flex h-full min-h-40 items-center justify-center px-4 text-center text-sm font-medium text-slate-400">
+          No product image available
+        </div>
+      )}
+    </div>
+
+    <div className="flex min-w-0 flex-1 flex-col p-4">
+      <div className="pr-10">
+        <h3 className="text-lg font-bold text-slate-900">
+          {offering.name}
+        </h3>
+
+        {offering.description && (
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            {offering.description}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {offering.pricingTiers?.map((tier: any) => {
+          const selected = isTierSelected(offering, tier);
+
+          return (
+            <button
+              key={tier.label}
+              type="button"
+              onClick={() => toggleOffering(offering, tier)}
+              className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-4 py-2 text-sm font-bold transition ${
+                selected
+                  ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                  : "border-purple-200 bg-purple-50 text-purple-700 hover:border-purple-400 hover:bg-purple-100"
+              }`}
+            >
+              {selected ? "✓ " : ""}
+              {tier.label} · ${Number(tier.price).toFixed(2)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+</div>
                           );
-                          // <div
-                          //   key={index}
-                          //   className="p-4 border border-gray-300 rounded-2xl shadow-2xl flex flex-col gap-2 relative"
-                          // >
-                          //   {/* Chosen */}
-                          //   <div>
-                          //     <CheckBadgeIcon className="h-6 w-6 text-green-500 absolute top-4 right-4" />
-                          //   </div>
-                          //   {/* Taxable or Not */}
-                          //   <div className="font-semibold">
-                          //     {product.taxable ? (
-                          //       <p className="text-green-700">Taxable</p>
-                          //     ) : (
-                          //       <p className="text-red-700">Non-Taxable</p>
-                          //     )}
-                          //   </div>
-
-                          //   <div className="flex flex-col gap-2 sm:flex-row">
-                          //     {/* Product Photo */}
-                          //     {product.photo ? (
-                          //       <div
-                          //         className="w-24 h-24 border border-purple-200 rounded-lg overflow-hidden p-4 cursor-zoom-in transition-all flex items-center hover:p-2 hover:opacity-80"
-                          //       >
-                          //         <img
-                          //           src={product.photo}
-                          //           alt={product.name}
-                          //           onClick={() => setZoomedImage(product.photo)}
-                          //         />
-                          //       </div>
-                          //     ) : (
-                          //       <div className="h-24 w-24 flex items-center justify-center shadow-2xl border border-gray-400 rounded-md">
-                          //         {product.name}
-                          //       </div>
-                          //     )}
-
-                          //     {/* Name, Price */}
-                          //     <div>
-                          //       <p>
-                          //         <b>Name: </b>{product.name}
-                          //       </p>
-                          //       <p>
-                          //         <b>Price: </b>${product.price}
-                          //       </p>
-                          //     </div>
-                          //   </div>
-
-                          //   {/* Description */}
-                          //   <div className="p-2 border border-gray-200 rounded-lg shadow-lg text-sm">
-                          //     {product.description}
-                          //   </div>
-
-                          //   {/* Select Button */}
-                          //   <button
-                          //     className="py-2 rounded-lg shadow-2xl w-full text-white bg-purple-500 hover:bg-purple-600 transition-all"
-
-                          //   >
-                          //     Select
-                          //   </button>
-                          // </div>
                         })}
+                        </div>
+
                         {/* Image Modal / Lightbox */}
                         {zoomedImage && (
                           <div
@@ -2971,21 +3461,41 @@ export default function NewOrderClient() {
                   {/* Delivery + Customer */}
                   <div
                     className={`
-                      ${orderPageOption === "delivery" || orderPageOption === "customer" ? "grid" : "hidden"} 
-                      grid-cols-1 xl:grid-cols-2 gap-6 w-full
+                      ${
+                        orderPageOption === "delivery" ||
+                        orderPageOption === "customer"
+                          ? "grid"
+                          : "hidden"
+                      }
+                      grid-cols-1 gap-6
+                      lg:contents
                     `}
                   >
                     {/* Delivery */}
                     <div
                       className={`
-                        ${orderPageOption === "delivery" ? "block" : "hidden xl:block"} 
-                      order-page-option
+                        ${orderPageOption === "delivery" ? "block" : "hidden"}
+                        order-page-option
+
+                        lg:col-span-7
+                        lg:col-start-1
+                        lg:row-start-2
+                        lg:block
+                        lg:rounded-none
+                        lg:border-0
+                        lg:border-b
+                        lg:border-slate-200
+                        lg:bg-transparent
+                        lg:px-0
+                        lg:py-4
+                        lg:shadow-none
                       `}
                     >
                       <h2 className="order-header">Delivery</h2>
                       {/* Delivery Date */}
                       <div>
                         <label className="order-input-label">
+                          <span className="text-red-500">*</span>{" "}
                           Delivery Date
                         </label>
                         <input
@@ -3005,12 +3515,14 @@ export default function NewOrderClient() {
                                 : null,
                             })
                           }
-                          className="order-input lowercase"
+                          className="order-input-alt text-lg lg:text-base xl:text-lg lowercase"
                         />
                       </div>
+
                       {/* Delivery Time */}
                       <div>
                         <label className="order-input-label">
+                          <span className="text-red-500">*</span>{" "}
                           Delivery Time
                         </label>
                         <select
@@ -3023,16 +3535,18 @@ export default function NewOrderClient() {
                                 | "specific",
                             })
                           }
-                          className="order-input focus:rounded-b-none"
+                          className="order-input-alt text-lg lg:text-base xl:text-lg focus:rounded-b-none"
                         >
                           <option value="anytime">Anytime</option>
                           <option value="specific">Specific Time</option>
                         </select>
+
                         {logistics.timeOption === "specific" && (
-                          <div className="mt-4 grid sm:grid-cols-2 gap-4 text-black opacity-100">
+                          <div className="my-2 grid sm:grid-cols-2 gap-4 text-black opacity-100">
                             {/* From Time */}
                             <div>
-                              <label className="block text-lg font-bold ml-2">
+                              <label className="order-input-label">
+                                <span className="text-red-500">*</span>{" "}
                                 From
                               </label>
                               <input
@@ -3044,12 +3558,14 @@ export default function NewOrderClient() {
                                     timeFrom: e.target.value,
                                   })
                                 }
-                                className="order-input"
+                                className="order-input-alt text-lg lg:text-base xl:text-lg"
                               />
                             </div>
+
                             {/* To Time */}
                             <div>
-                              <label className="block text-lg font-bold ml-2">
+                              <label className="order-input-label">
+                                <span className="text-red-500">*</span>{" "}
                                 To
                               </label>
                               <input
@@ -3061,16 +3577,17 @@ export default function NewOrderClient() {
                                     timeTo: e.target.value,
                                   })
                                 }
-                                className="order-input"
+                                className="order-input-alt text-lg lg:text-base xl:text-lg"
                               />
                             </div>
                           </div>
                         )}
                       </div>
+
                       {/* Special Instructions */}
                       <div>
                         <label className="order-input-label">
-                          Special Instructions (optional)
+                          Special Instructions
                         </label>
                         <textarea
                           placeholder="Special Instructions (gate code, leave at desk, etc)"
@@ -3082,7 +3599,7 @@ export default function NewOrderClient() {
                             })
                           }
                           rows={3}
-                          className="order-input"
+                          className="order-input-alt text-lg lg:text-base xl:text-lg"
                         />
                       </div>
                     </div>
@@ -3090,15 +3607,27 @@ export default function NewOrderClient() {
                     {/* Customer */}
                     <div
                       className={`
-                        ${orderPageOption === "customer" ? "block" : "hidden xl:block"} 
-                      order-page-option
+                        ${orderPageOption === "customer" ? "block" : "hidden"}
+                        order-page-option
+
+                        lg:col-span-7
+                        lg:col-start-1
+                        lg:row-start-3
+                        lg:block
+                        lg:rounded-none
+                        lg:border-0
+                        lg:bg-transparent
+                        lg:px-0
+                        lg:pb-0
+                        lg:pt-4
+                        lg:shadow-none
                       `}
                     >
                       <h2 className="order-header">Customer (Optional)</h2>
-                      <p className="text-sm -mt-2 text-red-500">
+                      <p className="text-sm -mt-2 text-purple-500">
                         *Adding a customer is recommended
                       </p>
-                      <div className="space-y-2">
+                      <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2 lg:space-y-0">
                         {/* First Name */}
                         <div>
                           <label
@@ -3119,9 +3648,10 @@ export default function NewOrderClient() {
                                 firstName: e.target.value,
                               })
                             }
-                            className="order-input"
+                            className="order-input-alt text-lg lg:text-base xl:text-lg"
                           />
                         </div>
+
                         {/* Last Name */}
                         <div>
                           <label
@@ -3142,9 +3672,10 @@ export default function NewOrderClient() {
                                 lastName: e.target.value,
                               })
                             }
-                            className="text-lg text-black px-3 py-2 border rounded-xl w-full capitalize"
+                            className="order-input-alt text-lg lg:text-base xl:text-lg"
                           />
                         </div>
+
                         {/* Phone Number */}
                         <div>
                           <label
@@ -3168,9 +3699,10 @@ export default function NewOrderClient() {
                             onFocus={() =>
                               handlePhoneFocus(customer, setCustomer)
                             }
-                            className="order-input"
+                            className="order-input-alt text-lg lg:text-base xl:text-lg"
                           />
                         </div>
+
                         {/* Email Address */}
                         <div>
                           <label
@@ -3192,7 +3724,7 @@ export default function NewOrderClient() {
                                 email: e.target.value,
                               })
                             }
-                            className="order-input"
+                            className="order-input-alt text-lg lg:text-base xl:text-lg"
                           />
                         </div>
                       </div>
@@ -3201,16 +3733,16 @@ export default function NewOrderClient() {
                 </div>
 
                 {/* Order Form Organizer */}
-                <div className="sticky bottom-0 h-12 bg-emerald-50 rounded-xl border flex overflow-hidden">
+                <div className="sticky bottom-0 flex h-12 overflow-hidden rounded-xl border bg-emerald-50 lg:hidden">
                   <button
                     className="w-full h-full border-r border-emerald-200 hover:bg-emerald-200 transition-all"
                     onClick={() => setOrderPageOption("recipient")}
                   >
-                    <span className="xl:hidden">Recipient</span>
-                    <span className="hidden xl:block">Recipient / Product</span>
+                    <span className="lg:hidden">Recipient</span>
+                    <span className="hidden lg:block">Recipient / Product</span>
                   </button>
                   <button
-                    className="w-full h-full border-x border-emerald-200 hover:bg-emerald-200 transition-all xl:hidden"
+                    className="w-full h-full border-x border-emerald-200 hover:bg-emerald-200 transition-all lg:hidden"
                     onClick={() => setOrderPageOption("products")}
                   >
                     Products
@@ -3219,13 +3751,13 @@ export default function NewOrderClient() {
                     className="w-full h-full border-x border-emerald-200 hover:bg-emerald-200 transition-all"
                     onClick={() => setOrderPageOption("delivery")}
                   >
-                    <span className="xl:hidden">Delivery Info</span>
-                    <span className="hidden xl:block">
+                    <span className="lg:hidden">Delivery Info</span>
+                    <span className="hidden lg:block">
                       Delivery Info / Customer
                     </span>
                   </button>
                   <button
-                    className="w-full h-full border-l border-emerald-200 hover:bg-emerald-200 transition-all xl:hidden"
+                    className="w-full h-full border-l border-emerald-200 hover:bg-emerald-200 transition-all lg:hidden"
                     onClick={() => setOrderPageOption("customer")}
                   >
                     Customer
@@ -3679,7 +4211,7 @@ export default function NewOrderClient() {
                           className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white text-xl px-4 py-2 rounded-full w-full transition-all"
                           title="Send Order"
                         >
-                          Send Order & Keep ${pricing.feeCharge} →
+                          {sendingOrder ? "Sending Order..." : "Send Order"}
                         </button>
                       </div>
 
@@ -4001,6 +4533,66 @@ export default function NewOrderClient() {
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Guided Step Navigation */}
+              <div className="sticky bottom-3 z-30 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:p-4">
+                <button
+                  type="button"
+                  onClick={goToPreviousOrderStep}
+                  disabled={orderPage === "shop-lookup"}
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:px-6"
+                >
+                  ← Back
+                </button>
+
+                <div className="hidden text-center sm:block">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    {orderPage === "shop-lookup"
+                      ? "Step 1 of 3"
+                      : orderPage === "order-form"
+                        ? "Step 2 of 3"
+                        : "Step 3 of 3"}
+                  </p>
+
+                  <p className="mt-0.5 text-sm font-semibold text-slate-700">
+                    {orderPage === "shop-lookup"
+                      ? "Florist"
+                      : orderPage === "order-form"
+                        ? "Order"
+                        : "Review"}
+                  </p>
+                </div>
+
+                {orderPage !== "send-order" ? (
+                  <button
+                    type="button"
+                    onClick={goToNextOrderStep}
+                    disabled={searching}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-purple-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-slate-400 sm:max-w-xs sm:flex-none sm:px-7"
+                  >
+                    {orderPage === "shop-lookup"
+                      ? searching
+                        ? hasRequestedFulfillingShop
+                          ? "Checking Availability..."
+                          : "Finding Florists..."
+                        : shopChosen
+                          ? "Continue to Order →"
+                          : hasRequestedFulfillingShop
+                            ? "Continue →"
+                            : "Find Florists →"
+                      : "Continue to Review →"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={sendOrder}
+                    disabled={sendingOrder || !orderDetailsAreComplete}
+                    className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400 sm:max-w-xs sm:flex-none sm:px-7"
+                  >
+                    {sendingOrder ? "Sending Order..." : "Send Order"}
+                  </button>
                 )}
               </div>
             </div>

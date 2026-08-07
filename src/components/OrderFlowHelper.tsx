@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronUp, X, HelpCircle } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
+  X,
+} from "lucide-react";
 
 const STORAGE_KEY = "hideOrderFlowHelper";
 const STORAGE_EVENT = "order-flow-helper-storage-change";
@@ -96,24 +101,32 @@ export default function OrderFlowHelper() {
             <span className="rounded-lg bg-white px-3 py-2 shadow-sm">
               Sent
             </span>
+
             <span>→</span>
+
             <span className="rounded-lg bg-white px-3 py-2 shadow-sm">
               Accepted
             </span>
+
             <span>→</span>
-            <span className="rounded-lg bg-white px-3 py-2 shadow-sm">
-              Paid
-            </span>
-            <span>→</span>
+
             <span className="rounded-lg bg-white px-3 py-2 shadow-sm">
               Delivered
             </span>
           </div>
 
           <ul className="list-disc space-y-1 pl-5 text-sm">
-            <li>The fulfilling shop accepts or declines the order</li>
-            <li>The originating shop marks the order as paid</li>
-            <li>The fulfilling shop marks it as delivered</li>
+            <li>The fulfilling shop accepts or declines the order.</li>
+
+            <li>
+              If accepted, payment is handled directly between the
+              florists outside GetBloomDirect.
+            </li>
+
+            <li>
+              The fulfilling shop delivers the order and marks it
+              complete.
+            </li>
           </ul>
         </div>
       )}

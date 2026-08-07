@@ -22,7 +22,6 @@ const webhookSchema = new mongoose.Schema(
         "order.created",
         "order.accepted",
         "order.declined",
-        "order.paid",
         "order.completed",
       ],
       default: [],

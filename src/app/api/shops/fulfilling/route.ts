@@ -23,7 +23,7 @@
 
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
-import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility.ts";
+import { getShopReceivingEligibility } from "@/lib/shops/getShopReceivingEligibility";
 import Shop from "@/models/Shop";
 import { Types } from "mongoose";
 import { getServerSession } from "next-auth";

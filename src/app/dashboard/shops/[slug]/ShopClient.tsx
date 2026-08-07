@@ -266,14 +266,25 @@ export default function ShopClient({
           </div>
 
           {/* Action Buttons */}
-          {loggedInShop?._id != shop?._id ? (
-            <div className="flex gap-3 mb-2">
-              {/* <button className="flex-1 md:flex-none px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold transition-all shadow-md shadow-purple-200">
-                Send Flowers
-              </button> */}
-              {/* <button className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full font-bold transition-all">
-                Message
-              </button> */}
+          {loggedInShop != shop?._id ? (
+            <div className="mb-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              {shop?._id && (
+                <Link
+                  href={`/dashboard/new-order?fulfillingShopId=${encodeURIComponent(
+                    String(shop._id),
+                  )}`}
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-md transition hover:bg-emerald-700 sm:w-auto"
+                >
+                  Create Order
+                </Link>
+              )}
+
+              <Link
+                href="/dashboard/network"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 font-bold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+              >
+                View Network
+              </Link>
             </div>
           ) : (
             <div className="flex gap-3 mb-2">

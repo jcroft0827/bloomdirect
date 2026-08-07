@@ -7,6 +7,11 @@ export function mapOrderForPOS(order: any) {
 
     status: order.status,
 
+    decline: {
+      reason: order.declineReason || "",
+      message: order.declineMessage || "",
+    },
+
     recipient: {
       fullName: order.recipient?.fullName || "",
       address: order.recipient?.address || "",

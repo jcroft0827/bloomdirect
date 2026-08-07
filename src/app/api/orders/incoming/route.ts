@@ -21,6 +21,7 @@ export async function GET() {
       status: {
         $in: [
           OrderStatus.PENDING_ACCEPTANCE,
+          OrderStatus.ACCEPTED,
           OrderStatus.ACCEPTED_AWAITING_PAYMENT,
           OrderStatus.PAID_AWAITING_FULFILLMENT,
         ],
@@ -31,21 +32,22 @@ export async function GET() {
 
     return NextResponse.json({ orders });
   } catch (error: any) {
-      console.error("INCOMING ERROR:", error);
-  
-      if (error instanceof ApiError) {
-        return NextResponse.json(
-          { error: error.message, code: error.code },
-          { status: error.status },
-        );
-      }
-  
+    console.error("INCOMING ERROR:", error);
+
+    if (error instanceof ApiError) {
       return NextResponse.json(
-        {
-          error: "Error With Order Incoming. Please contact GetBloomDirect Support.",
-          code: "SERVER_ERROR",
-        },
-        { status: 500 },
+        { error: error.message, code: error.code },
+        { status: error.status },
       );
     }
+
+    return NextResponse.json(
+      {
+        error:
+          "Error With Order Incoming. Please contact GetBloomDirect Support.",
+        code: "SERVER_ERROR",
+      },
+      { status: 500 },
+    );
+  }
 }

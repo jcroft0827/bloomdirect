@@ -6,61 +6,78 @@ type Props = {
 
 const steps = [
   {
-    key: OrderStatus.PENDING_ACCEPTANCE,
+    key: "pending",
     label: "Pending",
   },
   {
-    key: OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+    key: "accepted",
     label: "Accepted",
   },
   {
-    key: OrderStatus.PAID_AWAITING_FULFILLMENT,
-    label: "Paid",
-  },
-  {
-    key: OrderStatus.COMPLETED,
+    key: "completed",
     label: "Delivered",
   },
-];
+] as const;
+
+function getActiveStepIndex(status: OrderStatus): number {
+  switch (status) {
+    case OrderStatus.PENDING_ACCEPTANCE:
+      return 0;
+
+    case OrderStatus.ACCEPTED:
+    case OrderStatus.ACCEPTED_AWAITING_PAYMENT:
+    case OrderStatus.PAID_AWAITING_FULFILLMENT:
+      return 1;
+
+    case OrderStatus.COMPLETED:
+      return 2;
+
+    case OrderStatus.DECLINED:
+    case OrderStatus.OUTSIDE_NETWORK:
+    default:
+      return -1;
+  }
+}
 
 export default function OrderTimeline({ status }: Props) {
-  const activeIndex = steps.findIndex((s) => s.key === status);
+  const activeIndex = getActiveStepIndex(status);
 
   return (
     <div className="w-full">
-      <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-0">
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-0">
         {steps.map((step, index) => {
-          const isComplete = index <= activeIndex;
+          const isComplete = activeIndex >= 0 && index <= activeIndex;
+          const connectorComplete =
+            activeIndex >= 0 && index < activeIndex;
 
           return (
             <div
               key={step.key}
-              className="flex md:flex-1 items-center md:flex-col gap-4 md:gap-2"
+              className="flex items-center gap-4 md:flex-1 md:flex-col md:gap-2"
             >
-              {/* Dot */}
               <div
-                className={`w-6 h-6 rounded-full border-4 transition ${
+                className={`h-6 w-6 rounded-full border-4 transition ${
                   isComplete
-                    ? "bg-emerald-500 border-emerald-500"
-                    : "bg-white border-gray-300"
+                    ? "border-emerald-500 bg-emerald-500"
+                    : "border-gray-300 bg-white"
                 }`}
               />
 
-              {/* Label */}
               <span
-                className={`text-sm font-semibold text-center ${
+                className={`text-center text-sm font-semibold ${
                   isComplete ? "text-emerald-700" : "text-gray-400"
                 }`}
               >
                 {step.label}
               </span>
 
-              {/* Connector */}
               {index < steps.length - 1 && (
-                <div className="hidden md:block h-1 w-full bg-gray-200 mt-4">
+                <div className="mt-4 hidden h-1 w-full bg-gray-200 md:block">
                   <div
                     className={`h-full transition-all ${
-                      isComplete ? "bg-emerald-500 w-full" : "w-0"
+                      connectorComplete
+                        ? "w-full bg-emerald-500"
+                        : "w-0"
                     }`}
                   />
                 </div>

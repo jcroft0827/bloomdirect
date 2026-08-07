@@ -56,7 +56,8 @@ export async function POST(req: Request) {
     // - complete
     // ─────────────────────────────────────────────
     const fulfillingActions = [
-      OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+      OrderStatus.ACCEPTED,
+      OrderStatus.ACCEPTED_AWAITING_PAYMENT, // legacy
       OrderStatus.DECLINED,
       OrderStatus.COMPLETED,
     ];
@@ -73,7 +74,10 @@ export async function POST(req: Request) {
     // A fulfilling florist must have a configured payment method before
     // accepting an order.
     // ─────────────────────────────────────────────
-    if (status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
+    if (
+      status === OrderStatus.ACCEPTED ||
+      status === OrderStatus.ACCEPTED_AWAITING_PAYMENT // legacy
+    ) {
       const fulfillingShop = await Shop.findById(userShopId);
 
       if (!fulfillingShop) {
@@ -187,13 +191,19 @@ export async function POST(req: Request) {
     const now = new Date();
     order.status = status;
 
-    if (status === OrderStatus.ACCEPTED_AWAITING_PAYMENT) {
+    if (
+      status === OrderStatus.ACCEPTED ||
+      status === OrderStatus.ACCEPTED_AWAITING_PAYMENT
+    ) {
       order.acceptedAt = now;
       await addOrderActivity({
         orderId: order._id,
         action: OrderActivityActions.ORDER_ACCEPTED,
         actorShopId: session.user.id,
-        message: `Order accepted, awaiting payment`,
+        message:
+          status === OrderStatus.ACCEPTED
+            ? "Order accepted"
+            : "Order accepted, awaiting payment",
       });
 
       await sendOrderEvent({
@@ -307,21 +317,90 @@ export async function POST(req: Request) {
           subject,
           html,
         });
-
-      console.log(status);
-
       if (
-        status.toString().trim() ===
-        OrderStatus.ACCEPTED_AWAITING_PAYMENT.toString()
+        status === OrderStatus.ACCEPTED ||
+        status === OrderStatus.ACCEPTED_AWAITING_PAYMENT
       ) {
-        console.log("✅ ACCEPTED condition met. Sending email...");
-
-        console.log("Preparing to send to:", originShop?.email);
-
         // Fallbacks for everything
         const bizName = fulfillShop?.businessName || "A shop";
         const pref =
           fulfillShop?.paymentMethods?.defaultPaymentMethod || "Not specified";
+
+        const paymentMethods = fulfillShop?.paymentMethods;
+
+        const normalizePaymentHandle = (value?: string) =>
+          value?.trim().replace(/^[@$]/, "") || "";
+
+        const preferredPaymentButton = (() => {
+          const buttonStyle = [
+            "display:inline-block",
+            "padding:12px 20px",
+            "background-color:#111827",
+            "color:#ffffff",
+            "text-decoration:none",
+            "border-radius:8px",
+            "font-weight:600",
+            "margin:8px 0 20px",
+          ].join(";");
+
+          switch (pref) {
+            case "venmo": {
+              const handle = normalizePaymentHandle(
+                paymentMethods?.venmoHandle,
+              );
+
+              if (!handle) return "";
+
+              return `
+        <a
+          href="https://venmo.com/u/${encodeURIComponent(handle)}"
+          style="${buttonStyle}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Pay with Venmo
+        </a>
+      `;
+            }
+
+            case "cashapp": {
+              const cashtag = normalizePaymentHandle(
+                paymentMethods?.cashAppTag,
+              );
+
+              if (!cashtag) return "";
+
+              return `
+        <a
+          href="https://cash.app/$${encodeURIComponent(cashtag)}"
+          style="${buttonStyle}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Pay with Cash App
+        </a>
+      `;
+            }
+
+            case "paypal": {
+              if (!paymentMethods?.paypalEmail?.trim()) return "";
+
+              return `
+        <a
+          href="https://www.paypal.com/us/digital-wallet/send-receive-money/send-money"
+          style="${buttonStyle}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open PayPal
+        </a>
+      `;
+            }
+
+            default:
+              return "";
+          }
+        })();
 
         await sendEmail(
           originShop.email,
@@ -336,13 +415,15 @@ export async function POST(req: Request) {
           )}`,
           `
             <p><strong>${bizName}</strong> has accepted your order.</p>
-            <p>Please submit payment, and then select which payment method you chose on the order in GetBloomDirect to let the shop know you paid!</p>
+            <p>Please submit payment directly to the fulfilling florist using one of the payment methods below.</p>
 
             <p><strong>${bizName}'s preferred payment is ${pref}.</strong></p>
 
+            ${preferredPaymentButton}
+
             <p><strong>Payment Methods:</strong></p>
             <p><strong>Venmo: </strong>${fulfillShop.paymentMethods?.venmoHandle || "N/A"}</p>
-            <p><strong>CashApp: </strong>${fulfillShop.paymentMethods?.cashAppTag || "N/A"}</p>
+            <p><strong>Cash App: </strong>${fulfillShop.paymentMethods?.cashAppTag || "N/A"}</p>
             <p><strong>Zelle: </strong>${fulfillShop.paymentMethods?.zellePhoneOrEmail || "N/A"}</p>
             <p><strong>PayPal: </strong>${fulfillShop.paymentMethods?.paypalEmail || "N/A"}</p>
           `,

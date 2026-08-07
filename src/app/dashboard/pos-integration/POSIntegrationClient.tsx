@@ -43,7 +43,6 @@ const WEBHOOK_EVENTS = [
   "order.created",
   "order.accepted",
   "order.declined",
-  "order.paid",
   "order.completed",
 ] as const;
 

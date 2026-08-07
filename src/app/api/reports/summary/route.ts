@@ -31,20 +31,15 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const shop = await Shop.findById(session.user.id)
-      .select("_id isPro isSuspended");
+    const shop = await Shop.findById(session.user.id).select(
+      "_id isPro isSuspended",
+    );
 
     if (!shop) {
-      return NextResponse.json(
-        { error: "Shop not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
     }
 
     if (shop.isSuspended) {
@@ -67,43 +62,25 @@ export async function GET(req: Request) {
 
     const searchParams = new URL(req.url).searchParams;
 
-    const startDate = parseStartDate(
-      searchParams.get("startDate"),
-    );
+    const startDate = parseStartDate(searchParams.get("startDate"));
 
-    const endDate = parseEndDate(
-      searchParams.get("endDate"),
-    );
+    const endDate = parseEndDate(searchParams.get("endDate"));
 
-    if (
-      searchParams.get("startDate") &&
-      !startDate
-    ) {
+    if (searchParams.get("startDate") && !startDate) {
       return NextResponse.json(
         { error: "Invalid start date." },
         { status: 400 },
       );
     }
 
-    if (
-      searchParams.get("endDate") &&
-      !endDate
-    ) {
-      return NextResponse.json(
-        { error: "Invalid end date." },
-        { status: 400 },
-      );
+    if (searchParams.get("endDate") && !endDate) {
+      return NextResponse.json({ error: "Invalid end date." }, { status: 400 });
     }
 
-    if (
-      startDate &&
-      endDate &&
-      startDate > endDate
-    ) {
+    if (startDate && endDate && startDate > endDate) {
       return NextResponse.json(
         {
-          error:
-            "The start date must be before the end date.",
+          error: "The start date must be before the end date.",
         },
         { status: 400 },
       );
@@ -119,12 +96,21 @@ export async function GET(req: Request) {
       createdAtFilter.$lte = endDate;
     }
 
-    const hasDateFilter =
-      Object.keys(createdAtFilter).length > 0;
+    const hasDateFilter = Object.keys(createdAtFilter).length > 0;
 
-    const shopObjectId = new mongoose.Types.ObjectId(
-      session.user.id,
-    );
+    const refundDateFilter: Record<string, Date> = {};
+
+    if (startDate) {
+      refundDateFilter.$gte = startDate;
+    }
+
+    if (endDate) {
+      refundDateFilter.$lte = endDate;
+    }
+
+    const hasRefundDateFilter = Object.keys(refundDateFilter).length > 0;
+
+    const shopObjectId = new mongoose.Types.ObjectId(session.user.id);
 
     const sentMatch: Record<string, any> = {
       originatingShop: shopObjectId,
@@ -166,6 +152,7 @@ export async function GET(req: Request) {
       receivedSummaryResult,
       fulfillmentTypeResult,
       salesTaxResult,
+      refundSummaryResult,
     ] = await Promise.all([
       Order.aggregate([
         {
@@ -199,8 +186,7 @@ export async function GET(req: Request) {
             },
 
             fulfillmentValueCents: {
-              $sum:
-                "$pricing.fulfillingShopGetsCents",
+              $sum: "$pricing.fulfillingShopGetsCents",
             },
           },
         },
@@ -213,10 +199,7 @@ export async function GET(req: Request) {
         {
           $group: {
             _id: {
-              $ifNull: [
-                "$fulfillmentType",
-                "network",
-              ],
+              $ifNull: ["$fulfillmentType", "network"],
             },
 
             count: {
@@ -235,13 +218,11 @@ export async function GET(req: Request) {
             _id: null,
 
             taxableProductSubtotalCents: {
-              $sum:
-                "$pricing.taxableSubtotalCents",
+              $sum: "$pricing.taxableSubtotalCents",
             },
 
             productSubtotalCents: {
-              $sum:
-                "$pricing.productsTotalCents",
+              $sum: "$pricing.productsTotalCents",
             },
 
             taxableDeliveryFeesCents: {
@@ -265,40 +246,114 @@ export async function GET(req: Request) {
             },
 
             taxCollectedCents: {
-              $sum:
-                "$pricing.taxAmountCents",
+              $sum: "$pricing.taxAmountCents",
             },
 
             grossOrderTotalCents: {
-              $sum:
-                "$pricing.customerPaysCents",
+              $sum: "$pricing.customerPaysCents",
+            },
+          },
+        },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            originatingShop: shopObjectId,
+          },
+        },
+        {
+          $unwind: "$refunds",
+        },
+        {
+          $match: {
+            "refunds.status": "active",
+            ...(hasRefundDateFilter
+              ? {
+                  "refunds.refundDate": refundDateFilter,
+                }
+              : {}),
+          },
+        },
+        {
+          $group: {
+            _id: "$_id",
+
+            refundStatus: {
+              $first: {
+                $ifNull: ["$refundStatus", "none"],
+              },
+            },
+
+            refundedCents: {
+              $sum: "$refunds.amountCents",
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+
+            totalRefundedCents: {
+              $sum: "$refundedCents",
+            },
+
+            refundedOrders: {
+              $sum: 1,
+            },
+
+            partiallyRefundedOrders: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: ["$refundStatus", "partial"],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            fullyRefundedOrders: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: ["$refundStatus", "full"],
+                  },
+                  1,
+                  0,
+                ],
+              },
             },
           },
         },
       ]),
     ]);
 
-    const sentSummary =
-      sentSummaryResult[0] ?? {
-        ordersSent: 0,
-        sentOrderValueCents: 0,
-      };
+    const sentSummary = sentSummaryResult[0] ?? {
+      ordersSent: 0,
+      sentOrderValueCents: 0,
+    };
 
-    const receivedSummary =
-      receivedSummaryResult[0] ?? {
-        ordersReceived: 0,
-        fulfillmentValueCents: 0,
-      };
+    const receivedSummary = receivedSummaryResult[0] ?? {
+      ordersReceived: 0,
+      fulfillmentValueCents: 0,
+    };
 
-    const salesTax =
-      salesTaxResult[0] ?? {
-        taxableProductSubtotalCents: 0,
-        productSubtotalCents: 0,
-        taxableDeliveryFeesCents: 0,
-        nonTaxableDeliveryFeesCents: 0,
-        taxCollectedCents: 0,
-        grossOrderTotalCents: 0,
-      };
+    const salesTax = salesTaxResult[0] ?? {
+      taxableProductSubtotalCents: 0,
+      productSubtotalCents: 0,
+      taxableDeliveryFeesCents: 0,
+      nonTaxableDeliveryFeesCents: 0,
+      taxCollectedCents: 0,
+      grossOrderTotalCents: 0,
+    };
+
+    const refundSummary = refundSummaryResult[0] ?? {
+      totalRefundedCents: 0,
+      refundedOrders: 0,
+      partiallyRefundedOrders: 0,
+      fullyRefundedOrders: 0,
+    };
 
     const fulfillmentTypes = {
       network: 0,
@@ -307,27 +362,20 @@ export async function GET(req: Request) {
 
     for (const result of fulfillmentTypeResult) {
       if (result._id === "outside_network") {
-        fulfillmentTypes.outsideNetwork =
-          result.count;
+        fulfillmentTypes.outsideNetwork = result.count;
       } else {
-        fulfillmentTypes.network =
-          result.count;
+        fulfillmentTypes.network = result.count;
       }
     }
 
-    const nonTaxableProductSubtotalCents =
-      Math.max(
-        salesTax.productSubtotalCents -
-          salesTax.taxableProductSubtotalCents,
-        0,
-      );
+    const nonTaxableProductSubtotalCents = Math.max(
+      salesTax.productSubtotalCents - salesTax.taxableProductSubtotalCents,
+      0,
+    );
 
     const averageSentOrderValueCents =
       sentSummary.ordersSent > 0
-        ? Math.round(
-            sentSummary.sentOrderValueCents /
-              sentSummary.ordersSent,
-          )
+        ? Math.round(sentSummary.sentOrderValueCents / sentSummary.ordersSent)
         : 0;
 
     const averageFulfillmentOrderCents =
@@ -338,60 +386,63 @@ export async function GET(req: Request) {
           )
         : 0;
 
+    const netSentOrderValueCents = Math.max(
+      0,
+      sentSummary.sentOrderValueCents - refundSummary.totalRefundedCents,
+    );
+
     return NextResponse.json({
       filters: {
-        startDate:
-          startDate?.toISOString() ?? null,
-        endDate:
-          endDate?.toISOString() ?? null,
+        startDate: startDate?.toISOString() ?? null,
+        endDate: endDate?.toISOString() ?? null,
       },
 
       summary: {
         ordersSent: sentSummary.ordersSent,
-        ordersReceived:
-          receivedSummary.ordersReceived,
+        ordersReceived: receivedSummary.ordersReceived,
 
-        sentOrderValueCents:
-          sentSummary.sentOrderValueCents,
+        sentOrderValueCents: sentSummary.sentOrderValueCents,
 
-        fulfillmentValueCents:
-          receivedSummary.fulfillmentValueCents,
+        fulfillmentValueCents: receivedSummary.fulfillmentValueCents,
 
         averageSentOrderValueCents,
         averageFulfillmentOrderCents,
       },
 
+      refunds: {
+        totalRefundedCents: refundSummary.totalRefundedCents,
+
+        refundedOrders: refundSummary.refundedOrders,
+
+        partiallyRefundedOrders: refundSummary.partiallyRefundedOrders,
+
+        fullyRefundedOrders: refundSummary.fullyRefundedOrders,
+
+        netSentOrderValueCents,
+      },
+
       fulfillmentTypes,
 
       salesTax: {
-        taxableProductSubtotalCents:
-          salesTax.taxableProductSubtotalCents,
+        taxableProductSubtotalCents: salesTax.taxableProductSubtotalCents,
 
         nonTaxableProductSubtotalCents,
 
-        taxableDeliveryFeesCents:
-          salesTax.taxableDeliveryFeesCents,
+        taxableDeliveryFeesCents: salesTax.taxableDeliveryFeesCents,
 
-        nonTaxableDeliveryFeesCents:
-          salesTax.nonTaxableDeliveryFeesCents,
+        nonTaxableDeliveryFeesCents: salesTax.nonTaxableDeliveryFeesCents,
 
-        taxCollectedCents:
-          salesTax.taxCollectedCents,
+        taxCollectedCents: salesTax.taxCollectedCents,
 
-        grossOrderTotalCents:
-          salesTax.grossOrderTotalCents,
+        grossOrderTotalCents: salesTax.grossOrderTotalCents,
       },
     });
   } catch (error) {
-    console.error(
-      "REPORT SUMMARY ERROR:",
-      error,
-    );
+    console.error("REPORT SUMMARY ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to generate reporting data.",
+        error: "Unable to generate reporting data.",
       },
       { status: 500 },
     );

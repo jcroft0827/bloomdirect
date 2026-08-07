@@ -101,6 +101,46 @@ export interface OutsideFlorist {
   notes: string;
 }
 
+export type RefundSource = "manual" | "platform";
+
+export type RefundCategory = "delivery_fee" | "tax" | "full" | "custom";
+
+export type RefundEntryStatus = "active" | "voided";
+
+export type OrderRefundStatus = "none" | "partial" | "full";
+
+export type OrderRefund = {
+  _id: string;
+
+  amountCents: number;
+
+  refundDate: string;
+
+  source: RefundSource;
+
+  category: RefundCategory;
+
+  reason?: string;
+
+  notes?: string;
+
+  status: RefundEntryStatus;
+
+  createdByShop: string;
+
+  createdAt: string;
+
+  voidedAt?: string | null;
+
+  voidedByShop?: string | null;
+
+  voidReason?: string;
+
+  externalRefundId?: string;
+
+  externalPaymentId?: string;
+};
+
 export type OrderLean = {
   _id: string;
 
@@ -137,6 +177,12 @@ export type OrderLean = {
   activityLog?: OrderActivityLean[];
 
   reviews?: OrderReviewsLean[];
+
+  refundStatus: OrderRefundStatus;
+
+  totalRefundedCents: number;
+
+  refunds: OrderRefund[];
 
   paymentMarkedPaidAt?: string;
   acceptedAt?: string;

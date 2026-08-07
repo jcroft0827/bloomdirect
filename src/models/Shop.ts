@@ -183,6 +183,11 @@ const shopSchema = new mongoose.Schema(
 
     lastActivity: Date,
 
+    dismissedDashboardWelcome: {
+      type: Boolean,
+      default: false,
+    },
+
     // ===============================
     // SETTINGS COMPLETION TRACKING
     // ===============================

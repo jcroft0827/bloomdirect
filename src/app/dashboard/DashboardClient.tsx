@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import BloomSpinner from "@/components/BloomSpinner";
 import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
 import VerificationProgressBar from "@/components/verification/ProgressBar";
+import DashboardWelcome from "@/components/dashboard/DashboardWelcome";
 
 type DashboardReportPeriod = "month" | "year" | "all";
 
@@ -186,6 +187,7 @@ interface Shop {
   proSince: Date;
   lastLogin: Date;
   lastActivity: Date;
+  dismissedDashboardWelcome?: boolean;
   contact: Contact;
   address: Address;
   paymentMethods: PaymentMethods;
@@ -295,6 +297,8 @@ export default function DashboardClient() {
     useState<DashboardReportSummary | null>(null);
 
   const [reportLoading, setReportLoading] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [dismissingWelcome, setDismissingWelcome] = useState(false);
 
   // Invite Florists
   const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
@@ -339,6 +343,7 @@ export default function DashboardClient() {
           setShop(shopData.shop);
           setShopId(shopData.shop._id || shopData.id || "");
           setIsPro(Boolean(shopData.shop.isPro));
+          setShowWelcome(!Boolean(shopData.shop.dismissedDashboardWelcome));
         }
 
         if (shopData?.readiness) {
@@ -453,6 +458,56 @@ export default function DashboardClient() {
   };
 
   // ------------------------------
+  // HIDE WELCOME MESSAGE HANDLER
+  // ------------------------------
+  const handleDismissWelcome = async () => {
+    if (dismissingWelcome) {
+      return;
+    }
+
+    try {
+      setDismissingWelcome(true);
+
+      const response = await fetch("/api/shops/me/dashboard-welcome", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dismissed: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to hide the welcome guide.");
+      }
+
+      setShowWelcome(false);
+
+      setShop((currentShop) =>
+        currentShop
+          ? {
+              ...currentShop,
+              dismissedDashboardWelcome: true,
+            }
+          : currentShop,
+      );
+    } catch (error) {
+      console.error("DISMISS DASHBOARD WELCOME ERROR:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to hide the welcome guide.",
+      );
+    } finally {
+      setDismissingWelcome(false);
+    }
+  };
+
+  // ------------------------------
   // SHOW/HIDE PERSONAL MESSAGE
   // ------------------------------
   const handleVisibilityPersonalMessage = async () => {
@@ -512,16 +567,28 @@ export default function DashboardClient() {
   return (
     <div className="w-full rounded-2xl shadow-xl bg-gradient-to-br from-blue-50 via-white to-teal-50">
       <div className="mx-auto p-6">
+        {showWelcome && readiness && (
+          <DashboardWelcome
+            businessName={shop?.businessName}
+            readinessPercentage={readiness.completionPercentage}
+            readinessCompleted={readiness.completedCount}
+            readinessTotal={readiness.totalCount}
+            onDismiss={handleDismissWelcome}
+          />
+        )}
+
         {/* Verification Status */}
         <VerificationProgressBar
           steps={verificationSteps}
           isVerified={shop?.isVerified ?? false}
         />
 
-
         {/* Operational Readiness */}
         {readiness && readiness.completionPercentage < 100 && (
-          <div className="mb-12 overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-xl">
+          <div
+            id="shop-readiness"
+            className="mb-12 scroll-mt-24 overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-xl"
+          >
             <div className="bg-gradient-to-r from-purple-700 to-indigo-700 px-6 py-6 text-white md:px-8">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -534,8 +601,8 @@ export default function DashboardClient() {
                   </h2>
 
                   <p className="mt-2 max-w-2xl text-sm text-purple-100 md:text-base">
-                    Complete the remaining settings below to join the network and
-                    unlock all order features.
+                    Complete the remaining settings below to join the network
+                    and unlock all order features.
                   </p>
                 </div>
 

@@ -181,7 +181,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </h1>
 
                 <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
-                  Manage your shop, orders, and Bloom services
+                  Everything you need to run your flower shop.
                 </p>
               </div>
             </div>
@@ -200,6 +200,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   }
                 >
                   New Order
+                </span>
+                <span
+                  className={
+                    pathname === "/dashboard/network" ? "block" : "hidden"
+                  }
+                >
+                  Network
                 </span>
                 <span
                   className={
@@ -224,12 +231,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   POS Integration
                 </span>
+                <span
+                  className={
+                    pathname === "/dashboard/getting-started"
+                      ? "block"
+                      : "hidden"
+                  }
+                >
+                  Getting Started
+                </span>
                 {shop?.role === "admin" && (
-                  <span
-                    className={
-                      pathname === "/admin" ? "block" : "hidden"
-                    }
-                  >
+                  <span className={pathname === "/admin" ? "block" : "hidden"}>
                     Admin Panel
                   </span>
                 )}
