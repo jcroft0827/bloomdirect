@@ -150,11 +150,10 @@ async function saveWebsiteNeedsReviewInfo({
   matchedSignals: string[];
   riskSignals: string[];
 }) {
-  const existingRequest =
-    await WebsiteVerificationRequest.findOne({
-      shop: shop._id,
-      status: "pending",
-    });
+  const existingRequest = await WebsiteVerificationRequest.findOne({
+    shop: shop._id,
+    status: "pending",
+  });
 
   if (existingRequest) {
     return existingRequest;
@@ -235,8 +234,7 @@ async function inspectWebsite(website: string, shop: any) {
     );
 
     const businessNameMatch =
-      shop.businessName &&
-      text.includes(shop.businessName.toLowerCase());
+      shop.businessName && text.includes(shop.businessName.toLowerCase());
 
     const cityMatch =
       shop.address?.city && text.includes(shop.address.city.toLowerCase());
@@ -245,10 +243,12 @@ async function inspectWebsite(website: string, shop: any) {
       shop.address?.state && text.includes(shop.address.state.toLowerCase());
 
     const phone = normalizePhone(shop.contact?.phone);
-    const phoneMatch = phone.length >= 10 && text.replace(/\D/g, "").includes(phone);
+    const phoneMatch =
+      phone.length >= 10 && text.replace(/\D/g, "").includes(phone);
 
     const hasFloristSignals = matchedSignals.length >= 2;
-    const hasLocalSignals = !!businessNameMatch || !!cityMatch || !!stateMatch || !!phoneMatch;
+    const hasLocalSignals =
+      !!businessNameMatch || !!cityMatch || !!stateMatch || !!phoneMatch;
     const hasStrongRisk = matchedRiskSignals.length >= 1;
 
     if (hasFloristSignals && hasLocalSignals && !hasStrongRisk) {
@@ -314,6 +314,16 @@ export async function POST(req: Request) {
 
     if (!shop) {
       return NextResponse.json({ error: "Shop not found." }, { status: 404 });
+    }
+
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
     }
 
     if (

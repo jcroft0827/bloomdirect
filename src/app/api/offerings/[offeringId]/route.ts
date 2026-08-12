@@ -35,6 +35,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     const { offeringId } = await params;
     const body = await req.json();
 
@@ -205,6 +215,16 @@ export async function DELETE(
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     if (!shop.isPro) {
       return NextResponse.json(
         { error: "Deleting offerings is a Bloom Pro feature." },
@@ -239,7 +259,10 @@ export async function DELETE(
 
     if (totalOfferings <= 2) {
       return NextResponse.json(
-        { error: "A shop must keep at least Designer's Choice and one Featured Arrangement." },
+        {
+          error:
+            "A shop must keep at least Designer's Choice and one Featured Arrangement.",
+        },
         { status: 400 },
       );
     }
@@ -278,9 +301,6 @@ export async function DELETE(
   } catch (error) {
     console.error("DELETE OFFERING ERROR:", error);
 
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

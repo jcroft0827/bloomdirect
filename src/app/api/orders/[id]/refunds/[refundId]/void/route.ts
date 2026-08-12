@@ -3,6 +3,7 @@ import { connectToDB } from "@/lib/mongoose";
 import { OrderActivityActions } from "@/lib/order-activity-actions";
 import { getRefundSummary } from "@/lib/orders/refunds";
 import Order from "@/models/Order";
+import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,10 +18,7 @@ type RouteContext = {
   }>;
 };
 
-function normalizeRequiredText(
-  value: unknown,
-  maxLength: number,
-): string {
+function normalizeRequiredText(value: unknown, maxLength: number): string {
   if (typeof value !== "string") {
     return "";
   }
@@ -28,18 +26,12 @@ function normalizeRequiredText(
   return value.trim().slice(0, maxLength);
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: RouteContext,
-) {
+export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const { id: orderId, refundId } = await params;
@@ -80,42 +72,45 @@ export async function POST(
 
     await connectToDB();
 
-    const order = await Order.findById(orderId);
+    const shop = await Shop.findById(session.user.id).select("_id isSuspended");
 
-    if (!order) {
+    if (!shop) {
+      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
+    }
+
+    if (shop.isSuspended) {
       return NextResponse.json(
-        { error: "Order not found." },
-        { status: 404 },
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
       );
     }
 
-    if (
-      order.originatingShop.toString() !==
-      session.user.id.toString()
-    ) {
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    }
+
+    if (order.originatingShop.toString() !== session.user.id.toString()) {
       return NextResponse.json(
         {
-          error:
-            "Only the originating shop can void a refund for this order.",
+          error: "Only the originating shop can void a refund for this order.",
         },
         { status: 403 },
       );
     }
 
     if (!Array.isArray(order.refunds)) {
-      return NextResponse.json(
-        { error: "Refund not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Refund not found." }, { status: 404 });
     }
 
     const refund = order.refunds.id(refundId);
 
     if (!refund) {
-      return NextResponse.json(
-        { error: "Refund not found." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Refund not found." }, { status: 404 });
     }
 
     if (refund.status === "voided") {
@@ -127,14 +122,10 @@ export async function POST(
 
     const orderTotalCents = order.pricing?.orderTotalCents;
 
-    if (
-      !Number.isInteger(orderTotalCents) ||
-      orderTotalCents <= 0
-    ) {
+    if (!Number.isInteger(orderTotalCents) || orderTotalCents <= 0) {
       return NextResponse.json(
         {
-          error:
-            "This order does not have a valid total.",
+          error: "This order does not have a valid total.",
         },
         { status: 409 },
       );
@@ -160,8 +151,7 @@ export async function POST(
       ),
     });
 
-    order.totalRefundedCents =
-      updatedSummary.totalRefundedCents;
+    order.totalRefundedCents = updatedSummary.totalRefundedCents;
 
     order.refundStatus = updatedSummary.refundStatus;
 
@@ -186,16 +176,14 @@ export async function POST(
       refund,
       refundStatus: order.refundStatus,
       totalRefundedCents: order.totalRefundedCents,
-      remainingRefundableCents:
-        updatedSummary.remainingRefundableCents,
+      remainingRefundableCents: updatedSummary.remainingRefundableCents,
     });
   } catch (error) {
     console.error("VOID ORDER REFUND ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to void the refund. Please try again.",
+        error: "Unable to void the refund. Please try again.",
       },
       { status: 500 },
     );

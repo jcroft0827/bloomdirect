@@ -7,15 +7,11 @@ import {
 } from "@/lib/orders/refunds";
 import { OrderStatus } from "@/lib/order-status";
 import Order from "@/models/Order";
+import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
-const REFUND_CATEGORIES = [
-  "delivery_fee",
-  "tax",
-  "full",
-  "custom",
-] as const;
+const REFUND_CATEGORIES = ["delivery_fee", "tax", "full", "custom"] as const;
 
 type RefundCategory = (typeof REFUND_CATEGORIES)[number];
 
@@ -47,10 +43,7 @@ function isRefundCategory(value: unknown): value is RefundCategory {
   );
 }
 
-function normalizeOptionalText(
-  value: unknown,
-  maxLength: number,
-): string {
+function normalizeOptionalText(value: unknown, maxLength: number): string {
   if (typeof value !== "string") {
     return "";
   }
@@ -80,18 +73,12 @@ function parseRefundDate(value: unknown): Date | null {
   return parsedDate;
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: RouteContext,
-) {
+export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Unauthorized." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const { id: orderId } = await params;
@@ -115,9 +102,7 @@ export async function POST(
     }
 
     const amountCents =
-      typeof body.amountCents === "number"
-        ? body.amountCents
-        : Number.NaN;
+      typeof body.amountCents === "number" ? body.amountCents : Number.NaN;
 
     if (!isRefundCategory(body.category)) {
       return NextResponse.json(
@@ -150,19 +135,29 @@ export async function POST(
 
     await connectToDB();
 
-    const order = await Order.findById(orderId);
+    const shop = await Shop.findById(session.user.id).select("_id isSuspended");
 
-    if (!order) {
+    if (!shop) {
+      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
+    }
+
+    if (shop.isSuspended) {
       return NextResponse.json(
-        { error: "Order not found." },
-        { status: 404 },
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
       );
     }
 
-    if (
-      order.originatingShop.toString() !==
-      session.user.id.toString()
-    ) {
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    }
+
+    if (order.originatingShop.toString() !== session.user.id.toString()) {
       return NextResponse.json(
         {
           error:
@@ -184,14 +179,10 @@ export async function POST(
 
     const orderTotalCents = order.pricing?.orderTotalCents;
 
-    if (
-      !Number.isInteger(orderTotalCents) ||
-      orderTotalCents <= 0
-    ) {
+    if (!Number.isInteger(orderTotalCents) || orderTotalCents <= 0) {
       return NextResponse.json(
         {
-          error:
-            "This order does not have a valid refundable total.",
+          error: "This order does not have a valid refundable total.",
         },
         { status: 409 },
       );
@@ -199,10 +190,7 @@ export async function POST(
 
     const existingRefunds = Array.isArray(order.refunds)
       ? order.refunds.map(
-          (refund: {
-            amountCents: number;
-            status: "active" | "voided";
-          }) => ({
+          (refund: { amountCents: number; status: "active" | "voided" }) => ({
             amountCents: refund.amountCents,
             status: refund.status,
           }),
@@ -217,16 +205,13 @@ export async function POST(
     try {
       assertValidRefundAmount({
         amountCents,
-        remainingRefundableCents:
-          currentSummary.remainingRefundableCents,
+        remainingRefundableCents: currentSummary.remainingRefundableCents,
       });
     } catch (error) {
       return NextResponse.json(
         {
           error:
-            error instanceof Error
-              ? error.message
-              : "Invalid refund amount.",
+            error instanceof Error ? error.message : "Invalid refund amount.",
         },
         { status: 400 },
       );
@@ -238,8 +223,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            "A full refund must equal the remaining refundable amount.",
+          error: "A full refund must equal the remaining refundable amount.",
         },
         { status: 400 },
       );
@@ -267,18 +251,14 @@ export async function POST(
     const updatedSummary = getRefundSummary({
       orderTotalCents,
       refunds: order.refunds.map(
-        (refund: {
-          amountCents: number;
-          status: "active" | "voided";
-        }) => ({
+        (refund: { amountCents: number; status: "active" | "voided" }) => ({
           amountCents: refund.amountCents,
           status: refund.status,
         }),
       ),
     });
 
-    order.totalRefundedCents =
-      updatedSummary.totalRefundedCents;
+    order.totalRefundedCents = updatedSummary.totalRefundedCents;
 
     order.refundStatus = updatedSummary.refundStatus;
 
@@ -301,8 +281,7 @@ export async function POST(
 
     await order.save();
 
-    const createdRefund =
-      order.refunds[order.refunds.length - 1];
+    const createdRefund = order.refunds[order.refunds.length - 1];
 
     return NextResponse.json(
       {
@@ -310,8 +289,7 @@ export async function POST(
         refund: createdRefund,
         refundStatus: order.refundStatus,
         totalRefundedCents: order.totalRefundedCents,
-        remainingRefundableCents:
-          updatedSummary.remainingRefundableCents,
+        remainingRefundableCents: updatedSummary.remainingRefundableCents,
       },
       { status: 201 },
     );
@@ -320,8 +298,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        error:
-          "Unable to record the refund. Please try again.",
+        error: "Unable to record the refund. Please try again.",
       },
       { status: 500 },
     );

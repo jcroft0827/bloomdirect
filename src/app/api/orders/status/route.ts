@@ -48,6 +48,22 @@ export async function POST(req: Request) {
 
     const userShopId = session.user.id;
 
+    const currentShop = await Shop.findById(userShopId);
+
+    if (!currentShop) {
+      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+    }
+
+    if (currentShop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     // ─────────────────────────────────────────────
     // PERMISSIONS
     // Only fulfilling shop can:
@@ -78,16 +94,7 @@ export async function POST(req: Request) {
       status === OrderStatus.ACCEPTED ||
       status === OrderStatus.ACCEPTED_AWAITING_PAYMENT // legacy
     ) {
-      const fulfillingShop = await Shop.findById(userShopId);
-
-      if (!fulfillingShop) {
-        return NextResponse.json(
-          { error: "Fulfilling shop not found" },
-          { status: 404 },
-        );
-      }
-
-      const readiness = getShopReadiness(fulfillingShop.toObject());
+      const readiness = getShopReadiness(currentShop.toObject());
 
       if (!readiness.capabilities.canAcceptOrders) {
         return NextResponse.json(

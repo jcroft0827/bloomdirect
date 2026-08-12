@@ -21,6 +21,25 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const currentShopId = session.user.id;
+
+    const currentShop =
+      await Shop.findById(currentShopId).select("_id isSuspended");
+
+    if (!currentShop) {
+      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+    }
+
+    if (currentShop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     const { id } = await context.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -52,8 +71,6 @@ export async function POST(
         { status: 400 },
       );
     }
-
-    const currentShopId = session.user.id;
 
     const isOriginating = order.originatingShop.toString() === currentShopId;
     const isFulfilling = order.fulfillingShop.toString() === currentShopId;

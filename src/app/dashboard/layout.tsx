@@ -15,6 +15,8 @@ interface Shop {
   slug: string;
   isPro: boolean;
   role: string;
+  isSuspended: boolean;
+  suspensionReason?: string;
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -121,6 +123,68 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadNotifications();
   }, []);
+
+  if (shop?.isSuspended) {
+    return (
+      <div className="min-h-screen bg-emerald-50 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center justify-center">
+          <div className="w-full overflow-hidden rounded-3xl border border-red-200 bg-white shadow-xl">
+            <div className="border-b border-red-100 bg-red-50 px-6 py-8 sm:px-8">
+              <p className="text-sm font-bold uppercase tracking-widest text-red-600">
+                Account Suspended
+              </p>
+
+              <h1 className="mt-2 text-3xl font-black text-slate-900">
+                Your GetBloomDirect account is currently suspended.
+              </h1>
+
+              <p className="mt-3 max-w-2xl text-slate-600">
+                Access to GetBloomDirect has been temporarily restricted for{" "}
+                <span className="font-semibold text-slate-800">
+                  {shop.businessName}
+                </span>
+                .
+              </p>
+            </div>
+
+            <div className="space-y-6 px-6 py-8 sm:px-8">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+                  Reason
+                </p>
+
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-slate-700">
+                    {shop.suspensionReason?.trim() ||
+                      "No additional suspension details were provided."}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  What should I do next?
+                </h2>
+
+                <p className="mt-2 text-slate-600">
+                  If you believe this suspension was made in error or need help
+                  resolving the issue, contact GetBloomDirect. We&apos;ll review
+                  the account and help you determine the next steps.
+                </p>
+              </div>
+
+              <a
+                href="mailto:getbloomdirect@gmail.com?subject=GetBloomDirect%20Account%20Suspension"
+                className="inline-flex min-h-12 items-center justify-center rounded-xl bg-purple-700 px-6 py-3 font-bold text-white transition hover:bg-purple-800 focus:outline-none focus:ring-4 focus:ring-purple-200"
+              >
+                Contact GetBloomDirect
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-emerald-50 md:p-4 lg:gap-10 lg:p-10 overflow-hidden">

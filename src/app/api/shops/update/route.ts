@@ -35,6 +35,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     shop.set("branding.logo", body.logo);
 
     await shop.save();

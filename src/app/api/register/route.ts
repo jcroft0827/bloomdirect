@@ -5,11 +5,9 @@ import { NextResponse } from "next/server";
 
 import { ApiError } from "@/lib/api-error";
 import { sendEmailVerificationCode } from "@/lib/email/send-email-verification-code";
-import {
-  CURRENT_PRIVACY_VERSION,
-  CURRENT_TERMS_VERSION,
-} from "@/lib/legal";
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from "@/lib/legal";
 import { connectToDB } from "@/lib/mongoose";
+import InvitedFlorist from "@/models/InvitedFlorist";
 import Shop from "@/models/Shop";
 
 function generateVerificationCode() {
@@ -17,10 +15,7 @@ function generateVerificationCode() {
 }
 
 function hashVerificationCode(code: string) {
-  return crypto
-    .createHash("sha256")
-    .update(code)
-    .digest("hex");
+  return crypto.createHash("sha256").update(code).digest("hex");
 }
 
 function createShopSlug(businessName: string) {
@@ -63,8 +58,7 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         {
-          error:
-            "Shop name, email address, and password are required.",
+          error: "Shop name, email address, and password are required.",
         },
         { status: 400 },
       );
@@ -111,22 +105,17 @@ export async function POST(req: Request) {
     if (existing) {
       return NextResponse.json(
         {
-          error:
-            "An account already exists with this email address.",
+          error: "An account already exists with this email address.",
         },
         { status: 409 },
       );
     }
 
-    const verificationCode =
-      generateVerificationCode();
+    const verificationCode = generateVerificationCode();
 
-    const emailVerificationCodeHash =
-      hashVerificationCode(verificationCode);
+    const emailVerificationCodeHash = hashVerificationCode(verificationCode);
 
-    const emailVerificationExpires = new Date(
-      Date.now() + 10 * 60 * 1000,
-    );
+    const emailVerificationExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     /*
      * Use one timestamp for the entire registration agreement.
@@ -173,6 +162,41 @@ export async function POST(req: Request) {
       },
     });
 
+    /*
+     * If this florist was previously invited through Customer Success,
+     * connect the invitation record to the newly registered shop.
+     *
+     * Registration must never fail because this secondary bookkeeping fails.
+     */
+    try {
+      await InvitedFlorist.findOneAndUpdate(
+        {
+          email: normalizedEmail,
+          status: {
+            $in: ["draft", "sent", "failed"],
+          },
+        },
+        {
+          $set: {
+            status: "registered",
+            registeredShop: shop._id,
+            convertedAt: acceptedAt,
+            sendError: "",
+          },
+        },
+        {
+          sort: {
+            createdAt: -1,
+          },
+        },
+      );
+    } catch (invitationError) {
+      console.error(
+        "CUSTOMER SUCCESS INVITATION CONVERSION ERROR:",
+        invitationError,
+      );
+    }
+
     await sendEmailVerificationCode({
       to: shop.email,
       code: verificationCode,
@@ -216,8 +240,7 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         {
-          error:
-            "An account already exists with this email address.",
+          error: "An account already exists with this email address.",
           code: "EMAIL_ALREADY_EXISTS",
         },
         { status: 409 },

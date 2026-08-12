@@ -1,34 +1,26 @@
-type AdminSectionPageProps = {
-  title: string;
-  description: string;
-};
+import CustomerSuccessClient from "./CustomerSuccessClient";
 
-function AdminSectionPage({
-  title,
-  description,
-}: AdminSectionPageProps) {
+export default function CustomerSuccessPage() {
   return (
-    <div>
-      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-400">
-        GetBloomDirect Admin
-      </p>
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm font-bold uppercase tracking-widest text-purple-700">
+          Admin
+        </p>
 
-      <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
-        {title}
-      </h1>
+        <h1 className="mt-2 text-3xl font-black text-slate-900">
+          Customer Success
+        </h1>
 
-      <p className="mt-3 text-slate-400">
-        {description}
-      </p>
+        <p className="mt-2 max-w-3xl text-slate-600">
+          Keep florist relationships moving forward. See who needs
+          follow-up, track invitations, help registered florists
+          finish onboarding, and keep an eye on the shops that are
+          ready to use the network.
+        </p>
+      </div>
+
+      <CustomerSuccessClient />
     </div>
-  );
-}
-
-export default function OutreachPage() {
-  return (
-    <AdminSectionPage
-      title="Florist Outreach"
-      description="Manage prospective florists, invitations, follow-ups, and registrations."
-    />
   );
 }

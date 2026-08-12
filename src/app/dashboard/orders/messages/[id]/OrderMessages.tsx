@@ -34,15 +34,9 @@ export default function OrderMessages({
 
       window.dispatchEvent(new Event("refresh-notifications"));
     }
-    
+
     load();
   }, [orderId]);
-  
-  const sendingShopId = loggedInShopId;
-  const receivingShopId =
-    order.originatingShop.toString() === loggedInShopId
-      ? order.fulfillingShop.toString()
-      : order.originatingShop.toString();
 
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -59,9 +53,6 @@ export default function OrderMessages({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          orderId,
-          sendingShopId,
-          receivingShopId,
           message,
         }),
       });

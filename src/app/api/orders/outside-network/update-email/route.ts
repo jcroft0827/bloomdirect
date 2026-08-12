@@ -3,6 +3,7 @@ import { connectToDB } from "@/lib/mongoose";
 import Order from "@/models/Order";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+import Shop from "@/models/Shop";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -34,6 +35,22 @@ export async function PATCH(req: Request) {
 
     await connectToDB();
 
+    const shop = await Shop.findById(session.user.id).select("_id isSuspended");
+
+    if (!shop) {
+      return NextResponse.json({ error: "Shop not found." }, { status: 404 });
+    }
+
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     const order = await Order.findById(orderId).select(
       "originatingShop fulfillmentType outsideFlorist",
     );
@@ -44,7 +61,10 @@ export async function PATCH(req: Request) {
 
     if (order.fulfillmentType !== "outside_network") {
       return NextResponse.json(
-        { error: "Only outside-network orders can update outside florist email." },
+        {
+          error:
+            "Only outside-network orders can update outside florist email.",
+        },
         { status: 400 },
       );
     }

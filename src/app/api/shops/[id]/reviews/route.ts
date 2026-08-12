@@ -42,13 +42,23 @@ export async function POST(
     }
 
     const reviewerShop = await Shop.findById(session.user.id).select(
-      "businessName",
+      "businessName isSuspended",
     );
 
     if (!reviewerShop) {
       return NextResponse.json(
         { error: "Reviewer shop not found." },
         { status: 404 },
+      );
+    }
+
+    if (reviewerShop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
       );
     }
 
@@ -79,7 +89,6 @@ export async function POST(
       success: true,
       reviews: updatedShop.reviews,
     });
-
   } catch (error) {
     console.error("Failed to submit profile review: ", error);
 

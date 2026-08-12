@@ -35,21 +35,31 @@ function formatDate(value: string) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
+
     await connectToDB();
-    
+
     const originShop = await Shop.findById(session?.user?.id).select(
-      "businessName email",
+      "businessName email isSuspended",
     );
 
     if (!originShop) {
       return NextResponse.json(
         { error: "Origin shop not found." },
         { status: 404 },
+      );
+    }
+
+    if (originShop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
       );
     }
 

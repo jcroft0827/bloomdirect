@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { sendAdminFloristInvitationEmail } from "@/lib/email/adminFloristInvitationEmail";
 import { connectToDB } from "@/lib/mongoose";
-import { EmailEvent } from "@/models/EmailEvent";
 import InvitedFlorist from "@/models/InvitedFlorist";
+import { sendFloristInvitation } from "@/lib/admin/sendFloristInvitation";
 
 type InvitationDestination = "homepage" | "registration";
 
@@ -43,23 +41,14 @@ function getApplicationUrl() {
 function buildInvitationUrl(destination: InvitationDestination) {
   const baseUrl = getApplicationUrl();
 
-  return destination === "homepage"
-    ? baseUrl
-    : `${baseUrl}/register`;
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
+  return destination === "homepage" ? baseUrl : `${baseUrl}/register`;
 }
 
 export async function GET() {
   const admin = await requireAdmin();
 
   if (!admin.authorized) {
-    return NextResponse.json(
-      { error: admin.error },
-      { status: admin.status },
-    );
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
   }
 
   try {
@@ -67,10 +56,7 @@ export async function GET() {
 
     const invitations = await InvitedFlorist.find({})
       .populate("invitedBy", "shopName businessName email")
-      .populate(
-        "registeredShop",
-        "shopName businessName email slug",
-      )
+      .populate("registeredShop", "shopName businessName email slug")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -92,10 +78,7 @@ export async function POST(req: Request) {
   const admin = await requireAdmin();
 
   if (!admin.authorized) {
-    return NextResponse.json(
-      { error: admin.error },
-      { status: admin.status },
-    );
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
   }
 
   try {
@@ -105,8 +88,7 @@ export async function POST(req: Request) {
     const contactName = body.contactName?.trim();
     const email = body.email ? normalizeEmail(body.email) : "";
 
-    const invitationDestination =
-      body.invitationDestination || "registration";
+    const invitationDestination = body.invitationDestination || "registration";
 
     if (!shopName || !contactName || !email) {
       return NextResponse.json(
@@ -187,102 +169,33 @@ export async function POST(req: Request) {
       sendCount: 0,
     });
 
-    const subject = `${shopName}, you’re invited to join GetBloomDirect`;
+    const sendResult = await sendFloristInvitation({
+      invitationId: invitation._id.toString(),
+      invitedByName: admin.session.user.name || "The GetBloomDirect Team",
+      invitedByShopId: admin.adminShopId.toString(),
+      personalMessage: body.personalMessage,
+    });
 
-    try {
-      const emailResult = await sendAdminFloristInvitationEmail({
-        to: email,
-        shopName,
-        contactName,
-        inviteLink: invitationUrl,
-        invitedByName:
-          admin.session.user.name || "The GetBloomDirect Team",
-        personalMessage: body.personalMessage?.trim(),
-      });
-
-      const resendEmailId = emailResult.data?.id || "";
-      const sentAt = new Date();
-
-      invitation.status = "sent";
-      invitation.lastSentAt = sentAt;
-      invitation.lastContactedAt = sentAt;
-      invitation.sendCount = 1;
-      invitation.resendEmailId = resendEmailId;
-      invitation.sendError = "";
-
-      await invitation.save();
-
-      await EmailEvent.create({
-        type: "admin_invite_florist",
-        to: email,
-        subject,
-        status: "sent",
-        resendId: resendEmailId,
-        payload: {
-          invitedFloristId: invitation._id,
-          shopName,
-          contactName,
-          invitationUrl,
-          invitationDestination,
-          personalMessage: body.personalMessage?.trim() || "",
-          invitedBy: admin.adminShopId,
-        },
-      });
-
-      return NextResponse.json(
-        {
-          success: true,
-          invitation,
-        },
-        { status: 201 },
-      );
-    } catch (emailError: unknown) {
-      const message = getErrorMessage(emailError);
-
-      invitation.status = "failed";
-      invitation.sendCount = 1;
-      invitation.sendError = message;
-      invitation.lastContactedAt = new Date();
-
-      await invitation.save();
-
-      try {
-        await EmailEvent.create({
-          type: "admin_invite_florist",
-          to: email,
-          subject,
-          status: "failed",
-          error: message,
-          payload: {
-            invitedFloristId: invitation._id,
-            shopName,
-            contactName,
-            invitationUrl,
-            invitationDestination,
-            invitedBy: admin.adminShopId,
-          },
-        });
-      } catch (logError) {
-        console.error(
-          "Failed to log admin invitation email failure:",
-          logError,
-        );
-      }
-
+    if (!sendResult.success) {
       return NextResponse.json(
         {
           error:
             "The florist was saved, but the invitation email could not be sent.",
-          invitation,
+          invitation: sendResult.invitation,
         },
         { status: 502 },
       );
     }
-  } catch (error: unknown) {
-    console.error(
-      "Failed to create admin florist invitation:",
-      error,
+
+    return NextResponse.json(
+      {
+        success: true,
+        invitation: sendResult.invitation,
+      },
+      { status: 201 },
     );
+  } catch (error: unknown) {
+    console.error("Failed to create admin florist invitation:", error);
 
     return NextResponse.json(
       {

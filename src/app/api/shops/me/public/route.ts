@@ -16,11 +16,24 @@ export async function PATCH() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const shop = await Shop.findByIdAndUpdate(
-      session.user.id,
-      { isPublic: true },
-      { new: true },
-    );
+    const shop = await Shop.findById(session.user.id);
+
+    if (!shop) {
+      return NextResponse.json({ error: "Shop not found" }, { status: 404 });
+    }
+
+    if (shop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
+    shop.isPublic = true;
+    await shop.save();
 
     return NextResponse.json({
       success: true,
@@ -31,7 +44,6 @@ export async function PATCH() {
         isPublic: shop.isPublic,
       },
     });
-    
   } catch (err) {
     console.error("Failed to update public profile:", err);
 

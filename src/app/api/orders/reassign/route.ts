@@ -74,6 +74,16 @@ export async function POST(req: Request) {
       );
     }
 
+    if (sendingShop.isSuspended) {
+      return NextResponse.json(
+        {
+          error: "This account is currently suspended.",
+          code: "SHOP_SUSPENDED",
+        },
+        { status: 403 },
+      );
+    }
+
     if (!newShop) {
       return NextResponse.json(
         { error: "Fulfilling shop not found" },
