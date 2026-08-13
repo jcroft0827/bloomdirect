@@ -69,6 +69,14 @@ interface ShopResponse {
   };
 }
 
+function normalizeZip(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim().match(/^\d{5}/)?.[0] || "";
+}
+
 export async function POST(req: Request) {
   try {
     await connectToDB();
@@ -101,6 +109,19 @@ export async function POST(req: Request) {
       delTimeTo,
       excludedShopIds = [],
     } = await req.json();
+
+    /*
+     * Normalize both standard ZIP codes and ZIP+4 values to the
+     * five-digit ZIP used by GetBloomDirect delivery-zone matching.
+     */
+    const normalizedZip = normalizeZip(zip);
+
+    if (!normalizedZip) {
+      return NextResponse.json(
+        { error: "Please provide a valid ZIP code." },
+        { status: 400 },
+      );
+    }
 
     const blockedShopIds = (sendingShop.blockedFlorists ?? []).flatMap(
       (entry) => {
@@ -139,7 +160,7 @@ export async function POST(req: Request) {
     /*
      * 1. Geocode the delivery destination with Google.
      *
-     * Google Geocoding is now the production geocoder for
+     * Google Geocoding is the production geocoder for
      * GetBloomDirect network searches.
      */
     const googleApiKey = process.env.GOOGLE_API;
@@ -153,7 +174,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const fullAddress = [address, city, state, zip, "USA"]
+    const fullAddress = [address, city, state, normalizedZip, "USA"]
       .filter((value) => typeof value === "string" && value.trim().length > 0)
       .join(", ");
 
@@ -184,7 +205,9 @@ export async function POST(req: Request) {
       );
 
       return NextResponse.json(
-        { error: "Unable to geocode the delivery address." },
+        {
+          error: "Unable to geocode the delivery address.",
+        },
         { status: 502 },
       );
     }
@@ -206,14 +229,6 @@ export async function POST(req: Request) {
     const lat = location?.lat;
     const lng = location?.lng;
 
-    // Debugging output for geocoded destination
-    console.log("SHOP SEARCH DEBUG - geocoded destination", {
-      fullAddress,
-      lat,
-      lng,
-      zip,
-    });
-
     if (
       typeof lat !== "number" ||
       typeof lng !== "number" ||
@@ -223,7 +238,9 @@ export async function POST(req: Request) {
       console.error("Google Geocoding returned invalid coordinates.");
 
       return NextResponse.json(
-        { error: "Unable to resolve address coordinates." },
+        {
+          error: "Unable to resolve address coordinates.",
+        },
         { status: 502 },
       );
     }
@@ -234,87 +251,6 @@ export async function POST(req: Request) {
     /*
      * 2. Find eligible GetBloomDirect florists.
      */
-    //const shops: ShopResponse[] = await Shop.aggregate([
-    const debugCandidates = await Shop.find({
-      isSuspended: { $ne: true },
-      isArchived: { $ne: true },
-      isMarkedSpam: { $ne: true },
-      isPublic: true,
-      "verification.emailVerified": true,
-    })
-      .select(
-        "_id businessName address delivery paymentMethods verifiedFlorist isPro",
-      )
-      .lean();
-
-    console.log(
-      "SHOP SEARCH DEBUG - base candidates",
-      debugCandidates.map((shop) => ({
-        id: String(shop._id),
-        businessName: shop.businessName,
-        zip: shop.address?.zip,
-        geoLocation: shop.address?.geoLocation,
-        deliveryMethod: shop.delivery?.method,
-        zipZones: shop.delivery?.zipZones,
-        maxRadius: shop.delivery?.maxRadius,
-        paymentMethods: shop.paymentMethods,
-      })),
-    );
-
-    const debugGeoCandidates = await Shop.aggregate([
-      {
-        $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: [lng, lat],
-          },
-          key: "address.geoLocation",
-          distanceField: "calculatedDistance",
-          spherical: true,
-          distanceMultiplier: 0.000621371,
-        },
-      },
-      {
-        $match: {
-          businessName: {
-            $in: ["The Flower Shop", "Jakes Test Shop", "The Floral POS"],
-          },
-        },
-      },
-      {
-        $project: {
-          businessName: 1,
-          calculatedDistance: 1,
-
-          isPublic: 1,
-          isSuspended: 1,
-          isArchived: 1,
-          isMarkedSpam: 1,
-
-          email: 1,
-          contactPhone: "$contact.phone",
-          emailVerified: "$verification.emailVerified",
-
-          deliveryMethod: "$delivery.method",
-          maxRadius: "$delivery.maxRadius",
-          zipZones: "$delivery.zipZones",
-          distanceZones: "$delivery.distanceZones",
-
-          allowSameDay: "$delivery.allowSameDay",
-          blackoutDates: "$delivery.blackoutDates",
-          noMoreOrdersForDate: "$delivery.noMoreOrdersForDate",
-          noMoreOrdersTodayUntil: "$delivery.noMoreOrdersTodayUntil",
-
-          paymentMethods: 1,
-        },
-      },
-    ]);
-
-    console.log(
-      "SHOP SEARCH DEBUG - geo candidates",
-      JSON.stringify(debugGeoCandidates, null, 2),
-    );
-
     const shops: ShopResponse[] = await Shop.aggregate([
       {
         $geoNear: {
@@ -328,6 +264,7 @@ export async function POST(req: Request) {
           distanceMultiplier: 0.000621371,
         },
       },
+
       {
         $match: {
           _id: {
@@ -449,8 +386,14 @@ export async function POST(req: Request) {
           ],
         },
       },
+
       {
         $addFields: {
+          /*
+           * ZIP delivery zones may contain either a standard
+           * five-digit ZIP or ZIP+4. Compare the first five
+           * digits so both formats behave consistently.
+           */
           isZipValid: {
             $cond: [
               {
@@ -476,7 +419,7 @@ export async function POST(req: Request) {
                                 5,
                               ],
                             },
-                            zip,
+                            normalizedZip,
                           ],
                         },
                       },
@@ -542,6 +485,11 @@ export async function POST(req: Request) {
               {
                 $eq: ["$delivery.method", "zip"],
               },
+
+              /*
+               * ZIP fee lookup uses the same normalized
+               * five-digit comparison as ZIP eligibility.
+               */
               {
                 $let: {
                   vars: {
@@ -563,7 +511,7 @@ export async function POST(req: Request) {
                                   5,
                                 ],
                               },
-                              zip,
+                              normalizedZip,
                             ],
                           },
                         },
@@ -575,6 +523,10 @@ export async function POST(req: Request) {
                   },
                 },
               },
+
+              /*
+               * Distance delivery fee lookup.
+               */
               {
                 $let: {
                   vars: {
@@ -701,16 +653,6 @@ export async function POST(req: Request) {
       },
     ]);
 
-    // Debugging output for eligible shops after aggregation This will help identify any issues with the aggregation pipeline and ensure that the correct shops are being returned based on the search criteria.
-    console.log(
-      "SHOP SEARCH DEBUG - aggregation results",
-      shops.map((shop) => ({
-        id: shop._id,
-        businessName: shop.businessName,
-        deliveryCharge: shop.deliveryCharge,
-      })),
-    );
-
     /*
      * 3. Refine for delivery-time availability and apply
      * GetBloomDirect network priority sorting.
@@ -768,18 +710,31 @@ export async function POST(req: Request) {
   }
 }
 
-// import { NextResponse } from "next/server";
+// import authOptions from "@/lib/auth";
 // import { connectToDB } from "@/lib/mongoose";
 // import Shop from "@/models/Shop";
 // import moment from "moment";
 // import { Types } from "mongoose";
-// import authOptions from "@/lib/auth";
 // import { getServerSession } from "next-auth";
+// import { NextResponse } from "next/server";
 
 // type LeanSendingShop = {
 //   _id: Types.ObjectId;
 //   blockedFlorists?: Array<{
 //     shopId?: Types.ObjectId | string | null;
+//   }>;
+// };
+
+// type GoogleGeocodingResponse = {
+//   status?: string;
+//   error_message?: string;
+//   results?: Array<{
+//     geometry?: {
+//       location?: {
+//         lat?: number;
+//         lng?: number;
+//       };
+//     };
 //   }>;
 // };
 
@@ -891,41 +846,216 @@ export async function POST(req: Request) {
 //       ...validExcludedShopIds,
 //     ];
 
-//     // 1. Geocode Destination (OpenCage)
-//     const newAddress = address.replace(/ /g, "+");
-//     const newCity = city.replace(/ /g, "+");
-//     const newState = state.replace(/ /g, "+");
+//     /*
+//      * 1. Geocode the delivery destination with Google.
+//      *
+//      * Google Geocoding is now the production geocoder for
+//      * GetBloomDirect network searches.
+//      */
+//     const googleApiKey = process.env.GOOGLE_API;
 
-//     const geoQuery = `${newAddress},+${newCity},+${newState},+${zip},+USA`;
+//     if (!googleApiKey) {
+//       console.error("GOOGLE_API is not configured for geocoding.");
 
-//     const url = `https://api.opencagedata.com/geocode/v1/json?q=${geoQuery}&key=${process.env.OPENCAGE_API_KEY}&language=en&pretty=1`;
-//     const geoRes = await fetch(url);
-//     const geoData = await geoRes.json();
-//     if (!geoData.results?.length)
+//       return NextResponse.json(
+//         { error: "Geocoding service is unavailable." },
+//         { status: 500 },
+//       );
+//     }
+
+//     const fullAddress = [address, city, state, zip, "USA"]
+//       .filter((value) => typeof value === "string" && value.trim().length > 0)
+//       .join(", ");
+
+//     if (!fullAddress) {
+//       return NextResponse.json(
+//         { error: "A delivery address is required." },
+//         { status: 400 },
+//       );
+//     }
+
+//     const geocodeUrl = new URL(
+//       "https://maps.googleapis.com/maps/api/geocode/json",
+//     );
+
+//     geocodeUrl.searchParams.set("address", fullAddress);
+
+//     geocodeUrl.searchParams.set("key", googleApiKey);
+
+//     const geoRes = await fetch(geocodeUrl.toString(), {
+//       cache: "no-store",
+//     });
+
+//     if (!geoRes.ok) {
+//       console.error(
+//         "Google Geocoding HTTP error:",
+//         geoRes.status,
+//         geoRes.statusText,
+//       );
+
+//       return NextResponse.json(
+//         { error: "Unable to geocode the delivery address." },
+//         { status: 502 },
+//       );
+//     }
+
+//     const geoData = (await geoRes.json()) as GoogleGeocodingResponse;
+
+//     if (geoData.status !== "OK" || !geoData.results?.length) {
+//       console.warn(
+//         "Google Geocoding did not find the address:",
+//         geoData.status,
+//         geoData.error_message || "",
+//       );
+
 //       return NextResponse.json({ error: "Address not found" }, { status: 400 });
-//     const { lat, lng } = geoData.results[0].geometry;
+//     }
+
+//     const location = geoData.results[0]?.geometry?.location;
+
+//     const lat = location?.lat;
+//     const lng = location?.lng;
+
+//     // Debugging output for geocoded destination
+//     console.log("SHOP SEARCH DEBUG - geocoded destination", {
+//       fullAddress,
+//       lat,
+//       lng,
+//       zip,
+//     });
+
+//     if (
+//       typeof lat !== "number" ||
+//       typeof lng !== "number" ||
+//       !Number.isFinite(lat) ||
+//       !Number.isFinite(lng)
+//     ) {
+//       console.error("Google Geocoding returned invalid coordinates.");
+
+//       return NextResponse.json(
+//         { error: "Unable to resolve address coordinates." },
+//         { status: 502 },
+//       );
+//     }
 
 //     const deliveryDate = moment(delDate).startOf("day");
 //     const isToday = deliveryDate.isSame(moment(), "day");
 
-//     // 2. Aggregation Pipeline
-//     const shops: ShopResponse[] = await Shop.aggregate([
+//     /*
+//      * 2. Find eligible GetBloomDirect florists.
+//      */
+//     //const shops: ShopResponse[] = await Shop.aggregate([
+//     const debugCandidates = await Shop.find({
+//       isSuspended: { $ne: true },
+//       isArchived: { $ne: true },
+//       isMarkedSpam: { $ne: true },
+//       isPublic: true,
+//       "verification.emailVerified": true,
+//     })
+//       .select(
+//         "_id businessName address delivery paymentMethods verifiedFlorist isPro",
+//       )
+//       .lean();
+
+//     console.log(
+//       "SHOP SEARCH DEBUG - base candidates",
+//       debugCandidates.map((shop) => ({
+//         id: String(shop._id),
+//         businessName: shop.businessName,
+//         zip: shop.address?.zip,
+//         geoLocation: shop.address?.geoLocation,
+//         deliveryMethod: shop.delivery?.method,
+//         zipZones: shop.delivery?.zipZones,
+//         maxRadius: shop.delivery?.maxRadius,
+//         paymentMethods: shop.paymentMethods,
+//       })),
+//     );
+
+//     const debugGeoCandidates = await Shop.aggregate([
 //       {
 //         $geoNear: {
-//           near: { type: "Point", coordinates: [lng, lat] },
-//           key: "address.geoLocation", // Fixes "unsure which index to use"
+//           near: {
+//             type: "Point",
+//             coordinates: [lng, lat],
+//           },
+//           key: "address.geoLocation",
 //           distanceField: "calculatedDistance",
 //           spherical: true,
-//           distanceMultiplier: 0.000621371, // Miles
+//           distanceMultiplier: 0.000621371,
 //         },
 //       },
 //       {
 //         $match: {
-//           _id: { $nin: idsToExclude },
+//           businessName: {
+//             $in: ["The Flower Shop", "Jakes Test Shop", "The Floral POS"],
+//           },
+//         },
+//       },
+//       {
+//         $project: {
+//           businessName: 1,
+//           calculatedDistance: 1,
 
-//           isSuspended: { $ne: true },
-//           isArchived: { $ne: true },
-//           isMarkedSpam: { $ne: true },
+//           isPublic: 1,
+//           isSuspended: 1,
+//           isArchived: 1,
+//           isMarkedSpam: 1,
+
+//           email: 1,
+//           contactPhone: "$contact.phone",
+//           emailVerified: "$verification.emailVerified",
+
+//           deliveryMethod: "$delivery.method",
+//           maxRadius: "$delivery.maxRadius",
+//           zipZones: "$delivery.zipZones",
+//           distanceZones: "$delivery.distanceZones",
+
+//           allowSameDay: "$delivery.allowSameDay",
+//           blackoutDates: "$delivery.blackoutDates",
+//           noMoreOrdersForDate: "$delivery.noMoreOrdersForDate",
+//           noMoreOrdersTodayUntil: "$delivery.noMoreOrdersTodayUntil",
+
+//           paymentMethods: 1,
+//         },
+//       },
+//     ]);
+
+//     console.log(
+//       "SHOP SEARCH DEBUG - geo candidates",
+//       JSON.stringify(debugGeoCandidates, null, 2),
+//     );
+
+//     const shops: ShopResponse[] = await Shop.aggregate([
+//       {
+//         $geoNear: {
+//           near: {
+//             type: "Point",
+//             coordinates: [lng, lat],
+//           },
+//           key: "address.geoLocation",
+//           distanceField: "calculatedDistance",
+//           spherical: true,
+//           distanceMultiplier: 0.000621371,
+//         },
+//       },
+//       {
+//         $match: {
+//           _id: {
+//             $nin: idsToExclude,
+//           },
+
+//           isSuspended: {
+//             $ne: true,
+//           },
+
+//           isArchived: {
+//             $ne: true,
+//           },
+
+//           isMarkedSpam: {
+//             $ne: true,
+//           },
+
 //           isPublic: true,
 
 //           "verification.emailVerified": true,
@@ -965,75 +1095,137 @@ export async function POST(req: Request) {
 //             $ne: "",
 //           },
 
-//           $or: [
-//             {
-//               "paymentMethods.venmoHandle": {
-//                 $type: "string",
-//                 $ne: "",
-//               },
-//             },
-//             {
-//               "paymentMethods.cashAppTag": {
-//                 $type: "string",
-//                 $ne: "",
-//               },
-//             },
-//             {
-//               "paymentMethods.zellePhoneOrEmail": {
-//                 $type: "string",
-//                 $ne: "",
-//               },
-//             },
-//             {
-//               "paymentMethods.paypalEmail": {
-//                 $type: "string",
-//                 $ne: "",
-//               },
-//             },
-//           ],
-//           "delivery.blackoutDates": { $ne: deliveryDate.toDate() },
-//           "delivery.noMoreOrdersForDate": { $ne: deliveryDate.toDate() },
-//           ...(isToday
-//             ? {
-//                 "delivery.allowSameDay": true,
+//           "delivery.blackoutDates": {
+//             $ne: deliveryDate.toDate(),
+//           },
 
-//                 $or: [
-//                   { "delivery.noMoreOrdersTodayUntil": null },
-//                   { "delivery.noMoreOrdersTodayUntil": { $exists: false } },
-//                   { "delivery.noMoreOrdersTodayUntil": { $lte: new Date() } },
-//                 ],
-//               }
-//             : {}),
+//           "delivery.noMoreOrdersForDate": {
+//             $ne: deliveryDate.toDate(),
+//           },
+
+//           $and: [
+//             {
+//               $or: [
+//                 {
+//                   "paymentMethods.venmoHandle": {
+//                     $type: "string",
+//                     $ne: "",
+//                   },
+//                 },
+//                 {
+//                   "paymentMethods.cashAppTag": {
+//                     $type: "string",
+//                     $ne: "",
+//                   },
+//                 },
+//                 {
+//                   "paymentMethods.zellePhoneOrEmail": {
+//                     $type: "string",
+//                     $ne: "",
+//                   },
+//                 },
+//                 {
+//                   "paymentMethods.paypalEmail": {
+//                     $type: "string",
+//                     $ne: "",
+//                   },
+//                 },
+//               ],
+//             },
+
+//             ...(isToday
+//               ? [
+//                   {
+//                     "delivery.allowSameDay": true,
+
+//                     $or: [
+//                       {
+//                         "delivery.noMoreOrdersTodayUntil": null,
+//                       },
+//                       {
+//                         "delivery.noMoreOrdersTodayUntil": {
+//                           $exists: false,
+//                         },
+//                       },
+//                       {
+//                         "delivery.noMoreOrdersTodayUntil": {
+//                           $lte: new Date(),
+//                         },
+//                       },
+//                     ],
+//                   },
+//                 ]
+//               : []),
+//           ],
 //         },
 //       },
 //       {
 //         $addFields: {
-//           // Rule 6 Fix: Fallback to [] if zipZones is missing
 //           isZipValid: {
 //             $cond: [
-//               { $eq: ["$delivery.method", "zip"] },
-//               { $in: [zip, { $ifNull: ["$delivery.zipZones.zip", []] }] },
+//               {
+//                 $eq: ["$delivery.method", "zip"],
+//               },
+//               {
+//                 $gt: [
+//                   {
+//                     $size: {
+//                       $filter: {
+//                         input: {
+//                           $ifNull: ["$delivery.zipZones", []],
+//                         },
+//                         as: "zone",
+//                         cond: {
+//                           $eq: [
+//                             {
+//                               $substrCP: [
+//                                 {
+//                                   $ifNull: ["$$zone.zip", ""],
+//                                 },
+//                                 0,
+//                                 5,
+//                               ],
+//                             },
+//                             zip,
+//                           ],
+//                         },
+//                       },
+//                     },
+//                   },
+//                   0,
+//                 ],
+//               },
 //               true,
 //             ],
 //           },
-//           // Rule 7 & 8 Fix: Fallback for distance zones
+
 //           isDistanceValid: {
 //             $cond: [
-//               { $eq: ["$delivery.method", "distance"] },
+//               {
+//                 $eq: ["$delivery.method", "distance"],
+//               },
 //               {
 //                 $or: [
-//                   { $lte: ["$calculatedDistance", "$delivery.maxRadius"] },
+//                   {
+//                     $lte: ["$calculatedDistance", "$delivery.maxRadius"],
+//                   },
 //                   {
 //                     $reduce: {
-//                       input: { $ifNull: ["$delivery.distanceZones", []] },
+//                       input: {
+//                         $ifNull: ["$delivery.distanceZones", []],
+//                       },
 //                       initialValue: false,
 //                       in: {
 //                         $or: [
 //                           "$$value",
 //                           {
 //                             $and: [
-//                               { $gte: ["$calculatedDistance", "$$this.min"] },
-//                               { $lte: ["$calculatedDistance", "$$this.max"] },
+//                               {
+//                                 $gte: ["$calculatedDistance", "$$this.min"],
+//                               },
+//                               {
+//                                 $lte: ["$calculatedDistance", "$$this.max"],
+//                               },
 //                             ],
 //                           },
 //                         ],
@@ -1045,26 +1237,51 @@ export async function POST(req: Request) {
 //               true,
 //             ],
 //           },
+
 //           isHoliday: {
 //             $in: [
 //               deliveryDate.toDate(),
-//               { $ifNull: ["$delivery.holidayDates.date", []] },
+//               {
+//                 $ifNull: ["$delivery.holidayDates.date", []],
+//               },
 //             ],
 //           },
+
 //           baseFee: {
 //             $cond: [
-//               { $eq: ["$delivery.method", "zip"] },
 //               {
-//                 $getField: {
-//                   field: "fee",
-//                   input: {
-//                     $first: {
-//                       $filter: {
-//                         input: { $ifNull: ["$delivery.zipZones", []] },
-//                         as: "z",
-//                         cond: { $eq: ["$$z.zip", zip] },
+//                 $eq: ["$delivery.method", "zip"],
+//               },
+//               {
+//                 $let: {
+//                   vars: {
+//                     zone: {
+//                       $first: {
+//                         $filter: {
+//                           input: {
+//                             $ifNull: ["$delivery.zipZones", []],
+//                           },
+//                           as: "z",
+//                           cond: {
+//                             $eq: [
+//                               {
+//                                 $substrCP: [
+//                                   {
+//                                     $ifNull: ["$$z.zip", ""],
+//                                   },
+//                                   0,
+//                                   5,
+//                                 ],
+//                               },
+//                               zip,
+//                             ],
+//                           },
+//                         },
 //                       },
 //                     },
+//                   },
+//                   in: {
+//                     $ifNull: ["$$zone.fee", "$delivery.fallbackFee"],
 //                   },
 //                 },
 //               },
@@ -1074,41 +1291,67 @@ export async function POST(req: Request) {
 //                     zone: {
 //                       $first: {
 //                         $filter: {
-//                           input: { $ifNull: ["$delivery.distanceZones", []] },
+//                           input: {
+//                             $ifNull: ["$delivery.distanceZones", []],
+//                           },
 //                           as: "dz",
 //                           cond: {
 //                             $and: [
-//                               { $gte: ["$calculatedDistance", "$$dz.min"] },
-//                               { $lte: ["$calculatedDistance", "$$dz.max"] },
+//                               {
+//                                 $gte: ["$calculatedDistance", "$$dz.min"],
+//                               },
+//                               {
+//                                 $lte: ["$calculatedDistance", "$$dz.max"],
+//                               },
 //                             ],
 //                           },
 //                         },
 //                       },
 //                     },
 //                   },
-//                   in: { $ifNull: ["$$zone.fee", "$delivery.fallbackFee"] },
+//                   in: {
+//                     $ifNull: ["$$zone.fee", "$delivery.fallbackFee"],
+//                   },
 //                 },
 //               },
 //             ],
 //           },
 //         },
 //       },
-//       { $match: { isZipValid: true, isDistanceValid: true } },
+
+//       {
+//         $match: {
+//           isZipValid: true,
+//           isDistanceValid: true,
+//         },
+//       },
+
 //       {
 //         $lookup: {
 //           from: "fulfillmentofferings",
-//           let: { shopId: "$_id" },
+//           let: {
+//             shopId: "$_id",
+//           },
 //           pipeline: [
 //             {
 //               $match: {
-//                 $expr: { $eq: ["$shop", "$$shopId"] },
+//                 $expr: {
+//                   $eq: ["$shop", "$$shopId"],
+//                 },
 //                 isActive: true,
 //                 isFeatured: true,
 //                 type: "featured",
 //               },
 //             },
-//             { $sort: { sortOrder: 1, createdAt: -1 } },
-//             { $limit: 1 },
+//             {
+//               $sort: {
+//                 sortOrder: 1,
+//                 createdAt: -1,
+//               },
+//             },
+//             {
+//               $limit: 1,
+//             },
 //             {
 //               $project: {
 //                 name: 1,
@@ -1121,11 +1364,15 @@ export async function POST(req: Request) {
 //           as: "featuredArrangement",
 //         },
 //       },
+
 //       {
 //         $addFields: {
-//           featuredArrangement: { $first: "$featuredArrangement" },
+//           featuredArrangement: {
+//             $first: "$featuredArrangement",
+//           },
 //         },
 //       },
+
 //       {
 //         $project: {
 //           businessName: 1,
@@ -1136,13 +1383,27 @@ export async function POST(req: Request) {
 //           isPro: 1,
 //           "stats.ordersCompleted": 1,
 //           "stats.responseRate": 1,
-//           avgRating: { $ifNull: [{ $avg: "$reviews.rating" }, 0] },
-//           deliveryCharge: {
-//             $add: [
-//               { $ifNull: ["$baseFee", 0] },
-//               { $cond: ["$isHoliday", "$delivery.holidaySurcharge", 0] },
+
+//           avgRating: {
+//             $ifNull: [
+//               {
+//                 $avg: "$reviews.rating",
+//               },
+//               0,
 //             ],
 //           },
+
+//           deliveryCharge: {
+//             $add: [
+//               {
+//                 $ifNull: ["$baseFee", 0],
+//               },
+//               {
+//                 $cond: ["$isHoliday", "$delivery.holidaySurcharge", 0],
+//               },
+//             ],
+//           },
+
 //           "delivery.sameDayCutoff": 1,
 //           "delivery.blackoutTimes": 1,
 //           featuredArrangement: 1,
@@ -1150,7 +1411,20 @@ export async function POST(req: Request) {
 //       },
 //     ]);
 
-//     // 3. JS Refinement & Sort (Treating zero-reviews as 0.0 rating)
+//     // Debugging output for eligible shops after aggregation This will help identify any issues with the aggregation pipeline and ensure that the correct shops are being returned based on the search criteria.
+//     console.log(
+//       "SHOP SEARCH DEBUG - aggregation results",
+//       shops.map((shop) => ({
+//         id: shop._id,
+//         businessName: shop.businessName,
+//         deliveryCharge: shop.deliveryCharge,
+//       })),
+//     );
+
+//     /*
+//      * 3. Refine for delivery-time availability and apply
+//      * GetBloomDirect network priority sorting.
+//      */
 //     const results = shops
 //       .filter((shop) => {
 //         if (delTimeOpt === "specific") {
@@ -1158,24 +1432,29 @@ export async function POST(req: Request) {
 //             isToday &&
 //             shop.delivery?.sameDayCutoff &&
 //             shop.delivery.sameDayCutoff > delTimeFrom
-//           )
+//           ) {
 //             return false;
+//           }
+
 //           return !shop.delivery?.blackoutTimes?.some(
 //             (range: BlackoutTime) =>
 //               (delTimeFrom >= range.start && delTimeFrom <= range.end) ||
 //               (delTimeTo >= range.start && delTimeTo <= range.end),
 //           );
 //         }
+
 //         return true;
 //       })
 //       .sort((a, b) => {
 //         const aVerified = a.verifiedFlorist ? 1 : 0;
+
 //         const bVerified = b.verifiedFlorist ? 1 : 0;
 
 //         const aPro = a.isPro ? 1 : 0;
 //         const bPro = b.isPro ? 1 : 0;
 
 //         const aPriority = aVerified * 2 + aPro;
+
 //         const bPriority = bVerified * 2 + bPro;
 
 //         return (
@@ -1189,8 +1468,11 @@ export async function POST(req: Request) {
 //     return NextResponse.json(results);
 //   } catch (error) {
 //     console.error("API Error:", error);
+
 //     return NextResponse.json(
-//       { error: "Internal Server Error" },
+//       {
+//         error: "Internal Server Error",
+//       },
 //       { status: 500 },
 //     );
 //   }
