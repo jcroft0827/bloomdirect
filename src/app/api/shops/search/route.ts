@@ -457,11 +457,32 @@ export async function POST(req: Request) {
                 $eq: ["$delivery.method", "zip"],
               },
               {
-                $in: [
-                  zip,
+                $gt: [
                   {
-                    $ifNull: ["$delivery.zipZones.zip", []],
+                    $size: {
+                      $filter: {
+                        input: {
+                          $ifNull: ["$delivery.zipZones", []],
+                        },
+                        as: "zone",
+                        cond: {
+                          $eq: [
+                            {
+                              $substrCP: [
+                                {
+                                  $ifNull: ["$$zone.zip", ""],
+                                },
+                                0,
+                                5,
+                              ],
+                            },
+                            zip,
+                          ],
+                        },
+                      },
+                    },
                   },
+                  0,
                 ],
               },
               true,
@@ -522,20 +543,35 @@ export async function POST(req: Request) {
                 $eq: ["$delivery.method", "zip"],
               },
               {
-                $getField: {
-                  field: "fee",
-                  input: {
-                    $first: {
-                      $filter: {
-                        input: {
-                          $ifNull: ["$delivery.zipZones", []],
-                        },
-                        as: "z",
-                        cond: {
-                          $eq: ["$$z.zip", zip],
+                $let: {
+                  vars: {
+                    zone: {
+                      $first: {
+                        $filter: {
+                          input: {
+                            $ifNull: ["$delivery.zipZones", []],
+                          },
+                          as: "z",
+                          cond: {
+                            $eq: [
+                              {
+                                $substrCP: [
+                                  {
+                                    $ifNull: ["$$z.zip", ""],
+                                  },
+                                  0,
+                                  5,
+                                ],
+                              },
+                              zip,
+                            ],
+                          },
                         },
                       },
                     },
+                  },
+                  in: {
+                    $ifNull: ["$$zone.fee", "$delivery.fallbackFee"],
                   },
                 },
               },
