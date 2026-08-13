@@ -261,6 +261,60 @@ export async function POST(req: Request) {
       })),
     );
 
+    const debugGeoCandidates = await Shop.aggregate([
+      {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+          key: "address.geoLocation",
+          distanceField: "calculatedDistance",
+          spherical: true,
+          distanceMultiplier: 0.000621371,
+        },
+      },
+      {
+        $match: {
+          businessName: {
+            $in: ["The Flower Shop", "Jakes Test Shop", "The Floral POS"],
+          },
+        },
+      },
+      {
+        $project: {
+          businessName: 1,
+          calculatedDistance: 1,
+
+          isPublic: 1,
+          isSuspended: 1,
+          isArchived: 1,
+          isMarkedSpam: 1,
+
+          email: 1,
+          contactPhone: "$contact.phone",
+          emailVerified: "$verification.emailVerified",
+
+          deliveryMethod: "$delivery.method",
+          maxRadius: "$delivery.maxRadius",
+          zipZones: "$delivery.zipZones",
+          distanceZones: "$delivery.distanceZones",
+
+          allowSameDay: "$delivery.allowSameDay",
+          blackoutDates: "$delivery.blackoutDates",
+          noMoreOrdersForDate: "$delivery.noMoreOrdersForDate",
+          noMoreOrdersTodayUntil: "$delivery.noMoreOrdersTodayUntil",
+
+          paymentMethods: 1,
+        },
+      },
+    ]);
+
+    console.log(
+      "SHOP SEARCH DEBUG - geo candidates",
+      JSON.stringify(debugGeoCandidates, null, 2),
+    );
+
     const shops: ShopResponse[] = await Shop.aggregate([
       {
         $geoNear: {
