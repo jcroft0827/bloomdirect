@@ -611,7 +611,7 @@ export async function POST(req: Request) {
       },
     ]);
 
-    // Debugging output for eligible shops after aggregation
+    // Debugging output for eligible shops after aggregation This will help identify any issues with the aggregation pipeline and ensure that the correct shops are being returned based on the search criteria.
     console.log(
       "SHOP SEARCH DEBUG - aggregation results",
       shops.map((shop) => ({
