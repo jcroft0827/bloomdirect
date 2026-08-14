@@ -1,14 +1,48 @@
+// app/register/RegisterClient.tsx
+
 "use client";
 
 import BloomSpinner from "@/components/BloomSpinner";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          action?: string;
+          theme?: "light" | "dark" | "auto";
+          size?: "normal" | "compact" | "flexible";
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+        },
+      ) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 export default function Register() {
   const router = useRouter();
+
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const turnstileWidgetIdRef = useRef<string | null>(null);
+
+  const [turnstileReady, setTurnstileReady] = useState(false);
+
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   const [form, setForm] = useState({
     businessName: "",
@@ -17,15 +51,74 @@ export default function Register() {
   });
 
   const [registrationAccepted, setRegistrationAccepted] = useState(false);
+
   const [showPass, setShowPass] = useState(false);
 
   const [registering, setRegistering] = useState(false);
+
   const [verifying, setVerifying] = useState(false);
 
   const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   const [verificationCode, setVerificationCode] = useState("");
+
   const [registeredEmail, setRegisteredEmail] = useState("");
+
+  useEffect(() => {
+    if (
+      !turnstileReady ||
+      !turnstileSiteKey ||
+      !turnstileContainerRef.current ||
+      !window.turnstile ||
+      turnstileWidgetIdRef.current
+    ) {
+      return;
+    }
+
+    turnstileWidgetIdRef.current = window.turnstile.render(
+      turnstileContainerRef.current,
+      {
+        sitekey: turnstileSiteKey,
+        action: "register",
+        theme: "light",
+        size: "flexible",
+
+        callback: (token) => {
+          setTurnstileToken(token);
+        },
+
+        "expired-callback": () => {
+          setTurnstileToken("");
+        },
+
+        "error-callback": () => {
+          setTurnstileToken("");
+
+          toast.error(
+            "The security check could not be completed. Please try again.",
+          );
+        },
+      },
+    );
+
+    return () => {
+      const widgetId = turnstileWidgetIdRef.current;
+
+      if (widgetId && window.turnstile) {
+        window.turnstile.remove(widgetId);
+      }
+
+      turnstileWidgetIdRef.current = null;
+    };
+  }, [turnstileReady, turnstileSiteKey]);
+
+  function resetTurnstile() {
+    setTurnstileToken("");
+
+    if (window.turnstile && turnstileWidgetIdRef.current) {
+      window.turnstile.reset(turnstileWidgetIdRef.current);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +127,23 @@ export default function Register() {
       toast.error(
         "Please confirm that you are a retail florist and accept the Terms of Service and Privacy Policy.",
       );
+
+      return;
+    }
+
+    if (!turnstileSiteKey) {
+      toast.error(
+        "The security check is temporarily unavailable. Please try again later.",
+      );
+
+      return;
+    }
+
+    if (!turnstileToken) {
+      toast.error(
+        "Please complete the security check before creating your account.",
+      );
+
       return;
     }
 
@@ -42,13 +152,20 @@ export default function Register() {
     try {
       const res = await fetch("/api/register", {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           ...form,
+
+          turnstileToken,
+
           realRetailFloristAccepted: registrationAccepted,
+
           termsOfServiceAccepted: registrationAccepted,
+
           privacyPolicyAccepted: registrationAccepted,
         }),
       });
@@ -56,11 +173,20 @@ export default function Register() {
       const data = await res.json();
 
       if (!res.ok) {
+        /*
+         * Turnstile tokens are single-use. Once the
+         * registration endpoint attempts verification,
+         * obtain a fresh token before another attempt.
+         */
+        resetTurnstile();
+
         throw new Error(data.error || "Unable to create your account.");
       }
 
       setRegisteredEmail(data.email || form.email);
+
       setVerificationCode("");
+
       setShowVerificationModal(true);
 
       toast.success("Verification code sent to your email.");
@@ -84,6 +210,7 @@ export default function Register() {
 
     if (cleanedCode.length !== 6) {
       toast.error("Enter the six-digit verification code.");
+
       return;
     }
 
@@ -92,9 +219,11 @@ export default function Register() {
     try {
       const res = await fetch("/api/register/confirm-verification", {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           email: registeredEmail,
           code: cleanedCode,
@@ -119,6 +248,7 @@ export default function Register() {
         );
 
         router.push("/login");
+
         return;
       }
 
@@ -139,6 +269,19 @@ export default function Register() {
 
   return (
     <>
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+        strategy="afterInteractive"
+        onLoad={() => {
+          setTurnstileReady(true);
+        }}
+        onError={() => {
+          toast.error(
+            "The security check could not be loaded. Please refresh the page.",
+          );
+        }}
+      />
+
       <div className="flex min-h-screen items-center justify-center bg-purple-600">
         <div className="w-full max-w-lg p-8">
           <h1 className="mb-2 text-center text-4xl font-black tracking-wider text-white">
@@ -274,6 +417,23 @@ export default function Register() {
                 </label>
               </div>
 
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Security Check
+                </p>
+
+                {turnstileSiteKey ? (
+                  <div
+                    ref={turnstileContainerRef}
+                    className="flex min-h-[65px] w-full items-center justify-center"
+                  />
+                ) : (
+                  <p className="py-3 text-center text-sm font-medium text-red-600">
+                    Security verification is temporarily unavailable.
+                  </p>
+                )}
+              </div>
+
               <p className="text-center text-xs leading-5 text-gray-500">
                 By creating an account, you agree to the{" "}
                 <Link
@@ -296,7 +456,9 @@ export default function Register() {
 
               <button
                 type="submit"
-                disabled={registering || !registrationAccepted}
+                disabled={
+                  registering || !registrationAccepted || !turnstileToken
+                }
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
               >
                 {registering ? "Creating Your Shop..." : "Create Free Account"}
@@ -396,3 +558,402 @@ export default function Register() {
     </>
   );
 }
+
+// "use client";
+
+// import BloomSpinner from "@/components/BloomSpinner";
+// import { signIn } from "next-auth/react";
+// import Link from "next/link";
+// import { useRouter } from "next/navigation";
+// import { useState } from "react";
+// import toast from "react-hot-toast";
+
+// export default function Register() {
+//   const router = useRouter();
+
+//   const [form, setForm] = useState({
+//     businessName: "",
+//     email: "",
+//     password: "",
+//   });
+
+//   const [registrationAccepted, setRegistrationAccepted] = useState(false);
+//   const [showPass, setShowPass] = useState(false);
+
+//   const [registering, setRegistering] = useState(false);
+//   const [verifying, setVerifying] = useState(false);
+
+//   const [showVerificationModal, setShowVerificationModal] = useState(false);
+
+//   const [verificationCode, setVerificationCode] = useState("");
+//   const [registeredEmail, setRegisteredEmail] = useState("");
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+
+//     if (!registrationAccepted) {
+//       toast.error(
+//         "Please confirm that you are a retail florist and accept the Terms of Service and Privacy Policy.",
+//       );
+//       return;
+//     }
+
+//     setRegistering(true);
+
+//     try {
+//       const res = await fetch("/api/register", {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify({
+//           ...form,
+//           realRetailFloristAccepted: registrationAccepted,
+//           termsOfServiceAccepted: registrationAccepted,
+//           privacyPolicyAccepted: registrationAccepted,
+//         }),
+//       });
+
+//       const data = await res.json();
+
+//       if (!res.ok) {
+//         throw new Error(data.error || "Unable to create your account.");
+//       }
+
+//       setRegisteredEmail(data.email || form.email);
+//       setVerificationCode("");
+//       setShowVerificationModal(true);
+
+//       toast.success("Verification code sent to your email.");
+//     } catch (error) {
+//       console.error("REGISTRATION ERROR:", error);
+
+//       toast.error(
+//         error instanceof Error
+//           ? error.message
+//           : "Something went wrong while creating your account.",
+//       );
+//     } finally {
+//       setRegistering(false);
+//     }
+//   };
+
+//   const handleVerifyEmail = async (e: React.FormEvent) => {
+//     e.preventDefault();
+
+//     const cleanedCode = verificationCode.replace(/\D/g, "").slice(0, 6);
+
+//     if (cleanedCode.length !== 6) {
+//       toast.error("Enter the six-digit verification code.");
+//       return;
+//     }
+
+//     setVerifying(true);
+
+//     try {
+//       const res = await fetch("/api/register/confirm-verification", {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify({
+//           email: registeredEmail,
+//           code: cleanedCode,
+//         }),
+//       });
+
+//       const data = await res.json();
+
+//       if (!res.ok) {
+//         throw new Error(data.error || "Unable to verify your email.");
+//       }
+
+//       const login = await signIn("credentials", {
+//         email: registeredEmail,
+//         password: form.password,
+//         redirect: false,
+//       });
+
+//       if (login?.error) {
+//         toast.error(
+//           "Your email was verified, but automatic login failed. Please log in.",
+//         );
+
+//         router.push("/login");
+//         return;
+//       }
+
+//       toast.success("Email verified. Welcome to GetBloomDirect!");
+
+//       router.push("/dashboard");
+//       router.refresh();
+//     } catch (error) {
+//       console.error("EMAIL VERIFICATION ERROR:", error);
+
+//       toast.error(
+//         error instanceof Error ? error.message : "Unable to verify your email.",
+//       );
+//     } finally {
+//       setVerifying(false);
+//     }
+//   };
+
+//   return (
+//     <>
+//       <div className="flex min-h-screen items-center justify-center bg-purple-600">
+//         <div className="w-full max-w-lg p-8">
+//           <h1 className="mb-2 text-center text-4xl font-black tracking-wider text-white">
+//             Join GetBloomDirect
+//           </h1>
+
+//           <p className="mb-6 text-center text-white/95">
+//             Send florist-to-florist orders directly—without traditional
+//             wire-service commissions.
+//             <br />
+//             Built for independent florists.
+//           </p>
+
+//           <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+//             <form onSubmit={handleSubmit} className="space-y-4">
+//               <div>
+//                 <label
+//                   htmlFor="shop"
+//                   className="ml-1 text-xs uppercase text-gray-500"
+//                 >
+//                   Shop Name
+//                 </label>
+
+//                 <input
+//                   type="text"
+//                   id="shop"
+//                   placeholder="Shop Name"
+//                   required
+//                   value={form.businessName}
+//                   disabled={registering}
+//                   className="w-full rounded-lg border px-4 py-3 capitalize ring-purple-600 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
+//                   onChange={(e) =>
+//                     setForm({
+//                       ...form,
+//                       businessName: e.target.value,
+//                     })
+//                   }
+//                 />
+//               </div>
+
+//               <div>
+//                 <label
+//                   htmlFor="email"
+//                   className="ml-1 text-xs uppercase text-gray-500"
+//                 >
+//                   Email Address
+//                 </label>
+
+//                 <input
+//                   type="email"
+//                   id="email"
+//                   placeholder="Email"
+//                   required
+//                   value={form.email}
+//                   disabled={registering}
+//                   className="w-full rounded-lg border px-4 py-3 ring-purple-600 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
+//                   onChange={(e) =>
+//                     setForm({
+//                       ...form,
+//                       email: e.target.value,
+//                     })
+//                   }
+//                 />
+//               </div>
+
+//               <div>
+//                 <label
+//                   htmlFor="pass"
+//                   className="ml-1 text-xs uppercase text-gray-500"
+//                 >
+//                   Password
+//                 </label>
+
+//                 <input
+//                   type={showPass ? "text" : "password"}
+//                   id="pass"
+//                   placeholder="Password"
+//                   required
+//                   value={form.password}
+//                   disabled={registering}
+//                   className="w-full rounded-lg border px-4 py-3 ring-purple-600 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100"
+//                   onChange={(e) =>
+//                     setForm({
+//                       ...form,
+//                       password: e.target.value,
+//                     })
+//                   }
+//                 />
+
+//                 <button
+//                   type="button"
+//                   disabled={registering}
+//                   onClick={() => setShowPass((current) => !current)}
+//                   className="ml-2 text-sm text-gray-500 transition hover:text-gray-700 disabled:cursor-not-allowed"
+//                 >
+//                   {showPass ? "Hide Password" : "Show Password"}
+//                 </button>
+//               </div>
+
+//               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+//                 <label className="flex cursor-pointer items-start gap-3">
+//                   <input
+//                     type="checkbox"
+//                     checked={registrationAccepted}
+//                     required
+//                     disabled={registering}
+//                     onChange={(e) => setRegistrationAccepted(e.target.checked)}
+//                     className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-purple-600 disabled:cursor-not-allowed"
+//                   />
+
+//                   <span className="text-sm leading-6 text-gray-700">
+//                     I confirm that I represent a legitimate retail florist,
+//                     agree to the{" "}
+//                     <Link
+//                       href="/terms"
+//                       target="_blank"
+//                       rel="noopener noreferrer"
+//                       className="font-bold text-purple-700 underline decoration-purple-300 underline-offset-2 hover:text-purple-900"
+//                     >
+//                       Terms of Service
+//                     </Link>
+//                     , and acknowledge the{" "}
+//                     <Link
+//                       href="/privacy"
+//                       target="_blank"
+//                       rel="noopener noreferrer"
+//                       className="font-bold text-purple-700 underline decoration-purple-300 underline-offset-2 hover:text-purple-900"
+//                     >
+//                       Privacy Policy
+//                     </Link>
+//                     .
+//                   </span>
+//                 </label>
+//               </div>
+
+//               <p className="text-center text-xs leading-5 text-gray-500">
+//                 By creating an account, you agree to the{" "}
+//                 <Link
+//                   href="/terms"
+//                   target="_blank"
+//                   className="font-semibold text-purple-700 hover:text-purple-900"
+//                 >
+//                   Terms of Service
+//                 </Link>{" "}
+//                 and acknowledge the{" "}
+//                 <Link
+//                   href="/privacy"
+//                   target="_blank"
+//                   className="font-semibold text-purple-700 hover:text-purple-900"
+//                 >
+//                   Privacy Policy
+//                 </Link>
+//                 .
+//               </p>
+
+//               <button
+//                 type="submit"
+//                 disabled={registering || !registrationAccepted}
+//                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+//               >
+//                 {registering ? "Creating Your Shop..." : "Create Free Account"}
+
+//                 {registering && <BloomSpinner size={40} />}
+//               </button>
+
+//               <p className="mt-4 text-center text-sm text-gray-500">
+//                 Already have a GetBloomDirect account?
+//                 <Link
+//                   href="/login"
+//                   className="ml-1 transition hover:text-purple-600"
+//                 >
+//                   <b>Log In</b>
+//                 </Link>
+//               </p>
+//             </form>
+//           </div>
+//         </div>
+//       </div>
+
+//       {showVerificationModal && (
+//         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+//           <div
+//             role="dialog"
+//             aria-modal="true"
+//             aria-labelledby="verification-modal-title"
+//             className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl"
+//           >
+//             <div className="mb-6 text-center">
+//               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-purple-100 text-2xl">
+//                 ✉️
+//               </div>
+
+//               <h2
+//                 id="verification-modal-title"
+//                 className="text-2xl font-black text-gray-900"
+//               >
+//                 Check Your Email
+//               </h2>
+
+//               <p className="mt-2 text-gray-600">
+//                 We sent a six-digit verification code to:
+//               </p>
+
+//               <p className="mt-1 break-all font-bold text-purple-700">
+//                 {registeredEmail}
+//               </p>
+//             </div>
+
+//             <form onSubmit={handleVerifyEmail} className="space-y-5">
+//               <div>
+//                 <label
+//                   htmlFor="verification-code"
+//                   className="mb-2 block text-center text-xs font-bold uppercase tracking-wide text-gray-500"
+//                 >
+//                   Verification Code
+//                 </label>
+
+//                 <input
+//                   id="verification-code"
+//                   type="text"
+//                   inputMode="numeric"
+//                   autoComplete="one-time-code"
+//                   autoFocus
+//                   required
+//                   maxLength={6}
+//                   value={verificationCode}
+//                   disabled={verifying}
+//                   onChange={(e) =>
+//                     setVerificationCode(
+//                       e.target.value.replace(/\D/g, "").slice(0, 6),
+//                     )
+//                   }
+//                   className="w-full rounded-xl border-2 border-gray-200 px-4 py-4 text-center text-3xl font-black tracking-[0.5em] text-purple-700 outline-none transition focus:border-purple-600 disabled:cursor-not-allowed disabled:bg-gray-100"
+//                   placeholder="000000"
+//                 />
+//               </div>
+
+//               <button
+//                 type="submit"
+//                 disabled={verifying || verificationCode.length !== 6}
+//                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-4 font-bold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-purple-300"
+//               >
+//                 {verifying ? "Verifying Email..." : "Verify Email & Continue"}
+
+//                 {verifying && <BloomSpinner size={40} />}
+//               </button>
+
+//               <p className="text-center text-sm text-gray-500">
+//                 The verification code expires in 10 minutes.
+//               </p>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+//     </>
+//   );
+// }
