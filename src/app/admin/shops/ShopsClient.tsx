@@ -229,6 +229,9 @@ export default function ShopsClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ShopFilter>("all");
 
+  const [selectedShopIds, setSelectedShopIds] = useState<string[]>([]);
+  const [bulkSpamArchiving, setBulkSpamArchiving] = useState(false);
+
   const searchParams = useSearchParams();
 
   const loadCustomers = useCallback(async (showRefreshState = false) => {
@@ -339,7 +342,9 @@ export default function ShopsClient() {
           return customer.accountRisk.level === "review";
 
         case "likely_spam":
-          return customer.accountRisk.level === "likely_spam";
+          return (
+            customer.accountRisk.level === "likely_spam" && !customer.isArchived
+          );
 
         case "email_unverified":
           return !customer.readiness.requirements.emailVerified;
@@ -368,6 +373,110 @@ export default function ShopsClient() {
       }
     });
   }, [activeFilter, customers, searchQuery]);
+
+  const bulkSpamEligibleCustomers = useMemo(() => {
+    if (activeFilter !== "likely_spam") {
+      return [];
+    }
+
+    return filteredCustomers.filter(
+      (customer) => customer.role !== "admin" && !customer.isArchived,
+    );
+  }, [activeFilter, filteredCustomers]);
+
+  const allVisibleSpamSelected =
+    bulkSpamEligibleCustomers.length > 0 &&
+    bulkSpamEligibleCustomers.every((customer) =>
+      selectedShopIds.includes(customer._id),
+    );
+
+  useEffect(() => {
+    setSelectedShopIds([]);
+  }, [activeFilter, searchQuery]);
+
+  function toggleShopSelection(shopId: string) {
+    setSelectedShopIds((current) =>
+      current.includes(shopId)
+        ? current.filter((id) => id !== shopId)
+        : [...current, shopId],
+    );
+  }
+
+  function toggleAllVisibleSpam() {
+    const visibleIds = bulkSpamEligibleCustomers.map(
+      (customer) => customer._id,
+    );
+
+    if (allVisibleSpamSelected) {
+      setSelectedShopIds((current) =>
+        current.filter((id) => !visibleIds.includes(id)),
+      );
+
+      return;
+    }
+
+    setSelectedShopIds((current) =>
+      Array.from(new Set([...current, ...visibleIds])),
+    );
+  }
+
+  async function bulkMarkSpamAndArchive() {
+    if (selectedShopIds.length === 0) {
+      toast.error("Select at least one spam account.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      selectedShopIds.length === 1
+        ? "Mark this account as spam, suspend it, hide it, and archive it?"
+        : `Mark these ${selectedShopIds.length} accounts as spam, suspend them, hide them, and archive them?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBulkSpamArchiving(true);
+
+      const response = await fetch("/api/admin/customers/bulk-spam-archive", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          shopIds: selectedShopIds,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        success?: boolean;
+        processedCount?: number;
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to process selected spam accounts.",
+        );
+      }
+
+      toast.success(
+        data.message || `${selectedShopIds.length} spam accounts processed.`,
+      );
+
+      setSelectedShopIds([]);
+
+      await loadCustomers(true);
+    } catch (error: unknown) {
+      console.error("Failed to bulk mark spam and archive shops:", error);
+
+      toast.error(getErrorMessage(error));
+    } finally {
+      setBulkSpamArchiving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -481,6 +590,44 @@ export default function ShopsClient() {
               Showing {filteredCustomers.length} of {customers.length} shops.
             </p>
           </div>
+
+          {activeFilter === "likely_spam" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleAllVisibleSpam}
+                disabled={
+                  bulkSpamEligibleCustomers.length === 0 || bulkSpamArchiving
+                }
+                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {allVisibleSpamSelected
+                  ? "Clear selection"
+                  : `Select all (${bulkSpamEligibleCustomers.length})`}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void bulkMarkSpamAndArchive()}
+                disabled={selectedShopIds.length === 0 || bulkSpamArchiving}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/25 bg-red-400/[0.08] px-4 py-2.5 text-sm font-bold text-red-200 transition hover:bg-red-400/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkSpamArchiving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Archive className="h-4 w-4" />
+                )}
+
+                {bulkSpamArchiving
+                  ? "Processing..."
+                  : `Mark Spam & Archive${
+                      selectedShopIds.length > 0
+                        ? ` (${selectedShopIds.length})`
+                        : ""
+                    }`}
+              </button>
+            </div>
+          )}
         </div>
 
         {filteredCustomers.length === 0 ? (
@@ -501,6 +648,13 @@ export default function ShopsClient() {
               <ShopCard
                 key={customer._id}
                 customer={customer}
+                selectable={
+                  activeFilter === "likely_spam" &&
+                  customer.role !== "admin" &&
+                  !customer.isArchived
+                }
+                selected={selectedShopIds.includes(customer._id)}
+                onSelectionChanged={toggleShopSelection}
                 onSuspensionChanged={(
                   shopId,
                   isSuspended,
@@ -582,6 +736,9 @@ function MetricCard({ label, value, icon: Icon }: MetricCardProps) {
 
 type ShopCardProps = {
   customer: AdminCustomer;
+  selectable: boolean;
+  selected: boolean;
+  onSelectionChanged: (shopId: string) => void;
   onSuspensionChanged: (
     shopId: string,
     isSuspended: boolean,
@@ -603,6 +760,9 @@ type ShopCardProps = {
 
 function ShopCard({
   customer,
+  selectable,
+  selected,
+  onSelectionChanged,
   onSuspensionChanged,
   onReviewChanged,
   onArchiveChanged,
@@ -614,7 +774,35 @@ function ShopCard({
   const location = [cityState, customer.address?.zip].filter(Boolean).join(" ");
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-white/20 sm:p-6">
+    <article
+      className={`rounded-2xl border bg-white/[0.03] p-5 transition sm:p-6 ${
+        selected
+          ? "border-red-400/40 bg-red-400/[0.03]"
+          : "border-white/10 hover:border-white/20"
+      }`}
+    >
+      {selectable && (
+        <div className="mb-4 flex items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <label className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onSelectionChanged(customer._id)}
+              className="h-4 w-4 cursor-pointer rounded border-white/20 bg-slate-950 accent-red-500"
+            />
+
+            <span className="text-sm font-semibold text-slate-300">
+              Select for spam cleanup
+            </span>
+          </label>
+
+          {selected && (
+            <span className="rounded-full bg-red-400/10 px-2.5 py-1 text-xs font-bold text-red-300">
+              Selected
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <div className="flex items-start gap-4">
