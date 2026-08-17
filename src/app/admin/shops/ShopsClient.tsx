@@ -25,6 +25,7 @@ import {
   ShieldOff,
   Store,
   UserRoundCog,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -231,6 +232,7 @@ export default function ShopsClient() {
 
   const [selectedShopIds, setSelectedShopIds] = useState<string[]>([]);
   const [bulkSpamArchiving, setBulkSpamArchiving] = useState(false);
+  const [bulkDeletingSpam, setBulkDeletingSpam] = useState(false);
 
   const searchParams = useSearchParams();
 
@@ -374,19 +376,27 @@ export default function ShopsClient() {
     });
   }, [activeFilter, customers, searchQuery]);
 
-  const bulkSpamEligibleCustomers = useMemo(() => {
-    if (activeFilter !== "likely_spam") {
+  const selectableCustomers = useMemo(() => {
+    if (activeFilter !== "likely_spam" && activeFilter !== "archived") {
       return [];
     }
 
-    return filteredCustomers.filter(
-      (customer) => customer.role !== "admin" && !customer.isArchived,
-    );
+    return filteredCustomers.filter((customer) => {
+      if (customer.role === "admin") {
+        return false;
+      }
+
+      if (activeFilter === "likely_spam") {
+        return !customer.isArchived;
+      }
+
+      return customer.isArchived;
+    });
   }, [activeFilter, filteredCustomers]);
 
-  const allVisibleSpamSelected =
-    bulkSpamEligibleCustomers.length > 0 &&
-    bulkSpamEligibleCustomers.every((customer) =>
+  const allVisibleSelected =
+    selectableCustomers.length > 0 &&
+    selectableCustomers.every((customer) =>
       selectedShopIds.includes(customer._id),
     );
 
@@ -402,12 +412,14 @@ export default function ShopsClient() {
     );
   }
 
-  function toggleAllVisibleSpam() {
-    const visibleIds = bulkSpamEligibleCustomers.map(
-      (customer) => customer._id,
-    );
+  function toggleAllVisible() {
+    const maxSelection = activeFilter === "archived" ? 50 : 250;
 
-    if (allVisibleSpamSelected) {
+    const visibleIds = selectableCustomers
+      .slice(0, maxSelection)
+      .map((customer) => customer._id);
+
+    if (allVisibleSelected) {
       setSelectedShopIds((current) =>
         current.filter((id) => !visibleIds.includes(id)),
       );
@@ -415,9 +427,7 @@ export default function ShopsClient() {
       return;
     }
 
-    setSelectedShopIds((current) =>
-      Array.from(new Set([...current, ...visibleIds])),
-    );
+    setSelectedShopIds(visibleIds);
   }
 
   async function bulkMarkSpamAndArchive() {
@@ -475,6 +485,113 @@ export default function ShopsClient() {
       toast.error(getErrorMessage(error));
     } finally {
       setBulkSpamArchiving(false);
+    }
+  }
+
+  async function bulkPermanentlyDeleteSpam() {
+    if (selectedShopIds.length === 0) {
+      toast.error("Select at least one archived spam account.");
+      return;
+    }
+
+    if (selectedShopIds.length > 50) {
+      toast.error(
+        "You can permanently delete at most 50 accounts at one time.",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      selectedShopIds.length === 1
+        ? "PERMANENTLY DELETE this archived account?\n\nThis cannot be undone. The server will refuse deletion if the account contains protected activity or does not meet the spam-deletion requirements."
+        : `PERMANENTLY DELETE these ${selectedShopIds.length} archived accounts?\n\nThis cannot be undone. Each account will be checked server-side first. Accounts containing protected activity will be refused rather than deleted.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBulkDeletingSpam(true);
+
+      const response = await fetch("/api/admin/customers/bulk-delete-spam", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          shopIds: selectedShopIds,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        success?: boolean;
+        requestedCount?: number;
+        deletedCount?: number;
+        refusedCount?: number;
+        message?: string;
+        error?: string;
+        refused?: Array<{
+          shopId: string;
+          businessName: string;
+          email: string;
+          reasons: string[];
+        }>;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to permanently delete selected accounts.",
+        );
+      }
+
+      const deletedCount = data.deletedCount ?? 0;
+      const refusedCount = data.refusedCount ?? 0;
+
+      if (deletedCount > 0 && refusedCount === 0) {
+        toast.success(
+          data.message ||
+            `${deletedCount} archived spam accounts permanently deleted.`,
+        );
+      } else if (deletedCount > 0 && refusedCount > 0) {
+        toast.success(
+          `${deletedCount} deleted. ${refusedCount} protected and not deleted.`,
+        );
+      } else if (refusedCount > 0) {
+        toast.error(
+          `${refusedCount} selected account${
+            refusedCount === 1 ? " was" : "s were"
+          } protected and not deleted.`,
+        );
+      } else {
+        toast.error("No accounts were permanently deleted.");
+      }
+
+      if (data.refused && data.refused.length > 0) {
+        console.group("Permanent spam deletion — protected accounts");
+
+        for (const refused of data.refused) {
+          console.warn(
+            `${refused.businessName} (${refused.email || refused.shopId})`,
+            refused.reasons,
+          );
+        }
+
+        console.groupEnd();
+      }
+
+      setSelectedShopIds([]);
+
+      await loadCustomers(true);
+    } catch (error: unknown) {
+      console.error(
+        "Failed to permanently delete archived spam accounts:",
+        error,
+      );
+
+      toast.error(getErrorMessage(error));
+    } finally {
+      setBulkDeletingSpam(false);
     }
   }
 
@@ -591,41 +708,79 @@ export default function ShopsClient() {
             </p>
           </div>
 
-          {activeFilter === "likely_spam" && (
+          {(activeFilter === "likely_spam" || activeFilter === "archived") && (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={toggleAllVisibleSpam}
+                onClick={toggleAllVisible}
                 disabled={
-                  bulkSpamEligibleCustomers.length === 0 || bulkSpamArchiving
+                  selectableCustomers.length === 0 ||
+                  bulkSpamArchiving ||
+                  bulkDeletingSpam
                 }
                 className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {allVisibleSpamSelected
+                {allVisibleSelected
                   ? "Clear selection"
-                  : `Select all (${bulkSpamEligibleCustomers.length})`}
+                  : `Select all (${Math.min(
+                      selectableCustomers.length,
+                      activeFilter === "archived" ? 50 : 250,
+                    )})`}
               </button>
 
-              <button
-                type="button"
-                onClick={() => void bulkMarkSpamAndArchive()}
-                disabled={selectedShopIds.length === 0 || bulkSpamArchiving}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/25 bg-red-400/[0.08] px-4 py-2.5 text-sm font-bold text-red-200 transition hover:bg-red-400/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {bulkSpamArchiving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Archive className="h-4 w-4" />
-                )}
+              {activeFilter === "likely_spam" && (
+                <button
+                  type="button"
+                  onClick={() => void bulkMarkSpamAndArchive()}
+                  disabled={
+                    selectedShopIds.length === 0 ||
+                    bulkSpamArchiving ||
+                    bulkDeletingSpam
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-400/25 bg-red-400/[0.08] px-4 py-2.5 text-sm font-bold text-red-200 transition hover:bg-red-400/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkSpamArchiving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Archive className="h-4 w-4" />
+                  )}
 
-                {bulkSpamArchiving
-                  ? "Processing..."
-                  : `Mark Spam & Archive${
-                      selectedShopIds.length > 0
-                        ? ` (${selectedShopIds.length})`
-                        : ""
-                    }`}
-              </button>
+                  {bulkSpamArchiving
+                    ? "Processing..."
+                    : `Mark Spam & Archive${
+                        selectedShopIds.length > 0
+                          ? ` (${selectedShopIds.length})`
+                          : ""
+                      }`}
+                </button>
+              )}
+
+              {activeFilter === "archived" && (
+                <button
+                  type="button"
+                  onClick={() => void bulkPermanentlyDeleteSpam()}
+                  disabled={
+                    selectedShopIds.length === 0 ||
+                    bulkSpamArchiving ||
+                    bulkDeletingSpam
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkDeletingSpam ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+
+                  {bulkDeletingSpam
+                    ? "Deleting..."
+                    : `Permanently Delete${
+                        selectedShopIds.length > 0
+                          ? ` (${selectedShopIds.length})`
+                          : ""
+                      }`}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -649,9 +804,11 @@ export default function ShopsClient() {
                 key={customer._id}
                 customer={customer}
                 selectable={
-                  activeFilter === "likely_spam" &&
                   customer.role !== "admin" &&
-                  !customer.isArchived
+                  ((activeFilter === "likely_spam" &&
+                    customer.isArchived !== true) ||
+                    (activeFilter === "archived" &&
+                      customer.isArchived === true))
                 }
                 selected={selectedShopIds.includes(customer._id)}
                 onSelectionChanged={toggleShopSelection}
@@ -792,7 +949,7 @@ function ShopCard({
             />
 
             <span className="text-sm font-semibold text-slate-300">
-              Select for spam cleanup
+              Select account
             </span>
           </label>
 
