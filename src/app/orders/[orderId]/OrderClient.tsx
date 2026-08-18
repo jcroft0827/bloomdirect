@@ -65,6 +65,21 @@ export default function OrderClient({
   const [refundToVoid, setRefundToVoid] = useState<OrderRefund | null>(null);
   const [voidingRefund, setVoidingRefund] = useState(false);
 
+  const [markingPaid, setMarkingPaid] = useState(false);
+
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
+    "venmo" | "cashapp" | "zelle" | "paypal"
+  >(
+    order.paymentMethods?.default ||
+      (order.paymentMethods?.venmo
+        ? "venmo"
+        : order.paymentMethods?.cashapp
+          ? "cashapp"
+          : order.paymentMethods?.zelle
+            ? "zelle"
+            : "paypal"),
+  );
+
   const totalRefundedCents = order.totalRefundedCents ?? 0;
 
   const remainingRefundableCents = Math.max(
@@ -154,6 +169,46 @@ export default function OrderClient({
     } finally {
       setActionOrderId(null);
       setHandlingStatus(false);
+    }
+  };
+
+  const handleMarkPaid = async () => {
+    if (markingPaid) return;
+
+    try {
+      setMarkingPaid(true);
+
+      const res = await fetch(`/api/orders/${order._id}/mark-paid`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          paymentMethod: selectedPaymentMethod,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to record payment.");
+      }
+
+      if (data.alreadyPaid) {
+        toast.success("Payment was already recorded.");
+      } else {
+        toast.success("Payment recorded.");
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to mark order paid:", error);
+
+      toast.error(
+        error instanceof Error ? error.message : "Failed to record payment.",
+      );
+    } finally {
+      setMarkingPaid(false);
     }
   };
 
@@ -1028,7 +1083,10 @@ export default function OrderClient({
                       .slice()
                       .reverse()
                       .map((log, idx) => (
-                        <li key={idx} className="flex justify-between gap-4 border-b pb-2">
+                        <li
+                          key={idx}
+                          className="flex justify-between gap-4 border-b pb-2"
+                        >
                           <span>{log.message}</span>
                           <span className="text-gray-400">
                             {new Date(log.createdAt).toLocaleString()}
@@ -1092,6 +1150,98 @@ export default function OrderClient({
                         "Decline Order"
                       )}
                     </button>
+                  </div>
+                )}
+
+              {/* RECORD PAYMENT */}
+              {isOriginating &&
+                order.fulfillmentType !== "outside_network" &&
+                !order.paidAt &&
+                [
+                  OrderStatus.ACCEPTED,
+                  OrderStatus.ACCEPTED_AWAITING_PAYMENT,
+                  OrderStatus.PAID_AWAITING_FULFILLMENT,
+                  OrderStatus.COMPLETED,
+                ].includes(order.status) && (
+                  <div className="space-y-4 border-b pb-5">
+                    <div>
+                      <h3 className="text-lg font-black text-purple-700">
+                        Settlement
+                      </h3>
+
+                      <p className="mt-1 text-sm text-gray-600">
+                        Pay the fulfilling florist directly, then record the
+                        payment here.
+                      </p>
+                    </div>
+
+                    <select
+                      value={selectedPaymentMethod}
+                      onChange={(e) =>
+                        setSelectedPaymentMethod(
+                          e.target.value as
+                            | "venmo"
+                            | "cashapp"
+                            | "zelle"
+                            | "paypal",
+                        )
+                      }
+                      className="w-full rounded-xl border border-gray-300 bg-white p-3 font-semibold text-gray-800"
+                    >
+                      {order.paymentMethods?.venmo && (
+                        <option value="venmo">
+                          Venmo — {order.paymentMethods.venmo}
+                        </option>
+                      )}
+
+                      {order.paymentMethods?.cashapp && (
+                        <option value="cashapp">
+                          Cash App — {order.paymentMethods.cashapp}
+                        </option>
+                      )}
+
+                      {order.paymentMethods?.zelle && (
+                        <option value="zelle">
+                          Zelle — {order.paymentMethods.zelle}
+                        </option>
+                      )}
+
+                      {order.paymentMethods?.paypal && (
+                        <option value="paypal">
+                          PayPal — {order.paymentMethods.paypal}
+                        </option>
+                      )}
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={markingPaid}
+                      onClick={() => void handleMarkPaid()}
+                      className="w-full rounded-2xl bg-emerald-600 py-4 text-xl font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {markingPaid ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <span>Recording Payment</span>
+                          <BloomSpinner size={28} />
+                        </div>
+                      ) : (
+                        "Mark as Paid"
+                      )}
+                    </button>
+                  </div>
+                )}
+
+              {isOriginating &&
+                order.fulfillmentType !== "outside_network" &&
+                order.paidAt && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="font-black text-emerald-800">
+                      Payment Recorded
+                    </p>
+
+                    <p className="mt-1 text-sm text-emerald-700">
+                      Paid on {new Date(order.paidAt).toLocaleString()}
+                    </p>
                   </div>
                 )}
 
