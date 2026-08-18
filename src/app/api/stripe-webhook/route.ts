@@ -30,15 +30,17 @@ function getStripeId(
  *
  * active   -> access
  * trialing -> access
+ * past_due -> access during Stripe's payment-recovery window
  *
- * All other Stripe statuses do not grant paid Pro access.
+ * All other Stripe statuses do not grant Pro access.
  */
 function subscriptionHasProAccess(
   status: Stripe.Subscription.Status,
 ) {
   return (
     status === "active" ||
-    status === "trialing"
+    status === "trialing" ||
+    status === "past_due"
   );
 }
 
