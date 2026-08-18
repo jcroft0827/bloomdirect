@@ -135,6 +135,16 @@ export async function POST(req: Request) {
 
       customer: customerId,
 
+      automatic_tax: {
+        enabled: true,
+      },
+
+      billing_address_collection: "required",
+
+      customer_update: {
+        address: "auto",
+      },
+
       line_items: [
         {
           price: priceId,
@@ -163,7 +173,7 @@ export async function POST(req: Request) {
       cancel_url:
         `${normalizedAppUrl}/dashboard/upgrade` + "?checkout=canceled",
 
-      allow_promotion_codes: true,
+      allow_promotion_codes: false,
     });
 
     if (!checkoutSession.url) {
