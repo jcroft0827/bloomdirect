@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import VideoWalkthrough from "@/components/getting-started/VideoWalkthrough";
 
 type Walkthrough = {
   title: string;
@@ -26,6 +27,8 @@ type Walkthrough = {
   topics: string[];
   icon: typeof PlayCircle;
   proOnly?: boolean;
+  youtubeId?: string;
+  duration?: string;
 };
 
 const walkthroughs: Walkthrough[] = [
@@ -33,49 +36,81 @@ const walkthroughs: Walkthrough[] = [
     title: "Welcome to GetBloomDirect",
     description:
       "A complete introduction to the florist network, the dashboard, and the fastest way to get your shop ready.",
-    topics: ["How the network works", "Dashboard overview", "Recommended first steps"],
+    topics: [
+      "How the network works",
+      "Dashboard overview",
+      "Recommended first steps",
+    ],
     icon: PlayCircle,
+    youtubeId: "9ph-H4Yf0_A",
   },
   {
     title: "Build Your Shop Profile",
     description:
       "Create a trustworthy public presence that helps other florists understand who you are and how you serve customers.",
-    topics: ["Business details", "Branding and logo", "Public profile and verification"],
+    topics: [
+      "Business details",
+      "Branding and logo",
+      "Public profile and verification",
+    ],
     icon: Store,
+    youtubeId: "1CYGDZQKci8",
   },
   {
     title: "Configure Delivery Settings",
     description:
       "Set the delivery rules GetBloomDirect uses to decide when your shop is eligible to fulfill an order.",
-    topics: ["Delivery zones", "Cutoff and same-day rules", "Blackout dates and fees"],
+    topics: [
+      "Delivery zones",
+      "Cutoff and same-day rules",
+      "Blackout dates and fees",
+    ],
     icon: Truck,
+    youtubeId: "o29xGgZSoNE",
   },
   {
     title: "Add Payment Methods",
     description:
       "Choose how other florists can pay your shop and set the method you prefer to use by default.",
-    topics: ["Supported payment methods", "Default payment method", "Receiving eligibility"],
+    topics: [
+      "Supported payment methods",
+      "Default payment method",
+      "Receiving eligibility",
+    ],
     icon: CircleDollarSign,
+    youtubeId: "MXf6tbHtpHc",
   },
   {
     title: "Create and Send an Order",
     description:
       "Learn how delivery details generate eligible florists, how to choose a shop, and how to send a complete order.",
-    topics: ["Recipient and delivery details", "Choosing a fulfilling florist", "Reviewing and sending"],
+    topics: [
+      "Recipient and delivery details",
+      "Choosing a fulfilling florist",
+      "Reviewing and sending",
+    ],
     icon: Send,
   },
   {
     title: "Receive and Fulfill Orders",
     description:
       "Follow the simple incoming-order workflow from acceptance through delivery while keeping the sending florist informed.",
-    topics: ["Accepting or declining", "Order communication", "Marking an order delivered"],
+    topics: [
+      "Accepting or declining",
+      "Order communication",
+      "Marking an order delivered",
+    ],
     icon: PackageCheck,
   },
   {
     title: "Manage Fulfillment Offerings",
     description:
       "Show sending florists what your shop can create, how much it costs, and which options are currently available.",
-    topics: ["Designer’s Choice", "Pricing tiers", "Activation and substitutions"],
+    topics: [
+      "Designer’s Choice",
+      "Pricing tiers",
+      "Activation and substitutions",
+    ],
     icon: Boxes,
   },
   {
@@ -89,7 +124,11 @@ const walkthroughs: Walkthrough[] = [
     title: "Reviews and Verification",
     description:
       "Build confidence across the network through completed orders, verified reviews, and an accurate shop profile.",
-    topics: ["Leaving and receiving reviews", "Verification progress", "Network trust"],
+    topics: [
+      "Leaving and receiving reviews",
+      "Verification progress",
+      "Network trust",
+    ],
     icon: BadgeCheck,
   },
   {
@@ -103,7 +142,11 @@ const walkthroughs: Walkthrough[] = [
     title: "Bloom Pro",
     description:
       "See how Bloom Pro expands sending, offerings, reporting, favorites, visibility, and integration capabilities.",
-    topics: ["Unlimited sending", "Advanced shop tools", "Priority network features"],
+    topics: [
+      "Unlimited sending",
+      "Advanced shop tools",
+      "Priority network features",
+    ],
     icon: HeartHandshake,
     proOnly: true,
   },
@@ -116,6 +159,10 @@ const walkthroughs: Walkthrough[] = [
     proOnly: true,
   },
 ];
+
+const availableVideos = walkthroughs.filter(
+  (walkthrough) => walkthrough.youtubeId,
+).length;
 
 export default async function GettingStartedPage() {
   const session = await getServerSession(authOptions);
@@ -148,9 +195,9 @@ export default async function GettingStartedPage() {
                 Learn GetBloomDirect at your own pace.
               </h1>
               <p className="mt-4 text-base leading-7 text-gray-600 sm:text-lg">
-                This page will become your complete video walkthrough library. For now,
-                each lesson outlines exactly what the upcoming video will cover so you
-                can understand every part of the platform before the recordings arrive.
+                Watch step-by-step GetBloomDirect walkthroughs whenever you need
+                them. Start with the introduction or jump directly to the
+                workflow you&apos;re trying to complete.
               </p>
             </div>
 
@@ -167,8 +214,10 @@ export default async function GettingStartedPage() {
                 <PlayCircle size={22} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">12</p>
-                <p className="text-sm text-gray-500">Planned walkthroughs</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {availableVideos}
+                </p>
+                <p className="text-sm text-gray-500">Videos available</p>
               </div>
             </div>
           </div>
@@ -189,8 +238,10 @@ export default async function GettingStartedPage() {
                 <Bell size={22} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">Coming Soon</p>
-                <p className="text-sm text-gray-500">Videos will be added here</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {walkthroughs.length}
+                </p>
+                <p className="text-sm text-gray-500">Learning topics</p>
               </div>
             </div>
           </div>
@@ -198,10 +249,12 @@ export default async function GettingStartedPage() {
 
         <section>
           <div className="mb-5">
-            <h2 className="text-2xl font-bold text-gray-900">Platform walkthroughs</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Platform walkthroughs
+            </h2>
             <p className="mt-1 text-gray-600">
-              Start with the welcome lesson, then use the remaining guides whenever you
-              need help with a specific workflow.
+              Start with the welcome lesson, then use the remaining guides
+              whenever you need help with a specific workflow.
             </p>
           </div>
 
@@ -243,7 +296,10 @@ export default async function GettingStartedPage() {
                     </p>
                     <ul className="mt-3 space-y-2">
                       {walkthrough.topics.map((topic) => (
-                        <li key={topic} className="flex items-start gap-2 text-sm text-gray-600">
+                        <li
+                          key={topic}
+                          className="flex items-start gap-2 text-sm text-gray-600"
+                        >
                           <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
                           {topic}
                         </li>
@@ -252,10 +308,17 @@ export default async function GettingStartedPage() {
                   </div>
 
                   <div className="mt-auto pt-6">
-                    <div className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
-                      <PlayCircle size={18} />
-                      Video coming soon
-                    </div>
+                    {walkthrough.youtubeId ? (
+                      <VideoWalkthrough
+                        youtubeId={walkthrough.youtubeId}
+                        title={walkthrough.title}
+                      />
+                    ) : (
+                      <div className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
+                        <PlayCircle size={18} />
+                        Video coming soon
+                      </div>
+                    )}
                   </div>
                 </article>
               );
@@ -266,10 +329,13 @@ export default async function GettingStartedPage() {
         <section className="rounded-2xl border border-purple-100 bg-purple-50 p-6 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-purple-950">Need help before the videos arrive?</h2>
+              <h2 className="text-xl font-bold text-purple-950">
+                Still need a hand?
+              </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-purple-800">
-                The walkthrough library is being prepared. Until then, use the Support
-                area whenever a workflow is unclear or something does not behave as expected.
+                Can&apos;t find what you need in the walkthrough library? Use
+                the Support area whenever a workflow is unclear or something
+                does not behave as expected.
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm font-semibold text-purple-700">
