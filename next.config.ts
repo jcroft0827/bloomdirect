@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
   turbopack: {},
 
   /**
+   * ssh2 / ssh2-sftp-client use Node-specific crypto and native-style assets
+   * that Turbopack should not attempt to bundle into ESM chunks.
+   *
+   * Keep these packages external so the Node.js runtime resolves them
+   * normally inside the server function.
+   */
+  serverExternalPackages: ["ssh2-sftp-client", "ssh2"],
+
+  /**
    * Prevent source map issues in dev
    */
   productionBrowserSourceMaps: false,
