@@ -3,6 +3,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { NavLinks } from "@/components/NavLinks";
 import { Bell, Menu, X } from "lucide-react";
+import { SettingsDirtyStateProvider } from "./settings/SettingsDirtyState";
+import SettingsNavigationGuard from "./settings/SettingsNavigationGuard";
 
 interface Branding {
   logo: string;
@@ -187,10 +189,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-emerald-50 md:p-4 lg:gap-10 lg:p-10 overflow-hidden">
+    <SettingsDirtyStateProvider>
+      <SettingsNavigationGuard />
+      <div className="flex h-screen overflow-hidden bg-emerald-50 md:p-4 lg:gap-10 lg:p-10 print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
       {/* Desktop Sidebar (Static) */}
       {shop && (
-        <aside className="w-64 bg-white border-r flex-col justify-between rounded-2xl shadow-lg hidden lg:flex p-6">
+        <aside className="hidden w-64 flex-col justify-between rounded-2xl border-r bg-white p-6 shadow-lg lg:flex print:!hidden">
           <div>
             <h2 className="text-xl font-bold mb-8">GetBloomDirect</h2>
             <NavLinks
@@ -207,14 +211,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Background Dimmer */}
       {showNav && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden print:hidden"
           onClick={() => setShowNav(false)}
         />
       )}
 
       {/* Sliding Menu */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white p-6 shadow-2xl transform transition-transform duration-300 lg:hidden ${showNav ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white p-6 shadow-2xl transition-transform duration-300 lg:hidden print:hidden ${showNav ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-xl font-bold">Menu</h2>
@@ -232,8 +236,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         />
       </aside>
 
-      <div className="flex flex-col w-full">
-        <header className="flex w-screen py-2 px-4 bg-white mb-5 md:w-full md:rounded-2xl">
+      <div className="flex w-full flex-col print:block print:w-full">
+        <header className="mb-5 flex w-screen bg-white px-4 py-2 md:w-full md:rounded-2xl print:hidden">
           <div className="flex items-center justify-between w-full">
             {/* Logo + Greeting */}
             <div>
@@ -278,6 +282,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   }
                 >
                   Orders
+                </span>
+                <span
+                  className={
+                    pathname.startsWith("/dashboard/websites/orders")
+                      ? "block"
+                      : "hidden"
+                  }
+                >
+                  Website Orders
                 </span>
                 <span
                   className={
@@ -393,8 +406,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </button>
         </header>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto print:block print:overflow-visible">{children}</main>
       </div>
-    </div>
+      </div>
+    </SettingsDirtyStateProvider>
   );
 }

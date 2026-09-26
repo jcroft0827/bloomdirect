@@ -155,12 +155,14 @@ export async function POST(req: Request) {
       client_reference_id: shop._id.toString(),
 
       metadata: {
+        product: "gbd_pro",
         shopId: shop._id.toString(),
         billingPeriod,
       },
 
       subscription_data: {
         metadata: {
+          product: "gbd_pro",
           shopId: shop._id.toString(),
           billingPeriod,
         },

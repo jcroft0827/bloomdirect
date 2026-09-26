@@ -1,12 +1,25 @@
 import HomeFooter from "@/components/HomeFooter";
 import HomeHeader from "@/components/HomeHeader";
-import { ArrowLeft, Flower2, Home } from "lucide-react";
+import authOptions from "@/lib/auth";
+import {
+  ArrowLeft,
+  Flower2,
+  Home,
+  LayoutDashboard,
+} from "lucide-react";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const session = await getServerSession(authOptions);
+
+  const isAuthenticated = Boolean(
+    session?.user?.id,
+  );
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
-      <HomeHeader />
+      {!isAuthenticated && <HomeHeader />}
 
       <main className="flex flex-1 items-center justify-center px-6 py-20">
         <section className="mx-auto max-w-2xl text-center">
@@ -28,26 +41,55 @@ export default function NotFound() {
           </p>
 
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-6 py-3 font-bold text-white transition hover:bg-purple-700"
-            >
-              <Home className="h-5 w-5" />
-              Return Home
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-6 py-3 font-bold text-white transition hover:bg-purple-700"
+                >
+                  <LayoutDashboard className="h-5 w-5" />
+                  Return to Dashboard
+                </Link>
 
-            <Link
-              href="/contact"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-6 py-3 font-bold text-gray-800 transition hover:border-purple-300 hover:text-purple-700"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              Contact GetBloomDirect
-            </Link>
+                <Link
+                  href="/dashboard/websites"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-6 py-3 font-bold text-gray-800 transition hover:border-purple-300 hover:text-purple-700"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                  Back to Websites
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-purple-600 px-6 py-3 font-bold text-white transition hover:bg-purple-700"
+                >
+                  <Home className="h-5 w-5" />
+                  Return Home
+                </Link>
+
+                <Link
+                  href="/contact"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-6 py-3 font-bold text-gray-800 transition hover:border-purple-300 hover:text-purple-700"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                  Contact GetBloomDirect
+                </Link>
+              </>
+            )}
           </div>
+
+          {isAuthenticated && (
+            <p className="mt-6 text-sm text-gray-500">
+              You&apos;re still signed in. Use one of the buttons above to
+              return to your account.
+            </p>
+          )}
         </section>
       </main>
 
-      <HomeFooter />
+      {!isAuthenticated && <HomeFooter />}
     </div>
   );
 }

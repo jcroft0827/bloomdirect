@@ -38,6 +38,19 @@ export const NavLinks = ({
     pathname.startsWith("/dashboard/orders/") ||
     pathname.startsWith("/orders/");
 
+  const websitesPathIsActive =
+    pathname === "/dashboard/websites" ||
+    pathname.startsWith("/dashboard/websites/");
+
+  const websiteOrdersPathIsActive =
+    pathname === "/dashboard/websites/orders" ||
+    pathname.startsWith("/dashboard/websites/orders/");
+
+  const websiteCatalogPathIsActive =
+    pathname === "/dashboard/websites/products" ||
+    pathname.startsWith("/dashboard/websites/products/") ||
+    pathname.startsWith("/dashboard/websites/addons/");
+
   const shopPathIsActive =
     pathname === `/dashboard/shops/${slug}` ||
     pathname === "/dashboard/reports" ||
@@ -45,6 +58,7 @@ export const NavLinks = ({
     pathname === "/dashboard/settings";
 
   const [ordersOpen, setOrdersOpen] = useState(ordersPathIsActive);
+  const [websitesOpen, setWebsitesOpen] = useState(websitesPathIsActive);
   const [shopOpen, setShopOpen] = useState(shopPathIsActive);
   const [sendUsage, setSendUsage] = useState<MonthlySendUsage | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
@@ -56,6 +70,12 @@ export const NavLinks = ({
       setOrdersOpen(true);
     }
   }, [ordersPathIsActive]);
+
+  useEffect(() => {
+    if (websitesPathIsActive) {
+      setWebsitesOpen(true);
+    }
+  }, [websitesPathIsActive]);
 
   useEffect(() => {
     if (shopPathIsActive) {
@@ -214,6 +234,107 @@ export const NavLinks = ({
         >
           Network
         </Link>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setWebsitesOpen((current) => !current)}
+            className={groupButtonClass(websitesPathIsActive)}
+            aria-expanded={websitesOpen}
+            aria-controls="bloomwebsites-navigation"
+          >
+            <span>BloomWebsites</span>
+            <ChevronDown
+              size={18}
+              className={`transition-transform duration-200 ${
+                websitesOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {websitesOpen && (
+            <div
+              id="bloomwebsites-navigation"
+              className="ml-3 mt-1 space-y-1 border-l border-gray-200 pl-3"
+            >
+              <Link
+                href="/dashboard/websites"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites",
+                )}
+              >
+                Overview
+              </Link>
+
+              <Link
+                href="/dashboard/websites/orders"
+                onClick={onClose}
+                className={childNavItemClass(websiteOrdersPathIsActive)}
+              >
+                Orders
+              </Link>
+
+              <Link
+                href="/dashboard/websites/products"
+                onClick={onClose}
+                className={childNavItemClass(websiteCatalogPathIsActive)}
+              >
+                Catalog
+              </Link>
+
+              <Link
+                href="/dashboard/websites/reports"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/reports",
+                )}
+              >
+                Reports
+              </Link>
+
+              <Link
+                href="/dashboard/websites/branding"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/branding",
+                )}
+              >
+                Branding
+              </Link>
+
+              <Link
+                href="/dashboard/websites/launch"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/launch",
+                )}
+              >
+                Launch & Billing
+              </Link>
+
+              <Link
+                href="/dashboard/websites/domain"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/domain",
+                )}
+              >
+                Domain
+              </Link>
+
+              <Link
+                href="/dashboard/websites/integrations/tfpos"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/integrations/tfpos",
+                )}
+              >
+                TFPOS Integration
+              </Link>
+            </div>
+          )}
+        </div>
 
         <div>
           <button

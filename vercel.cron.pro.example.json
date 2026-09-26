@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/bloomwebsites/commerce-recovery",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

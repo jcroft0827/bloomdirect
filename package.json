@@ -13,6 +13,7 @@
     "@aws-sdk/s3-request-presigner": "^3.990.0",
     "@heroicons/react": "^2.2.0",
     "axios": "^1.13.5",
+    "basic-ftp": "^6.2.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "fast-xml-parser": "^5.3.2",
@@ -29,6 +30,7 @@
     "react-hot-toast": "^2.6.0",
     "react-spinners": "^0.17.0",
     "resend": "^6.5.2",
+    "ssh2-sftp-client": "^12.1.1",
     "stripe": "^20.0.0"
   },
   "devDependencies": {
@@ -36,6 +38,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "autoprefixer": "^10.4.22",
     "baseline-browser-mapping": "^2.10.34",
     "eslint": "^9",
@@ -43,5 +46,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

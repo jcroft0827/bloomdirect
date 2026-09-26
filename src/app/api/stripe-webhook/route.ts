@@ -7,6 +7,10 @@ import Stripe from "stripe";
 import { connectToDB } from "@/lib/mongoose";
 import { stripe } from "@/lib/stripe/stripe";
 import Shop from "@/models/Shop";
+import {
+  isBloomWebsiteSubscription,
+  syncBloomWebsiteSubscription,
+} from "@/lib/bloom-websites/billing/syncBloomWebsiteSubscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +45,52 @@ function subscriptionHasProAccess(
     status === "active" ||
     status === "trialing" ||
     status === "past_due"
+  );
+}
+
+function isBloomProSubscription(
+  subscription: Stripe.Subscription,
+) {
+  if (subscription.metadata?.product === "gbd_pro") {
+    return true;
+  }
+
+  if (subscription.metadata?.product === "bloomwebsites") {
+    return false;
+  }
+
+  const priceId =
+    subscription.items.data[0]?.price?.id || "";
+
+  return Boolean(
+    (process.env.STRIPE_PRO_MONTHLY_PRICE_ID &&
+      priceId === process.env.STRIPE_PRO_MONTHLY_PRICE_ID) ||
+      (process.env.STRIPE_PRO_ANNUAL_PRICE_ID &&
+        priceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID)
+  );
+}
+
+async function syncRelevantSubscription(
+  subscription: Stripe.Subscription,
+) {
+  if (isBloomWebsiteSubscription(subscription)) {
+    await syncBloomWebsiteSubscription(subscription);
+    return;
+  }
+
+  if (isBloomProSubscription(subscription)) {
+    await syncSubscription(subscription);
+    return;
+  }
+
+  console.warn(
+    "Ignoring unrecognized Stripe subscription:",
+    {
+      subscriptionId: subscription.id,
+      priceId:
+        subscription.items.data[0]?.price?.id || null,
+      product: subscription.metadata?.product || null,
+    },
   );
 }
 
@@ -131,11 +181,12 @@ export async function POST(
   }
 
   const webhookSecret =
+    process.env.GBD_STRIPE_WEBHOOK_SECRET ||
     process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
     console.error(
-      "STRIPE_WEBHOOK_SECRET is not configured.",
+      "GBD_STRIPE_WEBHOOK_SECRET is not configured.",
     );
 
     return NextResponse.json(
@@ -203,7 +254,7 @@ export async function POST(
             subscriptionId,
           );
 
-        await syncSubscription(subscription);
+        await syncRelevantSubscription(subscription);
 
         break;
       }
@@ -213,9 +264,8 @@ export async function POST(
       case "customer.subscription.deleted":
       case "customer.subscription.paused":
       case "customer.subscription.resumed": {
-        await syncSubscription(
-          event.data
-            .object as Stripe.Subscription,
+        await syncRelevantSubscription(
+          event.data.object as Stripe.Subscription,
         );
 
         break;

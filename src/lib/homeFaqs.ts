@@ -1,4 +1,3 @@
-// src/lib/homeFaqs.ts
 export type HomeFaq = {
   question: string;
   answer: string;
@@ -6,38 +5,53 @@ export type HomeFaq = {
 
 export const homeFaqs: HomeFaq[] = [
   {
+    question: "What is BloomWebsites?",
+    answer:
+      "BloomWebsites is a florist ecommerce platform inside GetBloomDirect. It helps flower shops build a public storefront with products, online ordering, delivery and pickup settings, customer payments, tax tools, order workflows, recipes, notifications, and refunds.",
+  },
+  {
+    question: "Can I build a BloomWebsite before paying?",
+    answer:
+      "Yes. Florists can build and preview their BloomWebsite for free. A BloomWebsites subscription is only required when the shop is ready to publish the storefront publicly.",
+  },
+  {
+    question: "How much does BloomWebsites cost?",
+    answer:
+      "BloomWebsites Standard is $129 per month or $1,349 per year. Annual billing saves $199 compared with paying monthly. Self-service setup is $0.",
+  },
+  {
+    question: "Does Bloom charge a fee on each website order?",
+    answer:
+      "No. BloomWebsites does not charge a Bloom percentage or per-order fee on website sales. Normal payment-processor fees still apply when customers pay by card.",
+  },
+  {
+    question: "Can customers choose delivery or pickup?",
+    answer:
+      "Yes. BloomWebsites supports florist-configured delivery and pickup settings, including delivery areas, delivery fees, same-day rules, cutoff times, blackout dates, and related fulfillment policies.",
+  },
+  {
+    question: "How do refunds work?",
+    answer:
+      "BloomWebsites can refund specific products, quantities, add-ons, delivery charges, tips, tax, or a custom amount. Structured refunds use the original order and tax snapshot so later shop-setting changes do not rewrite the old order.",
+  },
+  {
     question: "What is GetBloomDirect?",
     answer:
-      "GetBloomDirect is a fee-free florist-to-florist order network that helps independent flower shops send and receive orders directly.",
+      "GetBloomDirect is a florist-to-florist fulfillment network for independent flower shops. Bloom Free lets shops receive unlimited network orders and send up to 15 network orders per month without a Bloom per-order commission.",
   },
   {
-    question: "Is GetBloomDirect really free?",
+    question: "How are GetBloomDirect florist-to-florist orders paid today?",
     answer:
-      "Yes. Bloom Free allows florists to receive unlimited orders and send up to 15 orders per month. Bloom Pro adds unlimited sending and additional tools for growing shops.",
+      "Florists currently arrange settlement directly using the payment methods configured by the fulfilling shop. Integrated network payment options may be added in the future.",
   },
   {
-    question: "How does GetBloomDirect make money?",
+    question: "Do I need Bloom Pro to use BloomWebsites?",
     answer:
-      "GetBloomDirect offers an optional Bloom Pro subscription with advanced features such as unlimited sending, expanded fulfillment offerings, reporting, Favorite Florists, priority search placement, and POS API access.",
+      "No. BloomWebsites Standard is its own subscription. Bloom Pro is an optional GetBloomDirect network subscription for shops that want unlimited network sending and additional network tools.",
   },
   {
-    question: "Do florists pay commissions on orders?",
+    question: "Can BloomWebsites connect to a point-of-sale system?",
     answer:
-      "No. GetBloomDirect does not take a commission from florist-to-florist orders. The sending and fulfilling florists work directly with one another.",
-  },
-  {
-    question: "How are florists paid?",
-    answer:
-      "Florists arrange payment directly using the payment methods listed on the fulfilling shop's profile, such as Venmo, PayPal, Zelle, Cash App, or another agreed payment method.",
-  },
-  {
-    question: "Who can join GetBloomDirect?",
-    answer:
-      "GetBloomDirect is built for real retail florists and independent flower shops that send or fulfill florist-to-florist orders.",
-  },
-  {
-    question: "Can I use GetBloomDirect with my point-of-sale system?",
-    answer:
-      "Bloom Pro includes access to the GetBloomDirect POS API, which allows supported point-of-sale systems to retrieve and manage incoming florist orders.",
+      "BloomWebsites is being designed with a separate integration layer for future POS order exports and workflow integrations. GetBloomDirect Pro already includes access to the GetBloomDirect POS API.",
   },
 ];

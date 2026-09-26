@@ -1,60 +1,99 @@
-import { Truck, Store, Send, Star } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  CreditCard,
+  Globe2,
+  PencilRuler,
+} from "lucide-react";
+import Link from "next/link";
 
 const steps = [
   {
-    icon: Store,
-    title: "Customer Orders Flowers",
+    number: "01",
+    icon: PencilRuler,
+    title: "Build it for free",
     description:
-      "A customer orders flowers from your shop for delivery outside your local area.",
+      "Create your products, branding, delivery rules, pickup settings, add-ons, recipes, tax rules, and storefront without paying a website subscription.",
   },
   {
-    icon: Send,
-    title: "Choose a Trusted Florist",
+    number: "02",
+    icon: CreditCard,
+    title: "Connect your business",
     description:
-      "Search GetBloomDirect, select a verified florist, choose a fulfillment offering, and send the order directly.",
+      "Connect customer payments, complete your launch settings, and prepare the public domain you want customers to use.",
   },
   {
-    icon: Truck,
-    title: "Local Delivery",
+    number: "03",
+    icon: Globe2,
+    title: "Pay when you launch",
     description:
-      "The fulfilling florist designs and delivers the arrangement while keeping communication simple.",
+      "Activate BloomWebsites Standard only when you are ready to publish. Choose $129/month or $1,349/year.",
   },
   {
-    icon: Star,
-    title: "Grow Your Trusted Network",
+    number: "04",
+    icon: CheckCircle2,
+    title: "Run orders from Bloom",
     description:
-      "Leave reviews, strengthen trusted florist relationships, and grow your fulfillment network without wire-service fees."
+      "Manage incoming website orders, recipes, fulfillment, customer updates, refunds, and order history from your florist dashboard.",
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-gray-50 py-24">
-      <div className="mx-auto max-w-7xl px-6">
-        <h2 className="text-center text-4xl font-black text-gray-900">
-          How GetBloomDirect <span className="text-emerald-600">Works</span>
-        </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-lg text-gray-600">
-          Everything you need to send florist-to-florist orders—without paying wire-service commissions.
-        </p>
+    <section className="bg-white py-20 sm:py-24">
+      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+        <div className="grid gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+          <div className="lg:sticky lg:top-8">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+              No leap of faith required
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              Build the whole website before deciding to pay for it.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-slate-600">
+              You should be able to see your own products, branding, checkout,
+              delivery settings, and workflow before a subscription starts.
+            </p>
 
-        <div className="mt-16 grid grid-cols-1 gap-12 md:grid-cols-2">
-          {steps.map((step, i) => (
-            <div
-              key={i}
-              className="rounded-3xl bg-white p-8 text-center shadow-xl flex flex-col justify-center"
+            <Link
+              href="/register"
+              className="mt-7 inline-flex items-center gap-2 text-sm font-black text-purple-700 hover:text-purple-900"
             >
-              <div className="flex justify-center text-purple-600">
-                <step.icon className="h-8 w-8" />
-              </div>
+              Start building free
+              <ArrowRight size={16} />
+            </Link>
+          </div>
 
-              <h3 className="mt-6 text-2xl font-bold text-gray-900">
-                {step.title}
-              </h3>
+          <ol className="space-y-4">
+            {steps.map((step) => {
+              const Icon = step.icon;
 
-              <p className="mt-3 text-gray-600">{step.description}</p>
-            </div>
-          ))}
+              return (
+                <li
+                  key={step.number}
+                  className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 sm:grid-cols-[auto_1fr] sm:p-6"
+                >
+                  <div className="flex items-center gap-3 sm:block">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-purple-700 shadow-sm">
+                      <Icon size={21} />
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400 sm:mt-3 sm:block">
+                      Step {step.number}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-black text-slate-950">
+                      {step.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
+                      {step.description}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         </div>
       </div>
     </section>

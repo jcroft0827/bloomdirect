@@ -126,6 +126,11 @@ interface Shop {
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import {
+  settingsValuesEqual,
+  useSettingsSectionActions,
+  useSettingsSectionDirty,
+} from "./SettingsDirtyState";
 import toast, { Toaster } from "react-hot-toast";
 import { useRef } from "react";
 import { signOut } from "next-auth/react";
@@ -133,6 +138,32 @@ import BloomSpinner from "@/components/BloomSpinner";
 import { sign } from "crypto";
 import VerificationProgressBar from "@/components/verification/ProgressBar";
 import { useRouter } from "next/navigation";
+
+// 
+function getLegacySectionValue(shop: any, sectionKey: string | null) {
+  if (!shop || !sectionKey) {
+    return null;
+  }
+
+  switch (sectionKey) {
+    case "paymentMethods":
+      return shop.paymentMethods ?? {};
+    case "delivery":
+      return {
+        allowSameDay: shop.delivery?.allowSameDay ?? false,
+        sameDayCutoff: shop.delivery?.sameDayCutoff ?? "",
+        minProductTotal: shop.delivery?.minProductTotal ?? 0,
+      };
+    case "financials":
+      return shop.financials ?? {};
+    case "branding":
+      return shop.branding ?? {};
+    case "securityCode":
+      return shop.securityCode ?? "";
+    default:
+      return null;
+  }
+}
 
 // export default function SettingsClient({ initialShop }: { initialShop: any }) {
 type SettingsClientProps = {
@@ -280,11 +311,40 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   const sectionNames: Record<string, string> = {
     paymentMethods: "Payment Methods",
     shopInfo: "Shop Info",
-    delivery: "Delivery Settings",
+    delivery: "GetBloomDirect Order Settings",
     financials: "Taxes & Fees",
     branding: "Public Profile",
     securityCode: "Security Code",
   };
+
+  const legacySectionDirty = Boolean(
+    activeSection &&
+      backupShop &&
+      !settingsValuesEqual(
+        getLegacySectionValue(shop, activeSection),
+        getLegacySectionValue(backupShop, activeSection),
+      ),
+  );
+
+  useSettingsSectionDirty(
+    {
+      id: "getbloomdirect-active-section",
+      label: activeSection ? sectionNames[activeSection] ?? "GetBloomDirect" : "GetBloomDirect",
+      anchorId:
+        activeSection === "paymentMethods"
+          ? "payment-methods"
+          : activeSection === "delivery"
+            ? "delivery-settings"
+            : activeSection === "financials"
+              ? "financial-settings"
+              : activeSection === "branding"
+                ? "public-profile"
+                : activeSection === "securityCode"
+                  ? "security-settings"
+                  : undefined,
+    },
+    legacySectionDirty,
+  );
 
   const [isSaving, setIsSaving] = useState<string | null>(null);
 
@@ -381,14 +441,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   }, []);
 
   // #endregion
-
-  if (loading || !shop) {
-    return (
-      <div className="w-full h-[70vh] flex items-center justify-center">
-        <BloomSpinner />
-      </div>
-    );
-  }
 
   // #region Functions
 
@@ -513,21 +565,13 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
           paymentMethods: shop.paymentMethods,
         };
       } else if (sectionKey === "delivery") {
-        const zonesAreValid =
-          shop.delivery.method === "zip"
-            ? shop.delivery.zipZones.length > 0 &&
-              validateZipZones(shop.delivery.zipZones)
-            : shop.delivery.distanceZones.length > 0 &&
-              validateDistanceZones(shop.delivery.distanceZones);
+        payload = {
+          allowSameDay: shop.delivery.allowSameDay,
 
-        if (!zonesAreValid) {
-          toast.error(
-            "Add at least one complete delivery zone and fix any zone errors before saving.",
-          );
-          return;
-        }
+          sameDayCutoff: shop.delivery.sameDayCutoff,
 
-        payload = shop.delivery;
+          minProductTotal: shop.delivery.minProductTotal,
+        };
       } else if (sectionKey === "financials") {
         payload = {
           financials: shop.financials,
@@ -666,6 +710,12 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     setActiveSection(null);
     setBackupShop(null);
   };
+
+  useSettingsSectionActions("getbloomdirect-active-section", {
+    save: activeSection ? () => handleSave(activeSection) : undefined,
+    discard: handleEditCancel,
+    isSaving: Boolean(isSaving),
+  });
 
   // Upload Logo
   const handleLogoUpload = async (file: File) => {
@@ -1145,6 +1195,14 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     !!shop?.delivery?.noMoreOrdersTodayUntil &&
     new Date(shop?.delivery?.noMoreOrdersTodayUntil) > new Date();
 
+  if (loading || !shop) {
+    return (
+      <div className="w-full h-[70vh] flex items-center justify-center">
+        <BloomSpinner />
+      </div>
+    );
+  }
+
   return (
     <>
       <Toaster position="top-center" />
@@ -1516,253 +1574,14 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
             )}
           </div>
 
-          {/* Shop Info */}
-          <div
-            id="business-information"
-            className={`${normalSection} scroll-mt-28`}
-          >
-            {/* Header */}
-            <div>
-              <h2 className={normalH2}>Shop Info</h2>
-              <button
-                onClick={() => handleEditClick("shopInfo")}
-                className={
-                  (activeSection === "shopInfo" ? "hidden" : "block") +
-                  " absolute top-2 right-2"
-                }
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="1.5"
-                  stroke="currentColor"
-                  className="size-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {activeSection === "shopInfo" ? (
-              // {/* Edit */}
-              <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4 lg:grid-cols-2">
-                <div className="col-span-2 sm:col-span-4 lg:col-span-2">
-                  <RequirementNotice>
-                    Required for account readiness: phone number, street
-                    address, city, state, and ZIP code. Fields marked with{" "}
-                    <span className="font-bold text-red-600">*</span> must be
-                    completed.
-                  </RequirementNotice>
-                </div>
-                {/* Shop Name */}
-                <div className="col-span-2">
-                  <label className={normalLabel}>Shop Name</label>
-                  <input
-                    type="text"
-                    value={shop?.businessName ?? ""}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      const newSlug = updateSlug(newName);
-
-                      setShop((prev) => ({
-                        ...prev,
-                        businessName: newName,
-                        slug: newSlug,
-                      }));
-                    }}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop Phone */}
-                <div className="col-span-2">
-                  <label className={normalLabel}>
-                    Shop Phone (Public) <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="888-888-8888"
-                    maxLength={12}
-                    value={shop?.contact?.phone ?? ""}
-                    onChange={(e) =>
-                      updateContact("phone", formatDynamicPhone(e.target.value))
-                    }
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop Website */}
-                <div className="col-span-2">
-                  <label className={normalLabel}>Shop Website (Public)</label>
-                  <input
-                    type="text"
-                    placeholder="getbloomdirect.com"
-                    value={shop?.contact?.website ?? ""}
-                    onChange={(e) =>
-                      updateContact("website", e.target.value.toLowerCase())
-                    }
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop Address */}
-                <div className="col-span-2">
-                  <label className={normalLabel}>
-                    Shop Address <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="123 Flower Lane"
-                    value={shop?.address?.street ?? ""}
-                    onChange={(e) => updateAddress("street", e.target.value)}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop City */}
-                <div className="col-span-2">
-                  <label className={normalLabel}>
-                    Shop City <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Flower City"
-                    value={shop?.address?.city ?? ""}
-                    onChange={(e) => updateAddress("city", e.target.value)}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop State */}
-                <div className="col-span-1">
-                  <label className={normalLabel}>
-                    Shop State <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="NY"
-                    value={shop?.address?.state ?? ""}
-                    onChange={(e) => {
-                      updateAddress("state", e.target.value);
-                    }}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop Zip */}
-                <div className="col-span-1">
-                  <label className={normalLabel}>
-                    Shop Zip <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="14036"
-                    value={shop?.address?.zip ?? ""}
-                    maxLength={5}
-                    onChange={(e) => {
-                      updateAddress("zip", e.target.value);
-                    }}
-                    className={normalInput}
-                  />
-                </div>
-                {/* Shop Country */}
-                <div className="col-span-2">
-                  <label className={normalLabel}>Shop Country</label>
-                  <select
-                    name="country"
-                    value={shop?.address?.country ?? ""}
-                    onChange={(e) => updateAddress("country", e.target.value)}
-                    className={normalInput}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c === "US" ? "United States" : "Canada"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* Buttons */}
-                <div className="grid grid-cols-1 gap-4 col-span-2 sm:col-span-4 sm:grid-cols-2 lg:col-span-2">
-                  <button
-                    onClick={() => handleSave("shopInfo")}
-                    disabled={isSaving === "shopInfo"}
-                    className="bg-emerald-600 text-white text-xl px-10 py-2 rounded-xl transition-all hover:bg-emerald-700"
-                  >
-                    {isSaving === "shopInfo" ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    className="bg-red-500 text-white text-xl px-10 py-2 rounded-xl transition-all hover:bg-red-600"
-                    onClick={handleEditCancel}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              // {/* Preview */}
-              <div className="grid grid-cols-1 text-center gap-4 sm:grid-cols-2 sm:max-w-[40rem] sm:gap-x-10 lg:gap-x-4">
-                {/* Shop Name */}
-                <div className="lg:col-span-2">
-                  <label className={normalLabel}>Name</label>
-                  <p className={previewP}>{shop?.businessName}</p>
-                </div>
-                {/* Shop Phone */}
-                <div className="lg:col-span-2">
-                  <label className={normalLabel}>Phone Number</label>
-                  <p className={previewP}>{shop?.contact?.phone}</p>
-                </div>
-                {/* Shop Website */}
-                <div>
-                  <label className={normalLabel}>Website</label>
-                  {shop?.contact?.website ? (
-                    <p className={previewP}>{shop.contact.website}</p>
-                  ) : (
-                    <p className={previewP}>No Website Added</p>
-                  )}
-                </div>
-                {/* Shop Address */}
-                <div className="lg:col-span-2">
-                  <label className={normalLabel}>Address</label>
-                  <p className={previewP}>{shop?.address?.street}</p>
-                </div>
-                <div className="flex gap-4 justify-center lg:col-span-2">
-                  {/* Shop City */}
-                  <div>
-                    <label className={normalLabel}>City</label>
-                    <p className={previewP}>{shop?.address?.city}</p>
-                  </div>
-                  {/* Shop State */}
-                  <div>
-                    <label className={normalLabel}>State</label>
-                    <p className={previewP}>{shop?.address?.state}</p>
-                  </div>
-                  {/* Shop Zip */}
-                  <div>
-                    <label className={normalLabel}>Zip</label>
-                    <p className={previewP}>{shop?.address?.zip}</p>
-                  </div>
-                </div>
-                {/* Country */}
-                <div className="sm:col-span-2">
-                  <label className={normalLabel}>Country</label>
-                  <p className={previewP}>{shop?.address?.country}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Delivery Settings */}
+          {/* GetBloomDirect Order Settings */}
           <div
             id="delivery-settings"
             className={`${normalSection} scroll-mt-28`}
           >
-            {/* Header */}
             <div>
-              <h2 className={normalH2}>Delivery Settings</h2>
+              <h2 className={normalH2}>GetBloomDirect Order Settings</h2>
+
               <button
                 onClick={() => handleEditClick("delivery")}
                 className={
@@ -1786,347 +1605,105 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 </svg>
               </button>
             </div>
+
             {activeSection === "delivery" ? (
               <>
-                <RequirementNotice>
-                  Required to appear in florist search: choose a delivery method
-                  and configure at least one complete service area. Every zone
-                  needs all of its fields completed.
-                </RequirementNotice>
-                <div>
-                  <h3 className="mb-2 text-center">
-                    Choose Delivery Method{" "}
-                    <span className="text-red-600">*</span>
-                    <br /> (
-                    <span className="text-emerald-700 font-semibold">
-                      Zip
-                    </span>{" "}
-                    or
-                    <span className="text-emerald-700 font-semibold">
-                      {" "}
-                      Distance
-                    </span>
-                    )
-                  </h3>
-                  <div className="px-2 flex items-center justify-center gap-8 text-xl">
-                    {/* Zip */}
-                    <label>
-                      <input
-                        type="radio"
-                        name="method"
-                        value="zip"
-                        tabIndex={-1}
-                        checked={shop?.delivery?.method === "zip"}
-                        onChange={(e) => updateDelivery("method", "zip")}
-                      />{" "}
-                      Zip
-                    </label>
-                    {/* Distance */}
-                    <label>
-                      <input
-                        type="radio"
-                        name="method"
-                        value="distance"
-                        tabIndex={-1}
-                        checked={shop?.delivery?.method === "distance"}
-                        onChange={(e) => updateDelivery("method", "distance")}
-                      />{" "}
-                      Distance
-                    </label>
-                  </div>
+                <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm leading-6 text-purple-950">
+                  These settings affect GetBloomDirect network orders only. Your
+                  physical delivery area is now managed under Shared Settings.
                 </div>
 
-                {/* Dynamic Zone Section */}
-                <div className="border p-4 rounded-lg bg-gray-50">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium capitalize">
-                      {shop?.delivery?.method} Zones
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={addZone}
-                      className="text-xs bg-emerald-600 text-white px-2 py-1 rounded"
-                    >
-                      + Add{" "}
-                      {shop?.delivery?.method === "zip" ? "Zip" : "Distance"}{" "}
-                      Option
-                    </button>
-                  </div>
+                <div className="space-y-6">
+                  {/* SAME DAY */}
+                  <label className="flex cursor-pointer items-center justify-between gap-5 rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="text-left">
+                      <p className="font-semibold text-gray-900">
+                        Allow Same-Day Orders
+                      </p>
 
-                  {shop?.delivery?.method === "zip" ? (
-                    // Zip
-                    <div className="space-y-2">
-                      {shop?.delivery?.zipZones.map((zone, index) => (
-                        <div
-                          key={index}
-                          className="space-y-1 border-b pb-4 mb-4"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-start gap-2 lg:flex-col">
-                            <div className="grid grid-cols-1 gap-2 flex-1">
-                              {/* Name */}
-                              <div>
-                                <label className="mb-1 block text-left text-xs font-medium text-gray-600">
-                                  Zone Name{" "}
-                                  <span className="text-red-600">*</span>
-                                </label>
-                                <input
-                                  className={`w-full p-2 border-rounded ${zoneErrors[index]?.name ? "border-red-500" : "border-gray-300"}`}
-                                  value={zone.name}
-                                  onChange={(e) =>
-                                    updateZone(index, "name", e.target.value)
-                                  }
-                                  placeholder="Zone Name"
-                                />
-                                {zoneErrors[index]?.name && (
-                                  <p className="text-[10px] text-red-500 mt-1">
-                                    {zoneErrors[index].name}
-                                  </p>
-                                )}
-                              </div>
-                              {/* Zip */}
-                              <div>
-                                <label className="mb-1 block text-left text-xs font-medium text-gray-600">
-                                  ZIP Code{" "}
-                                  <span className="text-red-600">*</span>
-                                </label>
-                                <input
-                                  className={`w-full p-2 border rounded ${zoneErrors[index]?.zip ? "border-red-500" : "border-gray-300"}`}
-                                  value={zone.zip}
-                                  onChange={(e) =>
-                                    updateZone(index, "zip", e.target.value)
-                                  }
-                                  placeholder="ZIP Code"
-                                />
-                                {zoneErrors[index]?.zip && (
-                                  <p className="text-[10px] text-red-500 mt-1">
-                                    {zoneErrors[index].zip}
-                                  </p>
-                                )}
-                              </div>
-                              {/* Fee */}
-                              <div>
-                                <label className="mb-1 block text-left text-xs font-medium text-gray-600">
-                                  Fee <span className="text-red-600">*</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  className="w-full p-2 border rounded border-gray-300"
-                                  value={zone.fee}
-                                  onChange={(e) =>
-                                    updateZone(index, "fee", e.target.value)
-                                  }
-                                  onBlur={() =>
-                                    updateZone(
-                                      index,
-                                      "fee",
-                                      parseFloat(zone.fee.toString()).toFixed(
-                                        2,
-                                      ),
-                                    )
-                                  }
-                                  placeholder="Fee ($)"
-                                />
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeZone(index)}
-                              className="px-4 py-1 w-full bg-red-500 text-white rounded-md sm:text-red-500 sm:p-2 sm:w-auto sm:bg-transparent sm:rounded-none lg:bg-red-500 lg:px-4 lg:py-1 lg:w-full lg:text-white lg:rounded-md"
-                            >
-                              <span className="hidden sm:block lg:hidden">
-                                X
-                              </span>
-                              <span className="sm:hidden lg:block">
-                                Remove Zone
-                              </span>
-                            </button>
-                          </div>
-                          {zoneErrors[index]?.fields && (
-                            <p className="text-[10px] text-red-600 font-bold">
-                              {zoneErrors[index].fields}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                      <p className="mt-1 text-sm leading-5 text-gray-500">
+                        Allow other florists to request delivery for today
+                        through GetBloomDirect.
+                      </p>
                     </div>
-                  ) : (
-                    // Distance
-                    <div className="space-y-2">
-                      {shop?.delivery?.distanceZones.map((zone, index) => (
-                        <React.Fragment key={index}>
-                          <div
-                            className={`p-3 rounded-lg border ${zoneErrors[index]?.gap ? "bg-amber-50 border-amber-200" : "bg-white"}`}
-                          >
-                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3">
-                              <div>
-                                <label className="text-[10px] text-gray-400">
-                                  Min Miles{" "}
-                                  <span className="text-red-600">*</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  step={0.1}
-                                  className="w-full p-2 border rounded border-gray-300"
-                                  value={zone.min}
-                                  onChange={(e) =>
-                                    updateZone(index, "min", e.target.value)
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-gray-400">
-                                  Max Miles{" "}
-                                  <span className="text-red-600">*</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  step={0.1}
-                                  className={`w-full p-2 border rounded ${zoneErrors[index]?.max ? "border-red-500" : "border-gray-300"}`}
-                                  value={zone.max}
-                                  onChange={(e) =>
-                                    updateZone(index, "max", e.target.value)
-                                  }
-                                />
-                                {zoneErrors[index]?.max && (
-                                  <p className="text-[10px] text-red-500 mt-1">
-                                    {zoneErrors[index].max}
-                                  </p>
-                                )}
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-gray-400">
-                                  Fee ($){" "}
-                                  <span className="text-red-600">*</span>
-                                </label>
-                                <input
-                                  type="number"
-                                  className="w-full p-2 border rounded border-gray-300"
-                                  value={zone.fee}
-                                  onChange={(e) =>
-                                    updateZone(index, "fee", e.target.value)
-                                  }
-                                  onBlur={() =>
-                                    updateZone(
-                                      index,
-                                      "fee",
-                                      parseFloat(zone.fee.toString()).toFixed(
-                                        2,
-                                      ),
-                                    )
-                                  }
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeZone(index)}
-                                className="px-4 py-1 w-full col-span-3 bg-red-500 text-white rounded-md sm:p-2 sm:col-span-1 sm:max-h-11 sm:self-end sm:mb-[0.05rem] lg:col-span-3"
-                              >
-                                Remove Zone
-                              </button>
-                            </div>
-                          </div>
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
-                {/* Fallback Fee + Max Radius */}
-                <div className="grid grid-cols-1 gap-4 text-center md:grid-cols-2">
-                  {/* Fallback Fee */}
-                  <div>
-                    <label className={normalLabel}>
-                      Fallback Fee <span className="text-red-600">*</span>
-                    </label>
                     <input
-                      name="fallbackFee"
-                      type="number"
-                      step="0.01"
-                      placeholder="$0.00"
-                      value={shop?.delivery?.fallbackFee ?? 0}
-                      onChange={(e) =>
-                        updateDelivery("fallbackFee", e.target.value)
-                      }
-                      onBlur={handleFeeBlur}
-                      className={normalInput}
+                      type="checkbox"
+                      id="delivery"
+                      name="allowSameDay"
+                      checked={shop?.delivery?.allowSameDay ?? false}
+                      onChange={handleCBChange}
+                      className="h-5 w-5 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                     />
-                  </div>
-                  {/* Max Radius */}
-                  <div>
-                    <label className={normalLabel}>
-                      Max Radius (mi.) <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      name="maxRadius"
-                      type="number"
-                      placeholder="0"
-                      value={shop?.delivery?.maxRadius ?? 0}
-                      onChange={(e) =>
-                        updateDelivery("maxRadius", e.target.value)
-                      }
-                      className={normalInput}
-                    />
-                  </div>
-                </div>
+                  </label>
 
-                {/* Allow Same Day Delivery*/}
-                <div className="space-y-4 text-center">
-                  <div>
-                    <label className="flex flex-col items-center cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        id="delivery"
-                        name="allowSameDay"
-                        checked={shop?.delivery?.allowSameDay ?? false}
-                        onChange={handleCBChange}
-                        className="hidden" // Hide the default box
-                      />
-                      <span className="font-medium text-gray-700 mb-2">
-                        Allow Same Day Delivery
-                      </span>
-                      <div
-                        className={`
-                        px-6 py-2 rounded-lg font-bold transition-all duration-200 uppercase tracking-wider text-center
-                        ${
-                          shop?.delivery?.allowSameDay
-                            ? "bg-green-500 text-white shadow-[0_4px_0_0_#15803d] active:shadow-none active:translate-y-1"
-                            : "bg-red-500 text-white shadow-inner translate-y-1 opacity-80 ring-2 ring-red-700/20"
-                        }
-                      `}
-                      >
-                        {shop?.delivery?.allowSameDay ? "Allow" : "Don't Allow"}
-                      </div>
-                    </label>
-                  </div>
                   {shop?.delivery?.allowSameDay && (
                     <div>
-                      <label className={normalLabel}>
-                        Same Day Cutoff <span className="text-red-600">*</span>
-                      </label>
+                      <label className={normalLabel}>Same-Day Cutoff</label>
+
                       <input
                         type="time"
                         name="sameDayCutoff"
                         value={shop?.delivery?.sameDayCutoff ?? ""}
-                        onChange={(e) =>
-                          updateDelivery("sameDayCutoff", e.target.value)
+                        onChange={(event) =>
+                          updateDelivery("sameDayCutoff", event.target.value)
                         }
                         className={normalInput}
                       />
+
+                      <p className="mt-2 text-xs leading-5 text-gray-500">
+                        Orders requested after this time will no longer qualify
+                        for same-day delivery through GetBloomDirect.
+                      </p>
                     </div>
                   )}
+
+                  {/* MINIMUM */}
+                  <div>
+                    <label className={normalLabel}>Minimum Product Total</label>
+
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        $
+                      </span>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        name="minProductTotal"
+                        value={shop?.delivery?.minProductTotal ?? 0}
+                        onChange={(event) =>
+                          updateDelivery("minProductTotal", event.target.value)
+                        }
+                        className={`${normalInput} pl-7`}
+                      />
+                    </div>
+
+                    <p className="mt-2 text-xs leading-5 text-gray-500">
+                      This minimum applies to GetBloomDirect orders only.
+                      BloomWebsites will have its own minimum order setting.
+                    </p>
+                  </div>
                 </div>
 
-                {/* Buttons */}
-                <div className="grid grid-cols-1 gap-4 w-full sm:grid-cols-2">
+                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <button
+                    type="button"
                     onClick={() => handleSave("delivery")}
                     disabled={isSaving === "delivery"}
-                    className="bg-emerald-600 text-white text-xl px-10 py-2 rounded-xl transition-all hover:bg-emerald-700"
+                    className="flex min-h-12 w-full min-w-0 items-center justify-center rounded-xl bg-purple-600 px-4 py-3 text-center text-sm font-bold leading-5 text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-300 sm:px-5 sm:text-base"
                   >
-                    {isSaving === "delivery" ? "Saving..." : "Save"}
+                    <span className="min-w-0 break-words">
+                      {isSaving === "delivery"
+                        ? "Saving..."
+                        : "Save GetBloomDirect Settings"}
+                    </span>
                   </button>
+
                   <button
-                    className="bg-red-500 text-white text-xl px-10 py-2 rounded-xl transition-all hover:bg-red-600"
+                    type="button"
+                    className="flex min-h-12 w-full min-w-0 items-center justify-center rounded-xl bg-gray-100 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-200 sm:px-5 sm:text-base"
                     onClick={handleEditCancel}
                   >
                     Cancel
@@ -2134,82 +1711,25 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 </div>
               </>
             ) : (
-              <div className="grid grid-cols-1 gap-y-4 items-center justify-center text-center">
-                {/* Delivery Method */}
+              <div className="space-y-5 text-center">
                 <div>
-                  <label className={normalLabel}>Delivery Method</label>
-                  <p className={previewP}>{shop?.delivery?.method} Zones</p>
-                </div>
-                {shop?.delivery?.method === "distance" ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                    {shop?.delivery?.distanceZones.map((zone, index) => (
-                      <React.Fragment key={index}>
-                        <div className="p-3 rounded-lg border bg-white">
-                          <div className="grid grid-cols-3 gap-10">
-                            <div>
-                              <label className={normalLabel}>Min</label>
-                              <p className={previewP}>{zone.min} mi.</p>
-                            </div>
-                            <div>
-                              <label className={normalLabel}>Max</label>
-                              <p className={previewP}>{zone.max} mi.</p>
-                            </div>
-                            <div>
-                              <label className={normalLabel}>Fee</label>
-                              <p className={previewP}>${zone.fee}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                ) : (
-                  // Zip Zones
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-y-10 lg:grid-cols-1 lg:gap-y-4">
-                    {shop?.delivery?.zipZones.map((zone, index) => (
-                      <div
-                        key={index}
-                        className="border-b pb-4 sm:border-0 sm:pb-0"
-                      >
-                        <div className="grid grid-cols-2 gap-y-4 gap-x-8 flex-1 bg-white rounded-lg p-5">
-                          {/* Zone Name */}
-                          <div className="col-span-2">
-                            <p className={previewP}>{zone.name}</p>
-                          </div>
-                          {/* Zip */}
-                          <div>
-                            <label className={normalLabel}>Zip Code</label>
-                            <p className={previewP}>{zone.zip}</p>
-                          </div>
-                          {/* Fee */}
-                          <div>
-                            <label className={normalLabel}>Zone Fee</label>
-                            <p className={previewP}>${zone.fee}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  <label className={normalLabel}>Same-Day Orders</label>
 
-                {/* Fallback Fee + Max Radius */}
-                <div className="flex justify-evenly items-center w-full">
-                  <div>
-                    <label className={normalLabel}>Fallback Fee</label>
-                    <p className={previewP}>${shop?.delivery?.fallbackFee}</p>
-                  </div>
-                  <div>
-                    <label className={normalLabel}>Max Radius</label>
-                    <p className={previewP}>{shop?.delivery?.maxRadius} mi.</p>
-                  </div>
+                  <p
+                    className={
+                      shop?.delivery?.allowSameDay
+                        ? `${previewP} text-emerald-600`
+                        : `${previewP} text-red-500`
+                    }
+                  >
+                    {shop?.delivery?.allowSameDay ? "Allowed" : "Not Allowed"}
+                  </p>
                 </div>
 
-                {/* Allow Same Day Delivery + Same Day Cutoff */}
-                {shop?.delivery?.allowSameDay ? (
+                {shop?.delivery?.allowSameDay && (
                   <div>
-                    <p className={previewP + " text-emerald-500"}>
-                      Allow Same Day Delivery
-                    </p>
+                    <label className={normalLabel}>Same-Day Cutoff</label>
+
                     <p className={previewP}>
                       {new Date(
                         `1970-01-01T${shop?.delivery?.sameDayCutoff}:00`,
@@ -2220,13 +1740,20 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                       })}
                     </p>
                   </div>
-                ) : (
-                  <div>
-                    <p className={previewP + " text-red-500"}>
-                      Don&apos;t Allow Same Day Delivery
-                    </p>
-                  </div>
                 )}
+
+                <div>
+                  <label className={normalLabel}>Minimum Product Total</label>
+
+                  <p className={previewP}>
+                    ${Number(shop?.delivery?.minProductTotal ?? 0).toFixed(2)}
+                  </p>
+                </div>
+
+                <p className="mx-auto max-w-md text-xs leading-5 text-gray-500">
+                  Delivery zones, fees, and maximum service radius are managed
+                  under Shared Settings.
+                </p>
               </div>
             )}
           </div>
@@ -2467,7 +1994,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
           </div>
 
           {/* Public Profile Section */}
-          <div className={normalSection}>
+          <div id="public-profile" className={`${normalSection} scroll-mt-28`}>
             {/* Header */}
             <div>
               <h2 className={normalH2}>Public Profile</h2>
@@ -3321,7 +2848,10 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
           </div>
 
           {/* Security Code & Credentials */}
-          <div className="flex flex-col items-center gap-4 bg-gradient-to-br from-blue-100 to-white rounded-3xl shadow-xl p-10 text-center relative">
+          <div
+            id="security-settings"
+            className="scroll-mt-28 flex flex-col items-center gap-4 bg-gradient-to-br from-blue-100 to-white rounded-3xl shadow-xl p-10 text-center relative"
+          >
             {/* Header */}
             <div>
               <h2 className="font-semibold text-2xl text-gray-900">

@@ -1,66 +1,88 @@
-import { CheckCircle, Flower2, MessageSquare, Star, Users } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  MessageSquareText,
+  Send,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
 
-const highlights = [
+const points = [
+  {
+    icon: Send,
+    title: "Send directly",
+    description:
+      "Create florist-to-florist fulfillment orders without routing them through a traditional wire service.",
+  },
   {
     icon: Users,
-    title: "Independent Florists",
-    description: "Built for real flower shops looking for better fulfillment options.",
+    title: "Build florist relationships",
+    description:
+      "Search participating shops, save favorites, review activity, and build a network you actually know.",
   },
   {
-    icon: Flower2,
-    title: "Direct Fulfillment",
-    description: "Send and receive florist-to-florist orders without wire-service commissions.",
+    icon: MessageSquareText,
+    title: "Keep communication together",
+    description:
+      "Use order notes, messages, and status information to keep florist-to-florist work organized.",
   },
   {
-    icon: MessageSquare,
-    title: "Real Communication",
-    description: "Keep order details, notes, and florist communication in one place.",
-  },
-  {
-    icon: Star,
-    title: "Reviews & Trust",
-    description: "Build stronger relationships through reviews and verified florist activity.",
+    icon: BadgeCheck,
+    title: "No Bloom commission",
+    description:
+      "GetBloomDirect does not take a percentage from the florist-to-florist order itself.",
   },
 ];
 
 export default function HomeNetworkGrowth() {
   return (
-    <section className="bg-white py-24">
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-            <CheckCircle className="h-7 w-7" />
+    <section className="border-y border-slate-200 bg-slate-50 py-20 sm:py-24">
+      <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+              The other side of Bloom
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              Your local website and your florist network can live under one account.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-slate-600">
+              BloomWebsites is the ecommerce focus. GetBloomDirect remains the
+              free florist-to-florist network for shops that need help
+              fulfilling orders outside their own delivery area.
+            </p>
+
+            <Link
+              href="/register"
+              className="mt-7 inline-flex items-center gap-2 text-sm font-black text-emerald-800"
+            >
+              Create a free florist account
+              <ArrowRight size={16} />
+            </Link>
           </div>
 
-          <h2 className="text-4xl font-black text-gray-900">
-            The Network Starts{" "}
-            <span className="text-emerald-600">Here</span>
-          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {points.map((point) => {
+              const Icon = point.icon;
 
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
-            GetBloomDirect is helping independent florists move away from
-            commission-heavy wire services and build direct fulfillment
-            relationships with shops they trust. Every florist who joins expands the opportunities available to every other florist in the network.
-          </p>
-        </div>
-
-        <div className="mt-14 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {highlights.map((item, i) => (
-            <div
-              key={i}
-              className="rounded-3xl border border-gray-100 bg-gray-50 p-8 text-center"
-            >
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-600">
-                <item.icon className="h-7 w-7" />
-              </div>
-
-              <h3 className="mt-6 text-xl font-bold text-gray-900">
-                {item.title}
-              </h3>
-
-              <p className="mt-3 text-gray-600">{item.description}</p>
-            </div>
-          ))}
+              return (
+                <article
+                  key={point.title}
+                  className="rounded-3xl border border-slate-200 bg-white p-6"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                    <Icon size={19} />
+                  </div>
+                  <h3 className="mt-4 text-lg font-black text-slate-950">
+                    {point.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {point.description}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

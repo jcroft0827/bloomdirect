@@ -5,6 +5,8 @@ import type { MetadataRoute } from "next";
 const BASE_URL = "https://www.getbloomdirect.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  // BloomWebsite previews are intentionally excluded. Public storefront
+  // sitemap entries will be served from the florist's verified live domain.
   return [
     {
       url: BASE_URL,
