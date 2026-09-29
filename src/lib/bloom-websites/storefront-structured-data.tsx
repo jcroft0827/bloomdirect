@@ -2,6 +2,10 @@ import type {
   BloomWebsiteStorefront,
   BloomWebsiteStorefrontProductPage,
 } from "@/types/bloom-website";
+import {
+  BLOOM_WEBSITE_BUSINESS_DAYS,
+  getBloomWebsiteHomepageSeoDefaults,
+} from "@/lib/bloom-websites/storefront-seo";
 
 const GET_BLOOM_DIRECT_ORIGIN = "https://www.getbloomdirect.com";
 
@@ -114,13 +118,62 @@ function buildPostalAddress(
 function buildSameAs(
   storefront: BloomWebsiteStorefront | BloomWebsiteStorefrontProductPage,
 ) {
-  if (!storefront.website.settings.showSocialLinks) {
-    return [];
-  }
+  const socialLinks = storefront.website.settings.showSocialLinks
+    ? Object.values(storefront.shop.socialLinks)
+    : [];
 
-  return Object.values(storefront.shop.socialLinks)
+  return [
+    ...socialLinks,
+    storefront.website.seo?.googleBusinessProfileUrl || "",
+  ]
     .map((value) => getAbsoluteUrl(value))
+    .filter(
+      (value, index, values) =>
+        Boolean(value) && values.indexOf(value) === index,
+    );
+}
+
+function buildAreaServed(
+  storefront: BloomWebsiteStorefront | BloomWebsiteStorefrontProductPage,
+) {
+  const localDelivery = storefront.website.seo?.localDelivery;
+  const values = [
+    ...(localDelivery?.serviceCities || []),
+    ...(localDelivery?.neighborhoods || []),
+    ...(localDelivery?.serviceZipCodes || []),
+  ]
+    .map((value) => cleanText(value))
     .filter(Boolean);
+
+  return values.filter(
+    (value, index) =>
+      values.findIndex(
+        (candidate) => candidate.toLocaleLowerCase() === value.toLocaleLowerCase(),
+      ) === index,
+  );
+}
+
+function buildOpeningHours(
+  storefront: BloomWebsiteStorefront | BloomWebsiteStorefrontProductPage,
+) {
+  const schemaDayByKey = new Map(
+    BLOOM_WEBSITE_BUSINESS_DAYS.map((day) => [day.key, day.schemaUrl]),
+  );
+
+  return (storefront.website.seo?.businessHours || [])
+    .filter(
+      (entry) =>
+        entry.enabled === true &&
+        Boolean(entry.opens) &&
+        Boolean(entry.closes) &&
+        schemaDayByKey.has(entry.day),
+    )
+    .map((entry) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: schemaDayByKey.get(entry.day),
+      opens: entry.opens,
+      closes: entry.closes,
+    }));
 }
 
 function buildFloristNode(
@@ -134,6 +187,22 @@ function buildFloristNode(
     getAbsoluteUrl(website.branding.logo) ||
     getAbsoluteUrl(website.homepage.heroImage) ||
     undefined;
+  const story = website.aboutPage?.sections
+    ?.find((section) => section.key === "story")
+    ?.body;
+  const seoDefaults = getBloomWebsiteHomepageSeoDefaults({
+    businessName: shop.businessName,
+    siteName: website.siteName,
+    city: shop.address.city,
+    state: shop.address.state,
+    tagline: website.branding.tagline,
+    heroSubheadline: website.homepage.heroSubheadline,
+    heroImage: website.homepage.heroImage,
+    logo: website.branding.logo,
+    businessDescription: website.seo?.businessDescription,
+    aboutText: story || website.homepage.aboutText,
+  });
+  const openingHoursSpecification = buildOpeningHours(storefront);
 
   return compactObject({
     "@type": "Florist",
@@ -143,9 +212,12 @@ function buildFloristNode(
     image,
     logo: getAbsoluteUrl(website.branding.logo) || undefined,
     description:
+      cleanText(website.seo?.businessDescription) ||
+      cleanText(story) ||
       cleanText(website.homepage.aboutText) ||
       cleanText(website.branding.tagline) ||
       cleanText(website.homepage.heroSubheadline) ||
+      seoDefaults.businessDescription ||
       undefined,
     email: cleanText(shop.email) || undefined,
     telephone:
@@ -153,6 +225,11 @@ function buildFloristNode(
         ? cleanText(shop.phone)
         : undefined,
     address: buildPostalAddress(storefront),
+    openingHoursSpecification:
+      openingHoursSpecification.length > 0
+        ? openingHoursSpecification
+        : undefined,
+    areaServed: buildAreaServed(storefront),
     sameAs: buildSameAs(storefront),
   });
 }
@@ -240,6 +317,7 @@ export function getBloomWebsiteHomepageStructuredData(
         url: homepageUrl,
         name: cleanText(storefront.website.siteName),
         description:
+          cleanText(storefront.website.seo?.homepageDescription) ||
           cleanText(storefront.website.branding.tagline) ||
           cleanText(storefront.website.homepage.heroSubheadline) ||
           undefined,
@@ -247,6 +325,64 @@ export function getBloomWebsiteHomepageStructuredData(
           "@id": getFloristId(homepageUrl),
         },
       }),
+    ],
+  };
+}
+
+export function getBloomWebsiteAboutStructuredData(
+  storefront: BloomWebsiteStorefront,
+  options: StructuredDataOptions = {},
+) {
+  const homepageUrl = getStorefrontUrl({
+    previewSlug: storefront.website.previewSlug,
+    publicOrigin: options.publicOrigin,
+  });
+  const aboutUrl = getStorefrontUrl({
+    previewSlug: storefront.website.previewSlug,
+    pathname: "/about",
+    publicOrigin: options.publicOrigin,
+  });
+  const story = storefront.website.aboutPage?.sections
+    ?.find((section) => section.key === "story")
+    ?.body;
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      buildFloristNode(storefront, homepageUrl),
+      compactObject({
+        "@type": "AboutPage",
+        "@id": `${aboutUrl}#about`,
+        url: aboutUrl,
+        name: `About ${storefront.website.siteName}`,
+        description:
+          cleanText(storefront.website.seo?.businessDescription) ||
+          cleanText(story) ||
+          cleanText(storefront.website.homepage.aboutText) ||
+          cleanText(storefront.website.branding.tagline) ||
+          undefined,
+        mainEntity: {
+          "@id": getFloristId(homepageUrl),
+        },
+      }),
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${aboutUrl}#breadcrumb`,
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: homepageUrl,
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "About Us",
+            item: aboutUrl,
+          },
+        ],
+      },
     ],
   };
 }

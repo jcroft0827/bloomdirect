@@ -46,13 +46,13 @@ export default function BloomWebsiteShopStorefront({
   return (
     <div className="min-h-screen bg-[#fafafa] pb-28 text-gray-950 sm:pb-20">
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-8 sm:py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 sm:px-8 sm:py-3">
           <Link href={homeHref} className="flex min-w-0 items-center gap-3">
             {website.branding.logo ? (
               <img
                 src={website.branding.logo}
                 alt={website.siteName}
-                className="h-10 max-w-[155px] object-contain object-left sm:h-11 sm:max-w-[180px]"
+                className="h-14 w-auto max-w-[220px] object-contain object-left sm:h-16 sm:max-w-[260px] lg:h-20 lg:max-w-[320px]"
               />
             ) : (
               <>

@@ -1,3 +1,5 @@
+import { validateCatalogImageSourceUrl } from "@/lib/bloom-websites/catalogImageSource";
+
 export type CatalogImportFieldKey =
   | "name"
   | "sku"
@@ -754,6 +756,12 @@ export function normalizeCatalogImportRow(
   if (deluxeRecipe === "invalid") errors.push("Deluxe Recipe JSON is invalid.");
   if (premiumRecipe === "invalid") errors.push("Premium Recipe JSON is invalid.");
 
+  const primaryImageUrl = mappedValue(row, mapping, "imageUrl");
+  const galleryImages = parseList(mappedValue(row, mapping, "galleryImages"));
+  const standardTierImageUrl = mappedValue(row, mapping, "standardTierImageUrl");
+  const deluxeTierImageUrl = mappedValue(row, mapping, "deluxeTierImageUrl");
+  const premiumTierImageUrl = mappedValue(row, mapping, "premiumTierImageUrl");
+
   const seoTitle = mappedValue(row, mapping, "seoTitle");
   const seoDescription = mappedValue(row, mapping, "seoDescription");
   const imageAltText = mappedValue(row, mapping, "imageAltText");
@@ -761,6 +769,31 @@ export function normalizeCatalogImportRow(
   const socialTitle = mappedValue(row, mapping, "socialTitle");
   const socialDescription = mappedValue(row, mapping, "socialDescription");
   const socialImageUrl = mappedValue(row, mapping, "socialImageUrl");
+
+  const imageSources: Array<readonly [string, string]> = [
+    ["Primary image", primaryImageUrl],
+    ...galleryImages.map((url, index) => [`Gallery image ${index + 1}`, url] as const),
+    ["Standard tier image", standardTierImageUrl],
+    ["Social image", socialImageUrl],
+  ];
+
+  if (typeof deluxePriceParsed === "number") {
+    imageSources.push(["Deluxe tier image", deluxeTierImageUrl]);
+  }
+
+  if (typeof premiumPriceParsed === "number") {
+    imageSources.push(["Premium tier image", premiumTierImageUrl]);
+  }
+
+  for (const [label, sourceUrl] of imageSources) {
+    const imageError = validateCatalogImageSourceUrl(sourceUrl);
+    if (imageError) errors.push(`${label}: ${imageError}`);
+  }
+
+  const productPhotoCount = galleryImages.length + (primaryImageUrl ? 1 : 0);
+  if (productPhotoCount > 8) {
+    errors.push("A product can import up to 8 primary/gallery photos.");
+  }
 
   if (seoTitle.length > 70) errors.push("SEO title is longer than 70 characters.");
   if (seoDescription.length > 170) errors.push("SEO description is longer than 170 characters.");
@@ -794,14 +827,14 @@ export function normalizeCatalogImportRow(
       standardTierDescription: mappedValue(row, mapping, "standardTierDescription"),
       deluxeTierDescription: mappedValue(row, mapping, "deluxeTierDescription"),
       premiumTierDescription: mappedValue(row, mapping, "premiumTierDescription"),
-      standardTierImageUrl: mappedValue(row, mapping, "standardTierImageUrl"),
-      deluxeTierImageUrl: mappedValue(row, mapping, "deluxeTierImageUrl"),
-      premiumTierImageUrl: mappedValue(row, mapping, "premiumTierImageUrl"),
+      standardTierImageUrl,
+      deluxeTierImageUrl,
+      premiumTierImageUrl,
       standardRecipe: standardRecipe === "invalid" ? null : standardRecipe,
       deluxeRecipe: deluxeRecipe === "invalid" ? null : deluxeRecipe,
       premiumRecipe: premiumRecipe === "invalid" ? null : premiumRecipe,
-      imageUrl: mappedValue(row, mapping, "imageUrl"),
-      galleryImages: parseList(mappedValue(row, mapping, "galleryImages")),
+      imageUrl: primaryImageUrl,
+      galleryImages,
       taxable: typeof taxableParsed === "boolean" ? taxableParsed : true,
       taxRatePercent: typeof taxRateParsed === "number" ? Math.round(taxRateParsed * 1000) / 1000 : null,
       trackInventory,

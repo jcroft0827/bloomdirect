@@ -77,6 +77,7 @@ export function buildBloomWebsiteSitemapEntries(input: {
   origin: string;
   products: BloomWebsiteIndexingProduct[];
   websiteLastModified?: Date | string | null;
+  aboutEnabled?: boolean;
 }): MetadataRoute.Sitemap {
   const origin = new URL(input.origin).origin;
   const websiteLastModified = normalizeLastModified(input.websiteLastModified);
@@ -95,6 +96,15 @@ export function buildBloomWebsiteSitemapEntries(input: {
       priority: 0.9,
     },
   ];
+
+  if (input.aboutEnabled !== false) {
+    entries.push({
+      url: `${origin}/about`,
+      ...(websiteLastModified ? { lastModified: websiteLastModified } : {}),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    });
+  }
 
   for (const product of input.products) {
     const slug = cleanText(product.slug);
@@ -133,7 +143,7 @@ export function buildBloomWebsitePublicRobots(
   return {
     rules: {
       userAgent: "*",
-      allow: ["/", "/shop", "/products/"],
+      allow: ["/", "/shop", "/about", "/products/"],
       disallow: [
         "/checkout/",
         "/cart",

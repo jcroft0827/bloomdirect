@@ -6,12 +6,14 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   BarChart3,
+  BookOpenText,
   CheckCircle2,
   ClipboardList,
   ExternalLink,
   Globe2,
   Palette,
   PlugZap,
+  Search,
   ShoppingBag,
   Sparkles,
 } from "lucide-react";
@@ -181,6 +183,44 @@ export default async function WebsitesPage() {
 
               <p className="mt-1 text-sm leading-6 text-gray-500">
                 Customize your logo, colors, tagline and hero image.
+              </p>
+            </Link>
+
+            <Link
+              href="/dashboard/websites/about"
+              className="group bg-white p-6 transition hover:bg-purple-50/50"
+            >
+              <BookOpenText className="text-purple-700" size={23} />
+
+              <div className="mt-3 flex items-center gap-2">
+                <p className="font-bold text-gray-950">About Page</p>
+                <ArrowRight
+                  size={15}
+                  className="text-gray-400 transition group-hover:translate-x-1 group-hover:text-purple-700"
+                />
+              </div>
+
+              <p className="mt-1 text-sm leading-6 text-gray-500">
+                Tell your story yourself or let Bloom draft polished copy from your shop details.
+              </p>
+            </Link>
+
+            <Link
+              href="/dashboard/websites/seo"
+              className="group bg-white p-6 transition hover:bg-purple-50/50"
+            >
+              <Search className="text-purple-700" size={23} />
+
+              <div className="mt-3 flex items-center gap-2">
+                <p className="font-bold text-gray-950">SEO</p>
+                <ArrowRight
+                  size={15}
+                  className="text-gray-400 transition group-hover:translate-x-1 group-hover:text-purple-700"
+                />
+              </div>
+
+              <p className="mt-1 text-sm leading-6 text-gray-500">
+                Manage homepage search previews, local business details, hours, and search-engine verification.
               </p>
             </Link>
 

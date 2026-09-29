@@ -23,6 +23,28 @@ export async function generateUploadUrl(fileName: string, fileType: string) {
   return { uploadUrl, fileUrl };
 }
 
+export async function uploadBufferToS3(
+  fileName: string,
+  fileType: string,
+  body: Buffer,
+) {
+  const bucket = process.env.AWS_BUCKET_NAME;
+
+  if (!bucket) {
+    throw new Error("AWS bucket is not configured.");
+  }
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: fileName,
+      ContentType: fileType,
+      ContentLength: body.byteLength,
+      Body: body,
+    }),
+  );
+}
+
 export async function generateViewUrl(key: string) {
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,

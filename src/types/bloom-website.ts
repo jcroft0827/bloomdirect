@@ -36,6 +36,57 @@ export type BloomWebsitePurchasabilityState =
   | "sold_out"
   | "unavailable";
 
+export type BloomWebsiteBusinessDay =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export type BloomWebsiteBusinessHour = {
+  day: BloomWebsiteBusinessDay;
+  enabled: boolean;
+  opens: string;
+  closes: string;
+};
+
+export type BloomWebsiteLocalSeoContent = {
+  localDeliveryNote: string;
+  serviceCities: string[];
+  neighborhoods: string[];
+  hospitals: string[];
+  funeralHomes: string[];
+  seniorLiving: string[];
+  schools: string[];
+  venues: string[];
+  businesses: string[];
+};
+
+export type BloomWebsiteAboutSectionKey =
+  | "story"
+  | "specialties"
+  | "community";
+
+export type BloomWebsiteAboutSection = {
+  key: BloomWebsiteAboutSectionKey;
+  enabled: boolean;
+  title: string;
+  body: string;
+  sortOrder: number;
+};
+
+export type BloomWebsiteAboutFacts = {
+  openingYear: string;
+  founderNames: string;
+  originStory: string;
+  specialties: string;
+  community: string;
+  servicePhilosophy: string;
+  differentiators: string;
+};
+
 export type BloomWebsiteStorefrontPricingTier = {
   label: BloomWebsitePricingTierLabel;
   price: number;
@@ -103,6 +154,30 @@ export type BloomWebsiteStorefrontWebsite = {
     heroSubheadline: string;
     heroImage: string;
     aboutText: string;
+  };
+
+  aboutPage?: {
+    enabled: boolean;
+    heading: string;
+    contentMode: "custom" | "guided";
+    facts: BloomWebsiteAboutFacts;
+    sections: BloomWebsiteAboutSection[];
+  };
+
+  seo?: {
+    homepageTitle: string;
+    homepageDescription: string;
+    socialTitle: string;
+    socialDescription: string;
+    socialImageUrl: string;
+    businessDescription: string;
+    googleBusinessProfileUrl: string;
+    googleSiteVerification: string;
+    bingSiteVerification: string;
+    businessHours: BloomWebsiteBusinessHour[];
+    localDelivery: BloomWebsiteLocalSeoContent & {
+      serviceZipCodes: string[];
+    };
   };
 
   announcement: {

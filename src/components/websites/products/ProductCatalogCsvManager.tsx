@@ -10,7 +10,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   CATALOG_IMPORT_FIELDS,
@@ -30,7 +30,46 @@ type ImportResult = {
   skippedDuplicateCount: number;
   skippedInvalidCount: number;
   totalRows: number;
+  pendingImageCount: number;
 };
+
+type ImageMigrationStatus = {
+  pendingImageCount: number;
+  failedImageCount: number;
+  pendingProductCount: number;
+  failedProductCount: number;
+  failedExamples: Array<{
+    productName: string;
+    error: string;
+  }>;
+};
+
+function parseImageMigrationStatus(data: any): ImageMigrationStatus {
+  return {
+    pendingImageCount: Number(data?.pendingImageCount || 0),
+    failedImageCount: Number(data?.failedImageCount || 0),
+    pendingProductCount: Number(data?.pendingProductCount || 0),
+    failedProductCount: Number(data?.failedProductCount || 0),
+    failedExamples: Array.isArray(data?.failedExamples)
+      ? data.failedExamples
+          .filter(
+            (entry: unknown): entry is { productName?: unknown; error?: unknown } =>
+              Boolean(entry && typeof entry === "object"),
+          )
+          .slice(0, 5)
+          .map((entry: { productName?: unknown; error?: unknown }) => ({
+            productName:
+              typeof entry.productName === "string" && entry.productName.trim()
+                ? entry.productName.trim()
+                : "Product",
+            error:
+              typeof entry.error === "string" && entry.error.trim()
+                ? entry.error.trim()
+                : "Image could not be copied.",
+          }))
+      : [],
+  };
+}
 
 export default function ProductCatalogCsvManager({
   siteName,
@@ -46,6 +85,95 @@ export default function ProductCatalogCsvManager({
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [migratingImages, setMigratingImages] = useState(false);
+  const [imageMigrationError, setImageMigrationError] = useState("");
+  const [imageMigrationStatus, setImageMigrationStatus] =
+    useState<ImageMigrationStatus | null>(null);
+
+  const loadImageMigrationStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/websites/products/import-images", {
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) return null;
+
+      const status = parseImageMigrationStatus(data);
+      setImageMigrationStatus(status);
+      return status;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  async function runImageMigration(retryFailed = false) {
+    try {
+      setMigratingImages(true);
+      setImageMigrationError("");
+
+      if (retryFailed) {
+        const retryResponse = await fetch("/api/websites/products/import-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "retryFailed" }),
+        });
+        const retryData = await retryResponse.json().catch(() => null);
+
+        if (!retryResponse.ok) {
+          throw new Error(retryData?.error || "Unable to retry catalog images.");
+        }
+
+        setImageMigrationStatus(parseImageMigrationStatus(retryData));
+      }
+
+      let safetyCounter = 0;
+
+      while (safetyCounter < 10000) {
+        safetyCounter += 1;
+
+        const response = await fetch("/api/websites/products/import-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "process" }),
+        });
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Unable to copy catalog images into Bloom.");
+        }
+
+        const status = parseImageMigrationStatus(data);
+        setImageMigrationStatus(status);
+
+        if (status.pendingImageCount <= 0) break;
+
+        if (Number(data?.processedImageCount || 0) <= 0) {
+          throw new Error("Image migration paused before all pending images were processed.");
+        }
+      }
+
+      const finalStatus = await loadImageMigrationStatus();
+      if (finalStatus?.failedImageCount) {
+        setImageMigrationError(
+          `${finalStatus.failedImageCount} image${finalStatus.failedImageCount === 1 ? "" : "s"} could not be copied. You can retry the failed images without re-importing the catalog.`,
+        );
+      }
+    } catch (error) {
+      setImageMigrationError(
+        error instanceof Error
+          ? error.message
+          : "Image migration paused. Your products were imported and the image copy can be resumed.",
+      );
+      await loadImageMigrationStatus();
+    } finally {
+      setMigratingImages(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadImageMigrationStatus();
+  }, [loadImageMigrationStatus]);
 
   const validations = useMemo(
     () =>
@@ -116,6 +244,7 @@ export default function ProductCatalogCsvManager({
     setMapping({});
     setParseError("");
     setImportError("");
+    setImageMigrationError("");
     setResult(null);
     setSkipInvalidRows(false);
   }
@@ -143,12 +272,21 @@ export default function ProductCatalogCsvManager({
         throw new Error(data?.error || "Unable to import the catalog.");
       }
 
-      setResult({
+      const nextResult: ImportResult = {
         importedCount: Number(data.importedCount || 0),
         skippedDuplicateCount: Number(data.skippedDuplicateCount || 0),
         skippedInvalidCount: Number(data.skippedInvalidCount || 0),
         totalRows: Number(data.totalRows || rows.length),
-      });
+        pendingImageCount: Number(data.pendingImageCount || 0),
+      };
+      setResult(nextResult);
+      setImporting(false);
+
+      if (nextResult.pendingImageCount > 0) {
+        await runImageMigration();
+      } else {
+        await loadImageMigrationStatus();
+      }
     } catch (error) {
       setImportError(
         error instanceof Error ? error.message : "Unable to import the catalog.",
@@ -313,6 +451,80 @@ export default function ProductCatalogCsvManager({
         </div>
       </section>
 
+      {(migratingImages ||
+        (imageMigrationStatus &&
+          (imageMigrationStatus.pendingImageCount > 0 ||
+            imageMigrationStatus.failedImageCount > 0))) && (
+        <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                {migratingImages ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : imageMigrationStatus?.failedImageCount ? (
+                  <AlertTriangle size={18} />
+                ) : (
+                  <Upload size={18} />
+                )}
+              </div>
+              <div>
+                <h2 className="font-black text-blue-950">Catalog image migration</h2>
+                <p className="mt-1 text-sm leading-6 text-blue-900">
+                  {migratingImages
+                    ? `Copying images into Bloom storage${imageMigrationStatus?.pendingImageCount ? ` · ${imageMigrationStatus.pendingImageCount} remaining` : ""}. You can leave this page if needed and resume later.`
+                    : imageMigrationStatus?.pendingImageCount
+                      ? `${imageMigrationStatus.pendingImageCount} image${imageMigrationStatus.pendingImageCount === 1 ? " is" : "s are"} waiting to be copied into Bloom storage.`
+                      : `${imageMigrationStatus?.failedImageCount || 0} image${imageMigrationStatus?.failedImageCount === 1 ? " could" : "s could"} not be copied from the old provider.`}
+                </p>
+                {imageMigrationError && (
+                  <p className="mt-1 text-xs font-bold leading-5 text-amber-800">
+                    {imageMigrationError}
+                  </p>
+                )}
+                {(imageMigrationStatus?.failedExamples.length || 0) > 0 &&
+                  !migratingImages && (
+                    <div className="mt-2 space-y-1 text-xs leading-5 text-amber-900">
+                      {imageMigrationStatus!.failedExamples.slice(0, 3).map((failure, index) => (
+                        <p key={`${failure.productName}-${index}`}>
+                          <strong>{failure.productName}:</strong> {failure.error}
+                        </p>
+                      ))}
+                      {(imageMigrationStatus?.failedImageCount || 0) > 3 && (
+                        <p className="font-bold">
+                          Additional failed images are not shown here.
+                        </p>
+                      )}
+                    </div>
+                  )}
+              </div>
+            </div>
+
+            {!migratingImages && (
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {(imageMigrationStatus?.pendingImageCount || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void runImageMigration(false)}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-800"
+                  >
+                    <RefreshCcw size={15} /> Resume copy
+                  </button>
+                )}
+                {(imageMigrationStatus?.failedImageCount || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void runImageMigration(true)}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 transition hover:bg-amber-50"
+                  >
+                    <RefreshCcw size={15} /> Retry failed
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {rows.length > 0 && (
         <>
           <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -474,7 +686,7 @@ export default function ProductCatalogCsvManager({
             </div>
 
             <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
-              <strong>Images:</strong> imported image URLs remain linked to their current public location. If your old website provider will remove those files after cancellation, re-upload those images into Bloom so they live in your Bloom storage.
+              <strong>Images:</strong> public JPG, PNG, and WebP URLs are copied into your Bloom storage after the products are created. Bloom validates the source, file type, size, redirects, and destination before saving it, so your catalog does not depend on the old website provider continuing to host the image.
             </div>
 
             {importError && (
@@ -495,6 +707,11 @@ export default function ProductCatalogCsvManager({
                       Imported {result.importedCount} {result.importedCount === 1 ? "product" : "products"}.
                       {result.skippedDuplicateCount > 0 && ` Skipped ${result.skippedDuplicateCount} duplicate SKU ${result.skippedDuplicateCount === 1 ? "row" : "rows"}.`}
                       {result.skippedInvalidCount > 0 && ` Skipped ${result.skippedInvalidCount} invalid ${result.skippedInvalidCount === 1 ? "row" : "rows"}.`}
+                      {result.pendingImageCount > 0 &&
+                        !migratingImages &&
+                        (imageMigrationStatus?.pendingImageCount || 0) === 0 &&
+                        (imageMigrationStatus?.failedImageCount || 0) === 0 &&
+                        " Product images were copied into Bloom storage."}
                     </p>
                     <Link
                       href="/dashboard/websites/products"
@@ -519,6 +736,7 @@ export default function ProductCatalogCsvManager({
                 onClick={importProducts}
                 disabled={
                   importing ||
+                  migratingImages ||
                   !requiredMapped ||
                   validCount === 0 ||
                   (invalidCount > 0 && !skipInvalidRows)
@@ -528,6 +746,10 @@ export default function ProductCatalogCsvManager({
                 {importing ? (
                   <>
                     <Loader2 size={17} className="animate-spin" /> Importing…
+                  </>
+                ) : migratingImages ? (
+                  <>
+                    <Loader2 size={17} className="animate-spin" /> Copying Images…
                   </>
                 ) : (
                   <>

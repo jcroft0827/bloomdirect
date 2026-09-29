@@ -54,6 +54,16 @@ function toFilterSlug(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function formatLocalList(values: string[], limit = 6) {
+  const visible = values.slice(0, limit);
+  const remaining = values.length - visible.length;
+
+  if (visible.length === 0) return "";
+
+  const text = visible.join(", ");
+  return remaining > 0 ? `${text}, and ${remaining} more` : text;
+}
+
 export default function BloomClassicTheme({
   storefront,
   basePath,
@@ -102,6 +112,21 @@ export default function BloomClassicTheme({
   const fullAddress = [shop.address.street, cityState, shop.address.zip]
     .filter(Boolean)
     .join(" ");
+
+  const localDelivery = website.seo?.localDelivery;
+  const localServiceAreas = [
+    ...(localDelivery?.serviceCities || []),
+    ...(localDelivery?.neighborhoods || []),
+  ];
+  const localDeliveryZipCodes = localDelivery?.serviceZipCodes || [];
+  const localDestinationGroups = [
+    { label: "Hospitals & medical centers", values: localDelivery?.hospitals || [] },
+    { label: "Funeral homes", values: localDelivery?.funeralHomes || [] },
+    { label: "Senior & assisted living", values: localDelivery?.seniorLiving || [] },
+    { label: "Schools & universities", values: localDelivery?.schools || [] },
+    { label: "Wedding & event venues", values: localDelivery?.venues || [] },
+    { label: "Businesses & organizations", values: localDelivery?.businesses || [] },
+  ].filter((group) => group.values.length > 0);
 
   /*
    * Homepage merchandising should use real florist products.
@@ -161,7 +186,7 @@ export default function BloomClassicTheme({
 
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-gray-200/80 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-2 sm:px-8 sm:py-2.5">
           <Link
             href={storefrontHomeHref}
             className="flex min-w-0 items-center gap-3"
@@ -170,7 +195,7 @@ export default function BloomClassicTheme({
               <img
                 src={website.storefrontTheme.logo}
                 alt={`${website.siteName} logo`}
-                className="h-12 w-auto max-w-[180px] object-contain object-left sm:h-14 sm:max-w-[220px]"
+                className="h-16 w-auto max-w-[240px] object-contain object-left sm:h-[4.5rem] sm:max-w-[300px] lg:h-20 lg:max-w-[360px]"
               />
             ) : (
               <>
@@ -209,9 +234,14 @@ export default function BloomClassicTheme({
                 Shop
               </Link>
 
-              <a href="#about" className="transition hover:opacity-60">
-                About
-              </a>
+              {website.aboutPage?.enabled !== false && (
+                <Link
+                  href={`${storefrontBasePath}/about`}
+                  className="transition hover:opacity-60"
+                >
+                  About
+                </Link>
+              )}
 
               <a href="#delivery" className="transition hover:opacity-60">
                 Delivery
@@ -903,8 +933,8 @@ export default function BloomClassicTheme({
                   </h2>
 
                   <p className="mt-5 max-w-xl text-sm leading-7 opacity-80 sm:text-base">
-                    Order online from {shop.businessName} and send flowers
-                    locally with delivery handled right here in the community.
+                    {localDelivery?.localDeliveryNote ||
+                      `Order online from ${shop.businessName} and send flowers locally with delivery handled right here in the community.`}
                   </p>
 
                   <div className="mt-8">
@@ -939,7 +969,9 @@ export default function BloomClassicTheme({
                 </h3>
 
                 <div className="mt-8 space-y-5">
-                  {showAddress && cityState && (
+                  {(localServiceAreas.length > 0 ||
+                    localDeliveryZipCodes.length > 0 ||
+                    (showAddress && cityState)) && (
                     <div className="flex items-start gap-4 rounded-2xl border border-gray-200 bg-white p-5">
                       <div
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
@@ -953,12 +985,29 @@ export default function BloomClassicTheme({
 
                       <div>
                         <p className="font-black text-gray-950">
-                          Locally based
+                          {localServiceAreas.length > 0 ||
+                          localDeliveryZipCodes.length > 0
+                            ? "Areas we serve"
+                            : "Locally based"}
                         </p>
 
                         <p className="mt-1 text-sm leading-6 text-gray-500">
-                          Proudly serving customers from {cityState} and the
-                          surrounding delivery area.
+                          {localServiceAreas.length > 0 ? (
+                            <>
+                              Local flower delivery is available in {formatLocalList(localServiceAreas)}
+                              {localDeliveryZipCodes.length > 0
+                                ? `, including delivery ZIP codes ${formatLocalList(localDeliveryZipCodes, 8)}.`
+                                : "."}
+                            </>
+                          ) : localDeliveryZipCodes.length > 0 ? (
+                            <>
+                              Local delivery is available in ZIP codes {formatLocalList(localDeliveryZipCodes, 8)}.
+                            </>
+                          ) : (
+                            <>
+                              Proudly serving customers from {cityState} and the surrounding delivery area.
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1015,6 +1064,33 @@ export default function BloomClassicTheme({
                     </div>
                   </div>
                 </div>
+
+                {localDestinationGroups.length > 0 && (
+                  <div className="mt-8 border-t border-gray-200 pt-8">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">
+                      Local delivery destinations
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-gray-500">
+                      Local destinations {shop.businessName} can serve throughout the community.
+                    </p>
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      {localDestinationGroups.map((group) => (
+                        <div
+                          key={group.label}
+                          className="rounded-2xl border border-gray-200 bg-white p-4"
+                        >
+                          <p className="text-sm font-black text-gray-900">
+                            {group.label}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-gray-500">
+                            {formatLocalList(group.values)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1211,9 +1287,14 @@ export default function BloomClassicTheme({
                     All Flowers
                   </Link>
 
-                  <a href="#about" className="transition hover:text-white">
-                    About Us
-                  </a>
+                  {website.aboutPage?.enabled !== false && (
+                    <Link
+                      href={`${storefrontBasePath}/about`}
+                      className="transition hover:text-white"
+                    >
+                      About Us
+                    </Link>
+                  )}
 
                   <a href="#delivery" className="transition hover:text-white">
                     Delivery

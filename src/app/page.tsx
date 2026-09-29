@@ -8,6 +8,7 @@ import HomeHero from "@/components/HomeHero";
 import HomeNetworkGrowth from "@/components/HomeNetworkGrowth";
 import HomeNetworkStats from "@/components/HomeNetworkStats";
 import HomePricing from "@/components/HomePricing";
+import HomeSupport from "@/components/HomeSupport";
 import HomeWhySwitch from "@/components/HomeWhySwitch";
 import HowItWorks from "@/components/HowItWorks";
 import { homeFaqs } from "@/lib/homeFaqs";
@@ -255,6 +256,7 @@ export default function Home() {
         <HomeNetworkGrowth />
         <HomeNetworkStats />
 
+        <HomeSupport />
         <HomeFAQ />
         <HomeCTA />
         <HomeFooter />

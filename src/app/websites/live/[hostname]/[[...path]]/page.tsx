@@ -1,4 +1,5 @@
 import BloomWebsiteCartProvider from "@/components/websites/storefront/BloomWebsiteCartProvider";
+import BloomWebsiteAboutStorefront from "@/components/websites/storefront/BloomWebsiteAboutStorefront";
 import BloomWebsiteCardMessageCheckout from "@/components/websites/storefront/BloomWebsiteCardMessageCheckout";
 import BloomWebsiteCheckoutProvider from "@/components/websites/storefront/BloomWebsiteCheckoutProvider";
 import BloomWebsiteDeliveryCheckout from "@/components/websites/storefront/BloomWebsiteDeliveryCheckout";
@@ -18,6 +19,7 @@ import {
   normalizeBloomWebsiteHostname,
 } from "@/lib/bloom-websites/storefront-hostname";
 import {
+  getBloomWebsiteAboutMetadata,
   getBloomWebsiteCatalogMetadata,
   getBloomWebsiteHomepageMetadata,
   getBloomWebsitePreviewFallbackMetadata,
@@ -25,6 +27,7 @@ import {
 } from "@/lib/bloom-websites/storefront-metadata";
 import {
   BloomWebsiteJsonLd,
+  getBloomWebsiteAboutStructuredData,
   getBloomWebsiteHomepageStructuredData,
   getBloomWebsiteProductStructuredData,
 } from "@/lib/bloom-websites/storefront-structured-data";
@@ -56,7 +59,7 @@ function isKnownStorefrontPagePath(path: string[]) {
     return true;
   }
 
-  if (path.length === 1 && path[0] === "shop") {
+  if (path.length === 1 && ["shop", "about"].includes(path[0] || "")) {
     return true;
   }
 
@@ -150,6 +153,21 @@ export async function generateMetadata({
     });
   }
 
+  if (path.length === 1 && path[0] === "about") {
+    const storefront = await getBloomWebsiteStorefront(
+      tenant.previewSlug,
+      tenant.shopId,
+    );
+
+    if (!storefront || storefront.website.aboutPage?.enabled === false) {
+      return getBloomWebsitePreviewFallbackMetadata();
+    }
+
+    return getBloomWebsiteAboutMetadata(storefront, {
+      publicOrigin,
+    });
+  }
+
   if (path.length === 1 && path[0] === "shop") {
     const catalog = await getBloomWebsiteStorefrontCatalog(
       tenant.previewSlug,
@@ -185,6 +203,15 @@ export async function generateMetadata({
     title: {
       absolute: `Checkout | ${tenant.siteName}`,
     },
+    ...(tenant.logo
+      ? {
+          icons: {
+            icon: tenant.logo,
+            shortcut: tenant.logo,
+            apple: tenant.logo,
+          },
+        }
+      : {}),
     robots: {
       index: false,
       follow: false,
@@ -251,6 +278,24 @@ export default async function BloomWebsiteLiveRouteBoundary({
           storefront={storefront}
           basePath=""
         />
+      </>
+    );
+  } else if (path.length === 1 && path[0] === "about") {
+    if (storefront.website.aboutPage?.enabled === false) {
+      notFound();
+    }
+
+    const structuredData = getBloomWebsiteAboutStructuredData(
+      storefront,
+      {
+        publicOrigin: `https://${tenant.customDomain}`,
+      },
+    );
+
+    content = (
+      <>
+        <BloomWebsiteJsonLd data={structuredData} />
+        <BloomWebsiteAboutStorefront storefront={storefront} basePath="" />
       </>
     );
   } else if (path.length === 1 && path[0] === "shop") {

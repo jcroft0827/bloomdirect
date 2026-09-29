@@ -5,6 +5,7 @@ import type {
   BloomWebsiteStorefrontProductPage,
 } from "@/types/bloom-website";
 import type { BloomWebsiteStorefrontCatalog } from "@/lib/bloom-websites/getBloomWebsiteStorefrontCatalog";
+import { getBloomWebsiteHomepageSeoDefaults } from "@/lib/bloom-websites/storefront-seo";
 
 const DEFAULT_PREVIEW_DESCRIPTION =
   "Preview this BloomWebsites storefront before it goes live.";
@@ -93,6 +94,7 @@ function buildMetadata(input: {
   socialDescription?: string;
   imageUrl?: string;
   imageAlt?: string;
+  faviconUrl?: string;
 }): Metadata {
   const title = truncateMetadata(input.title, 70);
   const description = truncateMetadata(input.description, 170);
@@ -102,12 +104,22 @@ function buildMetadata(input: {
     250,
   );
   const images = getImages(input.imageUrl || "", input.imageAlt || title);
+  const faviconUrl = cleanText(input.faviconUrl);
 
   return {
     title: {
       absolute: title,
     },
     description,
+    ...(faviconUrl
+      ? {
+          icons: {
+            icon: faviconUrl,
+            shortcut: faviconUrl,
+            apple: faviconUrl,
+          },
+        }
+      : {}),
     alternates: {
       canonical: input.canonical,
     },
@@ -146,27 +158,79 @@ export function getBloomWebsiteHomepageMetadata(
   options: StorefrontMetadataOptions = {},
 ): Metadata {
   const { website, shop } = storefront;
+  const story = website.aboutPage?.sections
+    ?.find((section) => section.key === "story")
+    ?.body;
 
-  const title = website.siteName || shop.businessName;
+  const defaults = getBloomWebsiteHomepageSeoDefaults({
+    businessName: shop.businessName,
+    siteName: website.siteName,
+    city: shop.address.city,
+    state: shop.address.state,
+    tagline: website.branding.tagline,
+    heroSubheadline: website.homepage.heroSubheadline,
+    heroImage: website.homepage.heroImage,
+    logo: website.branding.logo,
+    businessDescription: website.seo?.businessDescription,
+    aboutText: story || website.homepage.aboutText,
+  });
+
+  const title =
+    cleanText(website.seo?.homepageTitle) || defaults.title;
   const description =
-    cleanText(website.branding.tagline) ||
-    cleanText(website.homepage.heroSubheadline) ||
-    `Shop fresh flowers and arrangements from ${shop.businessName}.`;
-
+    cleanText(website.seo?.homepageDescription) || defaults.description;
+  const socialTitle =
+    cleanText(website.seo?.socialTitle) || title;
+  const socialDescription =
+    cleanText(website.seo?.socialDescription) || description;
   const imageUrl =
-    cleanText(website.homepage.heroImage) || cleanText(website.branding.logo);
+    cleanText(website.seo?.socialImageUrl) ||
+    defaults.socialImageUrl;
 
   const publicOrigin = getPublicOrigin(options.publicOrigin);
-
-  return buildMetadata({
+  const metadata = buildMetadata({
     title,
     description,
     canonical:
       publicOrigin || `/websites/preview/${website.previewSlug}`,
     siteName: website.siteName,
+    socialTitle,
+    socialDescription,
     imageUrl,
     imageAlt: `${website.siteName} storefront`,
+    faviconUrl: website.branding.logo,
   });
+
+  if (!publicOrigin) {
+    return metadata;
+  }
+
+  const googleVerification = cleanText(
+    website.seo?.googleSiteVerification,
+  );
+  const bingVerification = cleanText(
+    website.seo?.bingSiteVerification,
+  );
+
+  return {
+    ...metadata,
+    ...((googleVerification || bingVerification)
+      ? {
+          verification: {
+            ...(googleVerification
+              ? { google: googleVerification }
+              : {}),
+            ...(bingVerification
+              ? {
+                  other: {
+                    "msvalidate.01": [bingVerification],
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 export function getBloomWebsiteCatalogMetadata(
@@ -188,6 +252,41 @@ export function getBloomWebsiteCatalogMetadata(
     siteName: website.siteName,
     imageUrl: firstProductImage || website.branding.logo,
     imageAlt: `${website.siteName} flower shop`,
+    faviconUrl: website.branding.logo,
+  });
+}
+
+export function getBloomWebsiteAboutMetadata(
+  storefront: BloomWebsiteStorefront,
+  options: StorefrontMetadataOptions = {},
+): Metadata {
+  const { website, shop } = storefront;
+  const publicOrigin = getPublicOrigin(options.publicOrigin);
+  const cityState = [shop.address.city, shop.address.state]
+    .map(cleanText)
+    .filter(Boolean)
+    .join(", ");
+  const story = website.aboutPage?.sections
+    ?.find((section) => section.key === "story")
+    ?.body;
+  const description =
+    cleanText(story) ||
+    cleanText(website.homepage.aboutText) ||
+    cleanText(website.branding.tagline) ||
+    `Learn more about ${shop.businessName}${
+      cityState ? `, your local florist in ${cityState}` : ""
+    }.`;
+
+  return buildMetadata({
+    title: `About ${website.siteName}`,
+    description,
+    canonical: publicOrigin
+      ? `${publicOrigin}/about`
+      : `/websites/preview/${website.previewSlug}/about`,
+    siteName: website.siteName,
+    imageUrl: website.branding.logo || website.homepage.heroImage,
+    imageAlt: `${website.siteName} logo`,
+    faviconUrl: website.branding.logo,
   });
 }
 
@@ -227,6 +326,7 @@ export function getBloomWebsiteProductMetadata(
     imageUrl: socialImageUrl,
     imageAlt:
       cleanText(product.seo.imageAltText) || `${product.name} from ${website.siteName}`,
+    faviconUrl: website.branding.logo,
   });
 
   if (!publicOrigin) {

@@ -2,6 +2,44 @@
 
 import mongoose, { Schema } from "mongoose";
 
+const bloomWebsiteBusinessHourSchema = new Schema(
+  {
+    day: {
+      type: String,
+      enum: [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ],
+      required: true,
+    },
+
+    enabled: {
+      type: Boolean,
+      default: false,
+    },
+
+    opens: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    closes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const bloomWebsiteSchema = new Schema(
   {
     // ===============================
@@ -243,6 +281,137 @@ const bloomWebsiteSchema = new Schema(
         trim: true,
         maxlength: 3000,
         default: "",
+      },
+    },
+
+    // ===============================
+    // ABOUT PAGE
+    // ===============================
+
+    aboutPage: {
+      enabled: {
+        type: Boolean,
+        default: true,
+      },
+
+      heading: {
+        type: String,
+        trim: true,
+        maxlength: 140,
+        default: "About Us",
+      },
+
+      contentMode: {
+        type: String,
+        enum: ["custom", "guided"],
+        default: "guided",
+      },
+
+      facts: {
+        openingYear: {
+          type: String,
+          trim: true,
+          maxlength: 4,
+          default: "",
+        },
+
+        founderNames: {
+          type: String,
+          trim: true,
+          maxlength: 180,
+          default: "",
+        },
+
+        originStory: {
+          type: String,
+          trim: true,
+          maxlength: 1200,
+          default: "",
+        },
+
+        specialties: {
+          type: String,
+          trim: true,
+          maxlength: 1000,
+          default: "",
+        },
+
+        community: {
+          type: String,
+          trim: true,
+          maxlength: 1000,
+          default: "",
+        },
+
+        servicePhilosophy: {
+          type: String,
+          trim: true,
+          maxlength: 1000,
+          default: "",
+        },
+
+        differentiators: {
+          type: String,
+          trim: true,
+          maxlength: 1000,
+          default: "",
+        },
+      },
+
+      sections: {
+        type: [
+          {
+            key: {
+              type: String,
+              enum: ["story", "specialties", "community"],
+              required: true,
+            },
+            enabled: {
+              type: Boolean,
+              default: true,
+            },
+            title: {
+              type: String,
+              trim: true,
+              maxlength: 140,
+              default: "",
+            },
+            body: {
+              type: String,
+              trim: true,
+              maxlength: 6000,
+              default: "",
+            },
+            sortOrder: {
+              type: Number,
+              min: 0,
+              default: 0,
+            },
+          },
+        ],
+        default: () => [
+          {
+            key: "story",
+            enabled: true,
+            title: "Our Story",
+            body: "",
+            sortOrder: 0,
+          },
+          {
+            key: "specialties",
+            enabled: true,
+            title: "What We Do Best",
+            body: "",
+            sortOrder: 1,
+          },
+          {
+            key: "community",
+            enabled: true,
+            title: "Rooted in Our Community",
+            body: "",
+            sortOrder: 2,
+          },
+        ],
       },
     },
 
@@ -587,6 +756,105 @@ const bloomWebsiteSchema = new Schema(
       taxExemptCustomersEnabled: {
         type: Boolean,
         default: false,
+      },
+    },
+
+    // ===============================
+    // WEBSITE SEO / LOCAL BUSINESS
+    // ===============================
+
+    seo: {
+      homepageTitle: {
+        type: String,
+        trim: true,
+        maxlength: 70,
+        default: "",
+      },
+
+      homepageDescription: {
+        type: String,
+        trim: true,
+        maxlength: 170,
+        default: "",
+      },
+
+      socialTitle: {
+        type: String,
+        trim: true,
+        maxlength: 100,
+        default: "",
+      },
+
+      socialDescription: {
+        type: String,
+        trim: true,
+        maxlength: 250,
+        default: "",
+      },
+
+      socialImageUrl: {
+        type: String,
+        trim: true,
+        maxlength: 2000,
+        default: "",
+      },
+
+      businessDescription: {
+        type: String,
+        trim: true,
+        maxlength: 1600,
+        default: "",
+      },
+
+      googleBusinessProfileUrl: {
+        type: String,
+        trim: true,
+        maxlength: 500,
+        default: "",
+      },
+
+      googleSiteVerification: {
+        type: String,
+        trim: true,
+        maxlength: 250,
+        default: "",
+      },
+
+      bingSiteVerification: {
+        type: String,
+        trim: true,
+        maxlength: 250,
+        default: "",
+      },
+
+      businessHours: {
+        type: [bloomWebsiteBusinessHourSchema],
+        default: () => [
+          { day: "monday", enabled: false, opens: "09:00", closes: "17:00" },
+          { day: "tuesday", enabled: false, opens: "09:00", closes: "17:00" },
+          { day: "wednesday", enabled: false, opens: "09:00", closes: "17:00" },
+          { day: "thursday", enabled: false, opens: "09:00", closes: "17:00" },
+          { day: "friday", enabled: false, opens: "09:00", closes: "17:00" },
+          { day: "saturday", enabled: false, opens: "09:00", closes: "13:00" },
+          { day: "sunday", enabled: false, opens: "09:00", closes: "13:00" },
+        ],
+      },
+
+      localDelivery: {
+        localDeliveryNote: {
+          type: String,
+          trim: true,
+          maxlength: 600,
+          default: "",
+        },
+        serviceCities: [{ type: String, trim: true, maxlength: 120 }],
+        neighborhoods: [{ type: String, trim: true, maxlength: 120 }],
+        hospitals: [{ type: String, trim: true, maxlength: 160 }],
+        funeralHomes: [{ type: String, trim: true, maxlength: 160 }],
+        seniorLiving: [{ type: String, trim: true, maxlength: 160 }],
+        schools: [{ type: String, trim: true, maxlength: 160 }],
+        venues: [{ type: String, trim: true, maxlength: 160 }],
+        businesses: [{ type: String, trim: true, maxlength: 160 }],
       },
     },
 

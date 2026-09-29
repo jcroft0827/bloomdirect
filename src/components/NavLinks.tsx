@@ -304,6 +304,26 @@ export const NavLinks = ({
               </Link>
 
               <Link
+                href="/dashboard/websites/about"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/about",
+                )}
+              >
+                About Page
+              </Link>
+
+              <Link
+                href="/dashboard/websites/seo"
+                onClick={onClose}
+                className={childNavItemClass(
+                  pathname === "/dashboard/websites/seo",
+                )}
+              >
+                SEO
+              </Link>
+
+              <Link
                 href="/dashboard/websites/launch"
                 onClick={onClose}
                 className={childNavItemClass(
@@ -411,6 +431,14 @@ export const NavLinks = ({
           className={navItemClass(pathname === "/dashboard/getting-started")}
         >
           Getting Started
+        </Link>
+
+        <Link
+          href="/support"
+          onClick={onClose}
+          className={navItemClass(pathname === "/support")}
+        >
+          Support
         </Link>
 
         {role === "admin" && (

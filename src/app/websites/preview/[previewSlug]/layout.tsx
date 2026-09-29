@@ -11,18 +11,45 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 
-export const metadata: Metadata = {
-  robots: {
+const previewRobots: Metadata["robots"] = {
+  index: false,
+  follow: false,
+  noarchive: true,
+  googleBot: {
     index: false,
     follow: false,
     noarchive: true,
-    googleBot: {
-      index: false,
-      follow: false,
-      noarchive: true,
-    },
   },
 };
+
+export async function generateMetadata({
+  params,
+}: PreviewLayoutProps): Promise<Metadata> {
+  const { previewSlug } = await params;
+
+  await connectToDB();
+
+  const website = (await BloomWebsite.findOne({
+    previewSlug: previewSlug.toLowerCase().trim(),
+  })
+    .select("branding.logo")
+    .lean()) as { branding?: { logo?: string } } | null;
+
+  const logo = website?.branding?.logo?.trim() || "";
+
+  return {
+    robots: previewRobots,
+    ...(logo
+      ? {
+          icons: {
+            icon: logo,
+            shortcut: logo,
+            apple: logo,
+          },
+        }
+      : {}),
+  };
+}
 
 type PreviewLayoutProps = {
   children: ReactNode;

@@ -98,6 +98,41 @@ const priceTierSchema = new Schema(
   },
 );
 
+const catalogImageMigrationItemSchema = new Schema(
+  {
+    kind: {
+      type: String,
+      enum: [
+        "primary",
+        "gallery",
+        "standardTier",
+        "deluxeTier",
+        "premiumTier",
+        "social",
+      ],
+      required: true,
+    },
+    url: {
+      type: String,
+      trim: true,
+      maxlength: 2048,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "failed"],
+      default: "pending",
+    },
+    error: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
 const bloomWebsiteProductSchema = new Schema(
   {
     // ===============================
@@ -303,6 +338,47 @@ const bloomWebsiteProductSchema = new Schema(
         type: String,
         trim: true,
         default: "",
+      },
+    },
+
+    // ===============================
+    // IMPORT IMAGE MIGRATION
+    // ===============================
+
+    /*
+     * Private migration state used only while copying externally hosted
+     * catalog images into Bloom storage. Source URLs are never rendered
+     * by the storefront and successful items are removed as they finish.
+     */
+    importImageMigration: {
+      status: {
+        type: String,
+        enum: ["none", "pending", "partial", "failed", "complete"],
+        default: "none",
+      },
+      items: {
+        type: [catalogImageMigrationItemSchema],
+        default: [],
+      },
+      migratedCount: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      failedCount: {
+        type: Number,
+        min: 0,
+        default: 0,
+      },
+      lastError: {
+        type: String,
+        trim: true,
+        maxlength: 500,
+        default: "",
+      },
+      updatedAt: {
+        type: Date,
+        default: null,
       },
     },
 

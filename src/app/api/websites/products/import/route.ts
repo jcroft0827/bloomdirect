@@ -7,6 +7,10 @@ import {
   type CatalogCsvRow,
   normalizeCatalogImportRow,
 } from "@/lib/bloom-websites/catalogCsv";
+import {
+  type CatalogImageMigrationItem,
+  isBloomHostedImageUrl,
+} from "@/lib/bloom-websites/catalogImageMigration";
 import { parseBloomWebsiteProductRecipe } from "@/lib/bloom-websites/productRecipes";
 import { connectToDB } from "@/lib/mongoose";
 import BloomWebsite from "@/models/BloomWebsite";
@@ -21,6 +25,27 @@ function slugify(value: string) {
     .replace(/['’]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function prepareImportedImage(
+  sourceUrl: string,
+  kind: CatalogImageMigrationItem["kind"],
+  migrationItems: CatalogImageMigrationItem[],
+) {
+  const source = sourceUrl.trim();
+  if (!source) return "";
+
+  if (isBloomHostedImageUrl(source)) {
+    return source;
+  }
+
+  migrationItems.push({
+    kind,
+    url: source,
+    status: "pending",
+  });
+
+  return "";
 }
 
 function makeUniqueSlug(name: string, occupied: Set<string>) {
@@ -153,6 +178,7 @@ export async function POST(request: Request) {
     let nextSortOrder = maxExistingSortOrder + 1;
 
     const documents = [];
+    let pendingImageCount = 0;
 
     for (const product of normalizedRows) {
       const normalizedSku = product.sku.trim().toLowerCase();
@@ -168,12 +194,52 @@ export async function POST(request: Request) {
 
       if (normalizedSku) importSkus.add(normalizedSku);
 
+      const imageMigrationItems: CatalogImageMigrationItem[] = [];
+      const importedPrimaryImageUrl = prepareImportedImage(
+        product.imageUrl,
+        "primary",
+        imageMigrationItems,
+      );
+      const importedGalleryImages = product.galleryImages
+        .map((sourceUrl) =>
+          prepareImportedImage(sourceUrl, "gallery", imageMigrationItems),
+        )
+        .filter(Boolean);
+      const standardTierImageUrl = prepareImportedImage(
+        product.standardTierImageUrl,
+        "standardTier",
+        imageMigrationItems,
+      );
+      const deluxeTierImageUrl =
+        product.deluxePrice !== null
+          ? prepareImportedImage(
+              product.deluxeTierImageUrl,
+              "deluxeTier",
+              imageMigrationItems,
+            )
+          : "";
+      const premiumTierImageUrl =
+        product.premiumPrice !== null
+          ? prepareImportedImage(
+              product.premiumTierImageUrl,
+              "premiumTier",
+              imageMigrationItems,
+            )
+          : "";
+      const socialImageUrl = prepareImportedImage(
+        product.socialImageUrl,
+        "social",
+        imageMigrationItems,
+      );
+
+      pendingImageCount += imageMigrationItems.length;
+
       const pricingTiers = [
         {
           label: "standard",
           price: product.standardPrice,
           description: product.standardTierDescription,
-          imageUrl: product.standardTierImageUrl,
+          imageUrl: standardTierImageUrl,
           recipe: parseBloomWebsiteProductRecipe(product.standardRecipe),
           enabled: true,
         },
@@ -184,7 +250,7 @@ export async function POST(request: Request) {
           label: "deluxe",
           price: product.deluxePrice,
           description: product.deluxeTierDescription,
-          imageUrl: product.deluxeTierImageUrl,
+          imageUrl: deluxeTierImageUrl,
           recipe: parseBloomWebsiteProductRecipe(product.deluxeRecipe),
           enabled: true,
         });
@@ -195,7 +261,7 @@ export async function POST(request: Request) {
           label: "premium",
           price: product.premiumPrice,
           description: product.premiumTierDescription,
-          imageUrl: product.premiumTierImageUrl,
+          imageUrl: premiumTierImageUrl,
           recipe: parseBloomWebsiteProductRecipe(product.premiumRecipe),
           enabled: true,
         });
@@ -212,8 +278,8 @@ export async function POST(request: Request) {
         category: product.category,
         occasions: product.occasions,
         tags: product.tags,
-        imageUrl: product.imageUrl,
-        galleryImages: product.galleryImages,
+        imageUrl: importedPrimaryImageUrl,
+        galleryImages: importedGalleryImages,
         pricingTiers,
         taxable: product.taxable,
         taxRatePercent: product.taxRatePercent,
@@ -234,7 +300,15 @@ export async function POST(request: Request) {
           canonicalUrl: product.canonicalUrl,
           socialTitle: product.socialTitle,
           socialDescription: product.socialDescription,
-          socialImageUrl: product.socialImageUrl,
+          socialImageUrl,
+        },
+        importImageMigration: {
+          status: imageMigrationItems.length > 0 ? "pending" : "none",
+          items: imageMigrationItems,
+          migratedCount: 0,
+          failedCount: 0,
+          lastError: "",
+          updatedAt: imageMigrationItems.length > 0 ? new Date() : null,
         },
         allowsSubstitutions: product.allowsSubstitutions,
         localOnly: product.localOnly,
@@ -256,6 +330,7 @@ export async function POST(request: Request) {
       skippedDuplicateCount: skippedDuplicates,
       skippedInvalidCount: invalid.length,
       totalRows: rows.length,
+      pendingImageCount,
     });
   } catch (error) {
     console.error("BloomWebsite catalog import failed:", error);

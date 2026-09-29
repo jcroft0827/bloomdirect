@@ -7,6 +7,11 @@ import BloomWebsiteAddon from "@/models/BloomWebsiteAddon";
 import BloomWebsiteProduct from "@/models/BloomWebsiteProduct";
 import Shop from "@/models/Shop";
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
+import {
+  getBloomWebsiteConfiguredDeliveryZipCodes,
+  normalizeBloomWebsiteBusinessHours,
+  normalizeBloomWebsiteLocalSeoContent,
+} from "@/lib/bloom-websites/storefront-seo";
 
 import type {
   BloomWebsiteAvailabilityType,
@@ -49,6 +54,35 @@ type WebsiteLean = {
     aboutText?: string;
   };
 
+  seo?: {
+    homepageTitle?: string;
+    homepageDescription?: string;
+    socialTitle?: string;
+    socialDescription?: string;
+    socialImageUrl?: string;
+    businessDescription?: string;
+    googleBusinessProfileUrl?: string;
+    googleSiteVerification?: string;
+    bingSiteVerification?: string;
+    businessHours?: Array<{
+      day?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+      enabled?: boolean;
+      opens?: string;
+      closes?: string;
+    }>;
+    localDelivery?: {
+      localDeliveryNote?: string;
+      serviceCities?: string[];
+      neighborhoods?: string[];
+      hospitals?: string[];
+      funeralHomes?: string[];
+      seniorLiving?: string[];
+      schools?: string[];
+      venues?: string[];
+      businesses?: string[];
+    };
+  };
+
   announcement?: {
     enabled?: boolean;
     message?: string;
@@ -86,6 +120,11 @@ type ShopLean = {
     state?: string;
     zip?: string;
     country?: string;
+  };
+
+  delivery?: {
+    method?: string;
+    zipZones?: Array<{ zip?: string }>;
   };
 
   branding?: {
@@ -308,6 +347,7 @@ export async function getBloomWebsiteStorefrontProduct(
         "theme",
         "branding",
         "homepage",
+        "seo",
         "announcement",
         "orderPolicy",
         "settings",
@@ -370,6 +410,8 @@ export async function getBloomWebsiteStorefrontProduct(
         "address.zip",
         "address.country",
         "branding.socialLinks",
+        "delivery.method",
+        "delivery.zipZones.zip",
       ].join(" "),
     )
     .lean()) as ShopLean | null;
@@ -579,6 +621,33 @@ export async function getBloomWebsiteStorefrontProduct(
         heroImage: website.homepage?.heroImage || "",
 
         aboutText: website.homepage?.aboutText || "",
+      },
+
+      seo: {
+        homepageTitle: website.seo?.homepageTitle?.trim() || "",
+        homepageDescription: website.seo?.homepageDescription?.trim() || "",
+        socialTitle: website.seo?.socialTitle?.trim() || "",
+        socialDescription: website.seo?.socialDescription?.trim() || "",
+        socialImageUrl: website.seo?.socialImageUrl?.trim() || "",
+        businessDescription: website.seo?.businessDescription?.trim() || "",
+        googleBusinessProfileUrl:
+          website.seo?.googleBusinessProfileUrl?.trim() || "",
+        googleSiteVerification:
+          website.seo?.googleSiteVerification?.trim() || "",
+        bingSiteVerification:
+          website.seo?.bingSiteVerification?.trim() || "",
+        businessHours: normalizeBloomWebsiteBusinessHours(
+          website.seo?.businessHours,
+        ),
+        localDelivery: {
+          ...normalizeBloomWebsiteLocalSeoContent(
+            website.seo?.localDelivery,
+          ),
+          serviceZipCodes: getBloomWebsiteConfiguredDeliveryZipCodes({
+            method: shop.delivery?.method,
+            zipZones: shop.delivery?.zipZones,
+          }),
+        },
       },
 
       announcement: {

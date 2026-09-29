@@ -1,6 +1,11 @@
 // src/lib/bloom-websites/getBloomWebsiteStorefront.ts
 
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
+import {
+  getBloomWebsiteConfiguredDeliveryZipCodes,
+  normalizeBloomWebsiteBusinessHours,
+  normalizeBloomWebsiteLocalSeoContent,
+} from "@/lib/bloom-websites/storefront-seo";
 import { connectToDB } from "@/lib/mongoose";
 
 import BloomWebsite from "@/models/BloomWebsite";
@@ -46,6 +51,57 @@ type BloomWebsiteLean = {
     aboutText?: string;
   };
 
+  aboutPage?: {
+    enabled?: boolean;
+    heading?: string;
+    contentMode?: "custom" | "guided";
+    facts?: {
+      openingYear?: string;
+      founderNames?: string;
+      originStory?: string;
+      specialties?: string;
+      community?: string;
+      servicePhilosophy?: string;
+      differentiators?: string;
+    };
+    sections?: Array<{
+      key?: "story" | "specialties" | "community";
+      enabled?: boolean;
+      title?: string;
+      body?: string;
+      sortOrder?: number;
+    }>;
+  };
+
+  seo?: {
+    homepageTitle?: string;
+    homepageDescription?: string;
+    socialTitle?: string;
+    socialDescription?: string;
+    socialImageUrl?: string;
+    businessDescription?: string;
+    googleBusinessProfileUrl?: string;
+    googleSiteVerification?: string;
+    bingSiteVerification?: string;
+    businessHours?: Array<{
+      day?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+      enabled?: boolean;
+      opens?: string;
+      closes?: string;
+    }>;
+    localDelivery?: {
+      localDeliveryNote?: string;
+      serviceCities?: string[];
+      neighborhoods?: string[];
+      hospitals?: string[];
+      funeralHomes?: string[];
+      seniorLiving?: string[];
+      schools?: string[];
+      venues?: string[];
+      businesses?: string[];
+    };
+  };
+
   announcement?: {
     enabled?: boolean;
     message?: string;
@@ -84,6 +140,11 @@ type ShopLean = {
     zip?: string;
     country?: string;
     timezone?: string;
+  };
+
+  delivery?: {
+    method?: string;
+    zipZones?: Array<{ zip?: string }>;
   };
 
   branding?: {
@@ -220,6 +281,8 @@ export async function getBloomWebsiteStorefront(
         "theme",
         "branding",
         "homepage",
+        "aboutPage",
+        "seo",
         "announcement",
         "orderPolicy",
         "settings",
@@ -244,6 +307,8 @@ export async function getBloomWebsiteStorefront(
         "address.country",
         "address.timezone",
         "branding.socialLinks",
+        "delivery.method",
+        "delivery.zipZones.zip",
       ].join(" "),
     )
     .lean()) as ShopLean | null;
@@ -356,6 +421,106 @@ export async function getBloomWebsiteStorefront(
         heroImage: website.homepage?.heroImage || "",
 
         aboutText: website.homepage?.aboutText || "",
+      },
+
+      aboutPage: {
+        enabled: website.aboutPage?.enabled !== false,
+        heading: website.aboutPage?.heading?.trim() || "About Us",
+        contentMode:
+          website.aboutPage?.contentMode === "custom" ? "custom" : "guided",
+        facts: {
+          openingYear: website.aboutPage?.facts?.openingYear?.trim() || "",
+          founderNames: website.aboutPage?.facts?.founderNames?.trim() || "",
+          originStory: website.aboutPage?.facts?.originStory?.trim() || "",
+          specialties: website.aboutPage?.facts?.specialties?.trim() || "",
+          community: website.aboutPage?.facts?.community?.trim() || "",
+          servicePhilosophy:
+            website.aboutPage?.facts?.servicePhilosophy?.trim() || "",
+          differentiators:
+            website.aboutPage?.facts?.differentiators?.trim() || "",
+        },
+        sections: (() => {
+          const fallbackStory = website.homepage?.aboutText?.trim() || "";
+          const defaults = [
+            {
+              key: "story" as const,
+              enabled: true,
+              title: "Our Story",
+              body: fallbackStory,
+              sortOrder: 0,
+            },
+            {
+              key: "specialties" as const,
+              enabled: true,
+              title: "What We Do Best",
+              body: "",
+              sortOrder: 1,
+            },
+            {
+              key: "community" as const,
+              enabled: true,
+              title: "Rooted in Our Community",
+              body: "",
+              sortOrder: 2,
+            },
+          ];
+
+          const byKey = new Map(
+            (website.aboutPage?.sections || [])
+              .filter((section) =>
+                ["story", "specialties", "community"].includes(
+                  section.key || "",
+                ),
+              )
+              .map((section) => [section.key, section]),
+          );
+
+          return defaults
+            .map((section) => {
+              const stored = byKey.get(section.key);
+
+              return {
+                key: section.key,
+                enabled: stored?.enabled !== false,
+                title: stored?.title?.trim() || section.title,
+                body:
+                  stored?.body?.trim() ||
+                  (section.key === "story" ? fallbackStory : section.body),
+                sortOrder:
+                  typeof stored?.sortOrder === "number"
+                    ? stored.sortOrder
+                    : section.sortOrder,
+              };
+            })
+            .sort((a, b) => a.sortOrder - b.sortOrder);
+        })(),
+      },
+
+      seo: {
+        homepageTitle: website.seo?.homepageTitle?.trim() || "",
+        homepageDescription: website.seo?.homepageDescription?.trim() || "",
+        socialTitle: website.seo?.socialTitle?.trim() || "",
+        socialDescription: website.seo?.socialDescription?.trim() || "",
+        socialImageUrl: website.seo?.socialImageUrl?.trim() || "",
+        businessDescription: website.seo?.businessDescription?.trim() || "",
+        googleBusinessProfileUrl:
+          website.seo?.googleBusinessProfileUrl?.trim() || "",
+        googleSiteVerification:
+          website.seo?.googleSiteVerification?.trim() || "",
+        bingSiteVerification:
+          website.seo?.bingSiteVerification?.trim() || "",
+        businessHours: normalizeBloomWebsiteBusinessHours(
+          website.seo?.businessHours,
+        ),
+        localDelivery: {
+          ...normalizeBloomWebsiteLocalSeoContent(
+            website.seo?.localDelivery,
+          ),
+          serviceZipCodes: getBloomWebsiteConfiguredDeliveryZipCodes({
+            method: shop.delivery?.method,
+            zipZones: shop.delivery?.zipZones,
+          }),
+        },
       },
 
       announcement: {

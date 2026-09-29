@@ -38,6 +38,7 @@ export async function GET(
     "User-agent: *",
     "Allow: /",
     "Allow: /shop",
+    "Allow: /about",
     "Allow: /products/",
     "Disallow: /checkout/",
     "Disallow: /cart",

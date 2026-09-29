@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import VideoWalkthrough from "@/components/getting-started/VideoWalkthrough";
 
 type Walkthrough = {
@@ -338,10 +339,13 @@ export default async function GettingStartedPage() {
                 does not behave as expected.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-purple-700">
+            <Link
+              href="/support"
+              className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm font-semibold text-purple-700 transition hover:bg-purple-100"
+            >
               <HeartHandshake size={20} />
-              We’re here to help.
-            </div>
+              Open Support
+            </Link>
           </div>
         </section>
       </div>

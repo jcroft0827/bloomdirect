@@ -15,6 +15,9 @@ type LiveWebsiteLean = {
   customDomain: string;
   status: "preview" | "live" | "paused";
   domainVerified?: boolean;
+  branding?: {
+    logo?: string;
+  };
 };
 
 type LiveShopLean = {
@@ -30,6 +33,7 @@ export type BloomWebsiteLiveTenant = {
   siteName: string;
   customDomain: string;
   businessName: string;
+  logo: string;
 };
 
 export async function getBloomWebsiteLiveTenant(
@@ -58,7 +62,7 @@ export async function getBloomWebsiteLiveTenant(
     status: "live",
   })
     .select(
-      "_id shop previewSlug siteName customDomain status domainVerified",
+      "_id shop previewSlug siteName customDomain status domainVerified branding.logo",
     )
     .lean()) as LiveWebsiteLean | null;
 
@@ -87,5 +91,6 @@ export async function getBloomWebsiteLiveTenant(
     siteName: website.siteName,
     customDomain: hostname,
     businessName: shop.businessName,
+    logo: website.branding?.logo?.trim() || "",
   };
 }

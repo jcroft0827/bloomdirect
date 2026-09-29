@@ -41,6 +41,7 @@ export default function HomeFooter() {
               <li><Link href="/#network" className={linkClass}>Florist Network</Link></li>
               <li><Link href="/api-docs/external/v1" className={linkClass}>POS API</Link></li>
               <li><Link href="/vision" className={linkClass}>Vision</Link></li>
+              <li><Link href="/support" className={linkClass}>Support</Link></li>
               <li><Link href="/contact" className={linkClass}>Contact</Link></li>
             </ul>
           </div>

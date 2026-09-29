@@ -15,6 +15,9 @@ type RouteProps = {
 
 type WebsiteLean = {
   updatedAt?: Date | null;
+  aboutPage?: {
+    enabled?: boolean;
+  };
 };
 
 type ProductLean = {
@@ -96,7 +99,7 @@ export async function GET(
 
   const [website, products] = await Promise.all([
     BloomWebsite.findById(tenant.websiteId)
-      .select("updatedAt")
+      .select("updatedAt aboutPage.enabled")
       .lean<WebsiteLean | null>(),
 
     BloomWebsiteProduct.find({
@@ -118,6 +121,7 @@ export async function GET(
     origin,
     products,
     websiteLastModified: website.updatedAt,
+    aboutEnabled: website.aboutPage?.enabled !== false,
   });
 
   return new Response(serializeSitemap(entries), {
