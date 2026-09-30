@@ -312,6 +312,33 @@ export default function ShopClient({
                 {shop.branding?.bio ||
                   `Professional florist serving ${shop?.address?.city} with custom, seasonal arrangements.`}
               </p>
+
+              {(shop?.branding?.socialLinks?.facebook ||
+                shop?.branding?.socialLinks?.instagram ||
+                shop?.branding?.socialLinks?.pinterest ||
+                shop?.branding?.socialLinks?.tiktok) && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {[
+                    ["Facebook", shop?.branding?.socialLinks?.facebook],
+                    ["Instagram", shop?.branding?.socialLinks?.instagram],
+                    ["Pinterest", shop?.branding?.socialLinks?.pinterest],
+                    ["TikTok", shop?.branding?.socialLinks?.tiktok],
+                  ]
+                    .filter(([, href]) => Boolean(href))
+                    .map(([label, href]) => (
+                      <a
+                        key={label}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:border-purple-300 hover:text-purple-700"
+                      >
+                        <GlobeAltIcon className="h-4 w-4" />
+                        {label}
+                      </a>
+                    ))}
+                </div>
+              )}
             </section>
 
             {!isLoadingLoggedInShop &&

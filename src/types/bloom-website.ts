@@ -52,6 +52,33 @@ export type BloomWebsiteBusinessHour = {
   closes: string;
 };
 
+
+export type BloomWebsiteHomepageSectionText = {
+  eyebrow: string;
+  heading: string;
+  description: string;
+};
+
+export type BloomWebsiteHomepageSectionContent = {
+  occasions: BloomWebsiteHomepageSectionText;
+  featured: BloomWebsiteHomepageSectionText;
+  about: BloomWebsiteHomepageSectionText;
+  trust: BloomWebsiteHomepageSectionText;
+  delivery: BloomWebsiteHomepageSectionText;
+  contact: BloomWebsiteHomepageSectionText;
+};
+
+export type BloomWebsiteHeroInfoCardContent = {
+  eyebrow: string;
+  heading: string;
+  description: string;
+};
+
+export type BloomWebsiteTrustPoint = {
+  title: string;
+  description: string;
+};
+
 export type BloomWebsiteLocalSeoContent = {
   localDeliveryNote: string;
   serviceCities: string[];
@@ -153,7 +180,10 @@ export type BloomWebsiteStorefrontWebsite = {
     heroHeadline: string;
     heroSubheadline: string;
     heroImage: string;
+    heroInfoCard: BloomWebsiteHeroInfoCardContent;
+    trustPoints: BloomWebsiteTrustPoint[];
     aboutText: string;
+    sectionContent: BloomWebsiteHomepageSectionContent;
   };
 
   aboutPage?: {

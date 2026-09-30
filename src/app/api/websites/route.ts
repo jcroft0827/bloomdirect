@@ -7,6 +7,11 @@ import Shop from "@/models/Shop";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import {
+  normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteTrustPoints,
+} from "@/lib/bloom-websites/storefront-content";
+import {
   DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
   normalizeStorefrontHexColor,
@@ -15,7 +20,6 @@ import {
   buildBloomWebsiteHeroHeadline,
   buildBloomWebsiteHeroSubheadline,
   isBloomWebsiteGeneratedHeroHeadline,
-  isBloomWebsiteGeneratedHeroSubheadline,
 } from "@/lib/bloom-websites/branding-copy";
 
 type BloomWebsiteLean = {
@@ -218,7 +222,11 @@ type UpdateBloomWebsiteBrandingBody = {
 
   homepage?: {
     heroHeadline?: unknown;
+    heroSubheadline?: unknown;
     heroImage?: unknown;
+    heroInfoCard?: unknown;
+    trustPoints?: unknown;
+    sectionContent?: unknown;
   };
 };
 
@@ -284,7 +292,31 @@ export async function PATCH(request: Request) {
       body.homepage?.heroHeadline,
       160,
     );
+    const heroSubheadlineWasProvided =
+      typeof body.homepage?.heroSubheadline === "string";
+    const heroSubheadline = cleanBrandingString(
+      body.homepage?.heroSubheadline,
+      300,
+    );
     const heroImage = cleanBrandingString(body.homepage?.heroImage, 2000);
+    const heroInfoCardWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "heroInfoCard");
+    const heroInfoCard = normalizeBloomWebsiteHeroInfoCardContent(
+      body.homepage?.heroInfoCard,
+    );
+    const trustPointsWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "trustPoints");
+    const trustPoints = normalizeBloomWebsiteTrustPoints(
+      body.homepage?.trustPoints,
+    );
+    const sectionContentWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "sectionContent");
+    const sectionContent = normalizeBloomWebsiteHomepageSectionContent(
+      body.homepage?.sectionContent,
+    );
 
     if (heroHeadlineWasProvided && !heroHeadline) {
       return NextResponse.json(
@@ -354,7 +386,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const updateSet: Record<string, string> = {
+    const updateSet: Record<string, unknown> = {
       siteName,
       "branding.logo": logo,
       "branding.tagline": tagline,
@@ -385,14 +417,20 @@ export async function PATCH(request: Request) {
         buildBloomWebsiteHeroHeadline(siteName);
     }
 
-    if (
-      isBloomWebsiteGeneratedHeroSubheadline(
-        existingWebsite.homepage?.heroSubheadline,
-        existingWebsite.branding?.tagline,
-      )
-    ) {
-      updateSet["homepage.heroSubheadline"] =
-        buildBloomWebsiteHeroSubheadline(tagline);
+    if (heroSubheadlineWasProvided) {
+      updateSet["homepage.heroSubheadline"] = heroSubheadline;
+    }
+
+    if (heroInfoCardWasProvided) {
+      updateSet["homepage.heroInfoCard"] = heroInfoCard;
+    }
+
+    if (trustPointsWasProvided) {
+      updateSet["homepage.trustPoints"] = trustPoints;
+    }
+
+    if (sectionContentWasProvided) {
+      updateSet["homepage.sectionContent"] = sectionContent;
     }
 
     const website = await BloomWebsite.findOneAndUpdate(
@@ -418,7 +456,11 @@ export async function PATCH(request: Request) {
           "branding.primaryColor",
           "branding.accentColor",
           "homepage.heroHeadline",
+          "homepage.heroSubheadline",
           "homepage.heroImage",
+          "homepage.heroInfoCard",
+          "homepage.trustPoints",
+          "homepage.sectionContent",
         ].join(" "),
       )
       .lean<{
@@ -438,7 +480,11 @@ export async function PATCH(request: Request) {
 
         homepage?: {
           heroHeadline?: string;
+          heroSubheadline?: string;
           heroImage?: string;
+          heroInfoCard?: unknown;
+          trustPoints?: unknown;
+          sectionContent?: unknown;
         };
       } | null>();
 
@@ -478,7 +524,17 @@ export async function PATCH(request: Request) {
 
         homepage: {
           heroHeadline: website.homepage?.heroHeadline || "",
+          heroSubheadline: website.homepage?.heroSubheadline || "",
           heroImage: website.homepage?.heroImage || "",
+          heroInfoCard: normalizeBloomWebsiteHeroInfoCardContent(
+            website.homepage?.heroInfoCard,
+          ),
+          trustPoints: normalizeBloomWebsiteTrustPoints(
+            website.homepage?.trustPoints,
+          ),
+          sectionContent: normalizeBloomWebsiteHomepageSectionContent(
+            website.homepage?.sectionContent,
+          ),
         },
       },
     });

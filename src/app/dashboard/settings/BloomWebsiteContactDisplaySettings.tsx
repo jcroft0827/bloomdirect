@@ -151,7 +151,7 @@ export default function BloomWebsiteContactDisplaySettings({
       title: "Show Social Links",
 
       description:
-        "Display available social media links such as Facebook and Instagram.",
+        "Display your shared Facebook, Instagram, Pinterest, and TikTok links when they are available.",
 
       icon: Share2,
     },
@@ -190,7 +190,8 @@ export default function BloomWebsiteContactDisplaySettings({
           <p className="mt-1 text-sm leading-6 text-purple-800">
             Turning something off here does not delete it from your shop account
             or change GetBloomDirect. It only hides that information from your
-            BloomWebsite.
+            BloomWebsite. Social accounts are managed as shared shop links in
+            Shared Social Media or Branding.
           </p>
         </div>
 

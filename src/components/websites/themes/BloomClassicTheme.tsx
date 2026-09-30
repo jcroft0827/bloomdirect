@@ -7,6 +7,7 @@ import {
   Heart,
   Instagram,
   Mail,
+  Music2,
   MapPin,
   Phone,
   ShieldCheck,
@@ -21,6 +22,11 @@ import BloomWebsiteStorefrontProductCard, {
 import Link from "next/link";
 import StorefrontCartButton from "@/components/websites/storefront/StorefrontCartButton";
 import type { BloomWebsiteStorefront } from "@/types/bloom-website";
+import {
+  getBloomWebsiteHeroInfoCardDefaults,
+  getBloomWebsiteHomepageSectionDefaults,
+  resolveBloomWebsiteTrustPoints,
+} from "@/lib/bloom-websites/storefront-content";
 
 type BloomClassicThemeProps = {
   storefront: BloomWebsiteStorefront;
@@ -127,6 +133,105 @@ export default function BloomClassicTheme({
     { label: "Wedding & event venues", values: localDelivery?.venues || [] },
     { label: "Businesses & organizations", values: localDelivery?.businesses || [] },
   ].filter((group) => group.values.length > 0);
+
+  const sectionDefaults = getBloomWebsiteHomepageSectionDefaults({
+    businessName: website.siteName,
+    cityState: showAddress ? cityState : "",
+    localDeliveryNote: localDelivery?.localDeliveryNote,
+  });
+
+  const occasionsContent = {
+    eyebrow:
+      website.homepage.sectionContent.occasions.eyebrow ||
+      sectionDefaults.occasions.eyebrow,
+    heading:
+      website.homepage.sectionContent.occasions.heading ||
+      sectionDefaults.occasions.heading,
+    description:
+      website.homepage.sectionContent.occasions.description ||
+      sectionDefaults.occasions.description,
+  };
+
+  const featuredContent = {
+    eyebrow:
+      website.homepage.sectionContent.featured.eyebrow ||
+      sectionDefaults.featured.eyebrow,
+    heading:
+      website.homepage.sectionContent.featured.heading ||
+      sectionDefaults.featured.heading,
+    description:
+      website.homepage.sectionContent.featured.description ||
+      sectionDefaults.featured.description,
+  };
+
+  const aboutContent = {
+    eyebrow:
+      website.homepage.sectionContent.about.eyebrow ||
+      sectionDefaults.about.eyebrow,
+    heading:
+      website.homepage.sectionContent.about.heading ||
+      sectionDefaults.about.heading,
+    description:
+      website.homepage.sectionContent.about.description ||
+      website.homepage.aboutText ||
+      sectionDefaults.about.description,
+  };
+
+  const trustContent = {
+    eyebrow:
+      website.homepage.sectionContent.trust.eyebrow ||
+      sectionDefaults.trust.eyebrow,
+    heading:
+      website.homepage.sectionContent.trust.heading ||
+      sectionDefaults.trust.heading,
+    description:
+      website.homepage.sectionContent.trust.description ||
+      sectionDefaults.trust.description,
+  };
+
+  const deliveryContent = {
+    eyebrow:
+      website.homepage.sectionContent.delivery.eyebrow ||
+      sectionDefaults.delivery.eyebrow,
+    heading:
+      website.homepage.sectionContent.delivery.heading ||
+      sectionDefaults.delivery.heading,
+    description:
+      website.homepage.sectionContent.delivery.description ||
+      sectionDefaults.delivery.description,
+  };
+
+  const contactContent = {
+    eyebrow:
+      website.homepage.sectionContent.contact.eyebrow ||
+      sectionDefaults.contact.eyebrow,
+    heading:
+      website.homepage.sectionContent.contact.heading ||
+      sectionDefaults.contact.heading,
+    description:
+      website.homepage.sectionContent.contact.description ||
+      sectionDefaults.contact.description,
+  };
+
+  const heroInfoCardDefaults = getBloomWebsiteHeroInfoCardDefaults({
+    siteName: website.siteName,
+  });
+
+  const heroInfoCard = {
+    eyebrow:
+      website.homepage.heroInfoCard.eyebrow || heroInfoCardDefaults.eyebrow,
+    heading:
+      website.homepage.heroInfoCard.heading || heroInfoCardDefaults.heading,
+    description:
+      website.homepage.heroInfoCard.description ||
+      heroInfoCardDefaults.description,
+  };
+
+  const trustPoints = resolveBloomWebsiteTrustPoints(
+    website.homepage.trustPoints,
+  );
+
+  const trustPointIcons = [Flower2, Sparkles, Truck, ShieldCheck];
 
   /*
    * Homepage merchandising should use real florist products.
@@ -433,16 +538,15 @@ export default function BloomClassicTheme({
                         color: accentColor,
                       }}
                     >
-                      Your neighborhood florist
+                      {heroInfoCard.eyebrow}
                     </p>
 
                     <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950">
-                      {website.siteName}
+                      {heroInfoCard.heading}
                     </h2>
 
                     <p className="mt-4 text-sm leading-7 text-gray-600">
-                      Fresh flowers, personal service, and thoughtful designs
-                      created right here in your community.
+                      {heroInfoCard.description}
                     </p>
 
                     <div className="mt-8 space-y-4 border-t border-gray-100 pt-7">
@@ -509,16 +613,15 @@ export default function BloomClassicTheme({
                     color: accentColor,
                   }}
                 >
-                  Find the right flowers
+                  {occasionsContent.eyebrow}
                 </p>
 
                 <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
-                  Shop by Occasion
+                  {occasionsContent.heading}
                 </h2>
 
                 <p className="mt-4 text-sm leading-7 text-gray-600 sm:text-base">
-                  Thoughtful flowers for life&apos;s celebrations, milestones,
-                  and meaningful moments.
+                  {occasionsContent.description}
                 </p>
               </div>
 
@@ -602,16 +705,15 @@ export default function BloomClassicTheme({
                     color: accentColor,
                   }}
                 >
-                  Fresh from our shop
+                  {featuredContent.eyebrow}
                 </p>
 
                 <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
-                  Featured Flowers
+                  {featuredContent.heading}
                 </h2>
 
                 <p className="mt-4 max-w-xl text-sm leading-7 text-gray-600 sm:text-base">
-                  Hand-designed arrangements created locally and delivered with
-                  care.
+                  {featuredContent.description}
                 </p>
               </div>
 
@@ -690,20 +792,15 @@ export default function BloomClassicTheme({
                     color: accentColor,
                   }}
                 >
-                  Meet your local florist
+                  {aboutContent.eyebrow}
                 </p>
 
                 <h2 className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
-                  Flowers mean more when they&apos;re personal.
+                  {aboutContent.heading}
                 </h2>
 
                 <p className="mt-6 max-w-2xl whitespace-pre-line text-base leading-8 text-gray-600">
-                  {website.homepage.aboutText ||
-                    `${shop.businessName} is proud to serve ${
-                      showAddress && cityState
-                        ? cityState
-                        : "our local community"
-                    } with fresh flowers, thoughtful designs, and personal service for life's meaningful moments.`}
+                  {aboutContent.description}
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-3">
@@ -773,12 +870,18 @@ export default function BloomClassicTheme({
                           color: accentColor,
                         }}
                       >
-                        Why shop local?
+                        {trustContent.eyebrow}
                       </p>
 
                       <h3 className="mt-2 text-2xl font-black tracking-tight text-gray-950 sm:text-3xl">
-                        Real flowers. Real people.
+                        {trustContent.heading}
                       </h3>
+
+                      {trustContent.description ? (
+                        <p className="mt-3 max-w-md text-sm leading-6 text-gray-500">
+                          {trustContent.description}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div
@@ -793,97 +896,35 @@ export default function BloomClassicTheme({
                   </div>
 
                   <div className="mt-8 divide-y divide-gray-100">
-                    <div className="flex gap-4 py-5 first:pt-0">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                        style={{
-                          backgroundColor: `${accentColor}14`,
-                          color: accentColor,
-                        }}
-                      >
-                        <Flower2 size={19} />
-                      </div>
+                    {trustPoints.map((point, index) => {
+                      const Icon = trustPointIcons[index] || ShieldCheck;
 
-                      <div>
-                        <p className="font-black text-gray-950">
-                          Designed by a local florist
-                        </p>
+                      return (
+                        <div
+                          key={`${point.title}-${index}`}
+                          className="flex gap-4 py-5 first:pt-0 last:pb-0"
+                        >
+                          <div
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                            style={{
+                              backgroundColor: `${accentColor}14`,
+                              color: accentColor,
+                            }}
+                          >
+                            <Icon size={19} />
+                          </div>
 
-                        <p className="mt-1 text-sm leading-6 text-gray-500">
-                          Your arrangement is created by the florist serving
-                          your community.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4 py-5">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                        style={{
-                          backgroundColor: `${accentColor}14`,
-                          color: accentColor,
-                        }}
-                      >
-                        <Sparkles size={19} />
-                      </div>
-
-                      <div>
-                        <p className="font-black text-gray-950">
-                          Thoughtfully prepared
-                        </p>
-
-                        <p className="mt-1 text-sm leading-6 text-gray-500">
-                          Each order is prepared with care for the person and
-                          moment you&apos;re celebrating.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4 py-5">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                        style={{
-                          backgroundColor: `${accentColor}14`,
-                          color: accentColor,
-                        }}
-                      >
-                        <Truck size={19} />
-                      </div>
-
-                      <div>
-                        <p className="font-black text-gray-950">
-                          Delivered locally
-                        </p>
-
-                        <p className="mt-1 text-sm leading-6 text-gray-500">
-                          Your flowers stay local from the design table through
-                          delivery.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4 py-5 last:pb-0">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                        style={{
-                          backgroundColor: `${accentColor}14`,
-                          color: accentColor,
-                        }}
-                      >
-                        <ShieldCheck size={19} />
-                      </div>
-
-                      <div>
-                        <p className="font-black text-gray-950">
-                          Personal service
-                        </p>
-
-                        <p className="mt-1 text-sm leading-6 text-gray-500">
-                          Questions about your order? You&apos;re working with a
-                          real local flower shop.
-                        </p>
-                      </div>
-                    </div>
+                          <div>
+                            <p className="font-black text-gray-950">
+                              {point.title}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-gray-500">
+                              {point.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -925,16 +966,15 @@ export default function BloomClassicTheme({
                   </div>
 
                   <p className="mt-8 text-xs font-black uppercase tracking-[0.2em] opacity-70 sm:text-sm">
-                    Local delivery
+                    {deliveryContent.eyebrow}
                   </p>
 
                   <h2 className="mt-3 max-w-xl text-3xl font-black tracking-tight sm:text-4xl">
-                    From our flower shop to their door.
+                    {deliveryContent.heading}
                   </h2>
 
                   <p className="mt-5 max-w-xl text-sm leading-7 opacity-80 sm:text-base">
-                    {localDelivery?.localDeliveryNote ||
-                      `Order online from ${shop.businessName} and send flowers locally with delivery handled right here in the community.`}
+                    {deliveryContent.description}
                   </p>
 
                   <div className="mt-8">
@@ -1109,16 +1149,15 @@ export default function BloomClassicTheme({
                   color: accentColor,
                 }}
               >
-                We&apos;re here to help
+                {contactContent.eyebrow}
               </p>
 
               <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
-                Get in touch with {shop.businessName}.
+                {contactContent.heading}
               </h2>
 
               <p className="mt-4 text-sm leading-7 text-gray-600 sm:text-base">
-                Have a question about flowers, delivery, or your order? Reach
-                out directly to your local florist.
+                {contactContent.description}
               </p>
             </div>
 
@@ -1232,7 +1271,7 @@ export default function BloomClassicTheme({
 
               <p className="mt-5 max-w-md text-sm leading-7 text-gray-400">
                 {website.storefrontTheme.tagline ||
-                  `Fresh flowers, thoughtful design, and personal service from ${shop.businessName}.`}
+                  `Fresh flowers, thoughtful design, and personal service from ${website.siteName}.`}
               </p>
 
               {showAddress && cityState && (
@@ -1243,31 +1282,31 @@ export default function BloomClassicTheme({
               )}
 
               {showSocialLinks &&
-                (shop.socialLinks.facebook || shop.socialLinks.instagram) && (
-                  <div className="mt-6 flex items-center gap-3">
-                    {shop.socialLinks.facebook && (
-                      <a
-                        href={shop.socialLinks.facebook}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`${website.siteName} on Facebook`}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                      >
-                        <Facebook size={18} />
-                      </a>
-                    )}
-
-                    {shop.socialLinks.instagram && (
-                      <a
-                        href={shop.socialLinks.instagram}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`${website.siteName} on Instagram`}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-                      >
-                        <Instagram size={18} />
-                      </a>
-                    )}
+                (shop.socialLinks.facebook ||
+                  shop.socialLinks.instagram ||
+                  shop.socialLinks.pinterest ||
+                  shop.socialLinks.tiktok) && (
+                  <div className="mt-6 flex flex-wrap items-center gap-2">
+                    {[
+                      { label: "Facebook", href: shop.socialLinks.facebook, Icon: Facebook },
+                      { label: "Instagram", href: shop.socialLinks.instagram, Icon: Instagram },
+                      { label: "Pinterest", href: shop.socialLinks.pinterest, Icon: MapPin },
+                      { label: "TikTok", href: shop.socialLinks.tiktok, Icon: Music2 },
+                    ]
+                      .filter((item) => Boolean(item.href))
+                      .map(({ label, href, Icon }) => (
+                        <a
+                          key={label}
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`${website.siteName} on ${label}`}
+                          className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+                        >
+                          <Icon size={16} />
+                          {label}
+                        </a>
+                      ))}
                   </div>
                 )}
             </div>

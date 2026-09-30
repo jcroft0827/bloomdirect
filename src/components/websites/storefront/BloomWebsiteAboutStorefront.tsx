@@ -1,4 +1,4 @@
-import { Flower2, MapPin, ShoppingBag } from "lucide-react";
+import { Facebook, Flower2, Instagram, MapPin, Music2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 
 import StorefrontCartButton from "@/components/websites/storefront/StorefrontCartButton";
@@ -46,13 +46,13 @@ export default function BloomWebsiteAboutStorefront({
   return (
     <div className="min-h-screen bg-white text-gray-950">
       <header className="sticky top-0 z-40 border-b border-gray-200/80 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-2.5 sm:px-8 sm:py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-2 sm:px-8 sm:py-2.5">
           <Link href={homeHref} className="flex min-w-0 items-center gap-3">
             {website.storefrontTheme.logo ? (
               <img
                 src={website.storefrontTheme.logo}
                 alt={`${website.siteName} logo`}
-                className="h-14 w-auto max-w-[220px] object-contain object-left sm:h-16 sm:max-w-[260px] lg:h-20 lg:max-w-[320px]"
+                className="h-16 w-auto max-w-[240px] object-contain object-left sm:h-[4.5rem] sm:max-w-[300px] lg:h-20 lg:max-w-[360px]"
               />
             ) : (
               <>
@@ -153,12 +153,43 @@ export default function BloomWebsiteAboutStorefront({
       </main>
 
       <footer className="bg-gray-950 px-5 py-10 text-white sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-xl">
             <p className="font-black">{website.siteName}</p>
-            <p className="mt-1 text-sm text-gray-400">
-              {cityState ? `Serving ${cityState} and surrounding communities.` : "Local flowers, thoughtfully designed."}
+            <p className="mt-2 text-sm leading-6 text-gray-400">
+              {website.storefrontTheme.tagline ||
+                (cityState
+                  ? `Serving ${cityState} and surrounding communities.`
+                  : "Local flowers, thoughtfully designed.")}
             </p>
+
+            {website.settings.showSocialLinks &&
+              (shop.socialLinks.facebook ||
+                shop.socialLinks.instagram ||
+                shop.socialLinks.pinterest ||
+                shop.socialLinks.tiktok) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[
+                    { label: "Facebook", href: shop.socialLinks.facebook, Icon: Facebook },
+                    { label: "Instagram", href: shop.socialLinks.instagram, Icon: Instagram },
+                    { label: "Pinterest", href: shop.socialLinks.pinterest, Icon: MapPin },
+                    { label: "TikTok", href: shop.socialLinks.tiktok, Icon: Music2 },
+                  ]
+                    .filter((item) => Boolean(item.href))
+                    .map(({ label, href, Icon }) => (
+                      <a
+                        key={label}
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+                      >
+                        <Icon size={15} />
+                        {label}
+                      </a>
+                    ))}
+                </div>
+              )}
           </div>
           <div className="flex gap-5 text-sm font-bold text-gray-300">
             <Link href={homeHref} className="hover:text-white">Home</Link>

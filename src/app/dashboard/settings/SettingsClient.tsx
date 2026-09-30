@@ -137,6 +137,7 @@ import { signOut } from "next-auth/react";
 import BloomSpinner from "@/components/BloomSpinner";
 import { sign } from "crypto";
 import VerificationProgressBar from "@/components/verification/ProgressBar";
+import SharedSocialLinksEditor from "@/components/settings/SharedSocialLinksEditor";
 import { useRouter } from "next/navigation";
 
 // 
@@ -157,7 +158,14 @@ function getLegacySectionValue(shop: any, sectionKey: string | null) {
     case "financials":
       return shop.financials ?? {};
     case "branding":
-      return shop.branding ?? {};
+      return {
+        logo: shop.branding?.logo ?? "",
+        bannerImage: shop.branding?.bannerImage ?? "",
+        bio: shop.branding?.bio ?? "",
+        primaryColor: shop.branding?.primaryColor ?? "",
+      };
+    case "socialLinks":
+      return shop.branding?.socialLinks ?? {};
     case "securityCode":
       return shop.securityCode ?? "";
     default:
@@ -295,12 +303,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   const [newEmail, setNewEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
 
-  // Socials
-  const [showFB, setShowFB] = useState(false);
-  const [showInsta, setShowInsta] = useState(false);
-  const [showPin, setShowPin] = useState(false);
-  const [showTik, setShowTik] = useState(false);
-
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   const [securityCodeInfo, setSecurityCodeInfo] = useState(false);
@@ -314,6 +316,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
     delivery: "GetBloomDirect Order Settings",
     financials: "Taxes & Fees",
     branding: "Public Profile",
+    socialLinks: "Shared Social Media",
     securityCode: "Security Code",
   };
 
@@ -339,7 +342,9 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
               ? "financial-settings"
               : activeSection === "branding"
                 ? "public-profile"
-                : activeSection === "securityCode"
+                : activeSection === "socialLinks"
+                  ? "shared-social-links"
+                  : activeSection === "securityCode"
                   ? "security-settings"
                   : undefined,
     },
@@ -578,8 +583,14 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
         };
       } else if (sectionKey === "branding") {
         payload = {
-          ...shop.branding,
-          socialLinks: shop.branding.socialLinks || {},
+          logo: shop.branding?.logo || "",
+          bannerImage: shop.branding?.bannerImage || "",
+          bio: shop.branding?.bio || "",
+          primaryColor: shop.branding?.primaryColor || "",
+        };
+      } else if (sectionKey === "socialLinks") {
+        payload = {
+          socialLinks: shop.branding?.socialLinks || {},
         };
       } else if (sectionKey === "securityCode") {
         payload = {
@@ -1993,6 +2004,94 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
             )}
           </div>
 
+          {/* Shared Social Media */}
+          <div
+            id="shared-social-links"
+            className={`${normalSection} scroll-mt-28 lg:col-span-2`}
+          >
+            <div className="w-full">
+              <h2 className={normalH2}>Shared Social Media</h2>
+              <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+                Add your social accounts once. GetBloomDirect uses these links on
+                your public florist profile, and BloomWebsites uses the same links
+                in the storefront footer and local-business SEO.
+              </p>
+
+              {activeSection !== "socialLinks" && (
+                <button
+                  onClick={() => handleEditClick("socialLinks")}
+                  className="absolute right-2 top-2"
+                  aria-label="Edit shared social media"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="1.5"
+                    stroke="currentColor"
+                    className="size-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {activeSection === "socialLinks" ? (
+              <div className="w-full max-w-4xl">
+                <SharedSocialLinksEditor
+                  value={shop.branding?.socialLinks || {
+                    facebook: "",
+                    instagram: "",
+                    pinterest: "",
+                    tiktok: "",
+                  }}
+                  onChange={updateSocials}
+                />
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                  <button
+                    onClick={() => handleSave("socialLinks")}
+                    disabled={isSaving === "socialLinks"}
+                    className="rounded-xl bg-emerald-600 px-8 py-2.5 text-lg font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {isSaving === "socialLinks" ? "Saving..." : "Save Social Links"}
+                  </button>
+                  <button
+                    className="rounded-xl bg-red-500 px-8 py-2.5 text-lg font-bold text-white transition hover:bg-red-600"
+                    onClick={handleEditCancel}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex w-full flex-wrap justify-center gap-2 text-sm">
+                {[
+                  ["Facebook", shop.branding?.socialLinks?.facebook],
+                  ["Instagram", shop.branding?.socialLinks?.instagram],
+                  ["Pinterest", shop.branding?.socialLinks?.pinterest],
+                  ["TikTok", shop.branding?.socialLinks?.tiktok],
+                ].map(([label, href]) => (
+                  <span
+                    key={label}
+                    className={`rounded-full border px-3 py-1.5 font-semibold ${
+                      href
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-gray-200 bg-gray-50 text-gray-400"
+                    }`}
+                  >
+                    {label}: {href ? "Connected" : "Not added"}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Public Profile Section */}
           <div id="public-profile" className={`${normalSection} scroll-mt-28`}>
             {/* Header */}
@@ -2112,515 +2211,13 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                   ></textarea>
                 </div>
 
-                {/* Social Links */}
-                <div className="flex flex-col gap-4 items-start sm:gap-2 pb-4 md:pb-0 lg:pb-4 xl:pb-0">
-                  {/* Facebook */}
-                  <div className="w-full">
-                    {showFB ? (
-                      <div className="w-full flex flex-col items-center gap-2 sm:flex-row">
-                        <div className="w-full flex gap-2 items-center sm:gap-1">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              className="bg-[#0866FF] rounded-full"
-                            >
-                              <path
-                                fill="white"
-                                d="M16,2c-7.732,0-14,6.268-14,14,0,6.566,4.52,12.075,10.618,13.588v-9.31h-2.887v-4.278h2.887v-1.843c0-4.765,2.156-6.974,6.835-6.974,.887,0,2.417,.174,3.043,.348v3.878c-.33-.035-.904-.052-1.617-.052-2.296,0-3.183,.87-3.183,3.13v1.513h4.573l-.786,4.278h-3.787v9.619c6.932-.837,12.304-6.74,12.304-13.897,0-7.732-6.268-14-14-14Z"
-                              />
-                            </svg>
-                          </div>
-                          <input
-                            type="text"
-                            name="facebook"
-                            placeholder="https://www.facebook.com/flower-shop"
-                            value={shop?.branding?.socialLinks?.facebook ?? ""}
-                            onChange={(e) =>
-                              updateSocials("facebook", e.target.value)
-                            }
-                            className="px-2 py-1 border-2 rounded-xl w-full text-center sm:text-sm"
-                          />
-                        </div>
-                        <div className="w-full flex gap-4 justify-center sm:w-auto sm:gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setShowFB(false)}
-                            className="w-full flex"
-                          >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
-                              X
-                            </span>
-                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
-                              Cancel Edit
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShop((prev) => ({
-                                ...prev,
-                                branding: {
-                                  ...prev.branding,
-                                  socialLinks: {
-                                    ...prev.branding.socialLinks,
-                                    facebook: "",
-                                  },
-                                },
-                              }));
-                            }}
-                            className="w-full flex"
-                          >
-                            <span className="hidden sm:block">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth="1.5"
-                                stroke="currentColor"
-                                className="size-6 text-red-500"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                />
-                              </svg>
-                            </span>
-                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
-                              Remove
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 sm:flex-row md:flex-col md:gap-1 xl:flex-row xl:gap-2 xl:justify-between">
-                        <div className="flex items-center gap-2 sm:w-full md:w-auto">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              className="bg-[#0866FF] rounded-full"
-                            >
-                              <path
-                                fill="white"
-                                d="M16,2c-7.732,0-14,6.268-14,14,0,6.566,4.52,12.075,10.618,13.588v-9.31h-2.887v-4.278h2.887v-1.843c0-4.765,2.156-6.974,6.835-6.974,.887,0,2.417,.174,3.043,.348v3.878c-.33-.035-.904-.052-1.617-.052-2.296,0-3.183,.87-3.183,3.13v1.513h4.573l-.786,4.278h-3.787v9.619c6.932-.837,12.304-6.74,12.304-13.897,0-7.732-6.268-14-14-14Z"
-                              />
-                            </svg>
-                          </div>
-                          <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop?.branding?.socialLinks?.facebook ||
-                              "Add Your Facebook Profile!"}
-                          </p>
-                        </div>
-                        <div className="w-full sm:w-auto md:w-full xl:w-auto">
-                          <button
-                            type="button"
-                            onClick={() => setShowFB(true)}
-                            className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
-                          >
-                            {shop?.branding?.socialLinks?.facebook
-                              ? "Edit"
-                              : "Add"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Instagram */}
-                  <div className="w-full">
-                    {showInsta ? (
-                      <div className="w-full flex flex-cl items-center gap-2 sm:flex-row">
-                        <div className="w-full flex gap-2 items-center sm:gap-1">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org"
-                              width="30"
-                              height="30"
-                              viewBox="0 0 32 32"
-                              className="rounded-lg"
-                            >
-                              <defs>
-                                <linearGradient
-                                  id="instagram-gradient"
-                                  x1="0%"
-                                  y1="100%"
-                                  x2="100%"
-                                  y2="0%"
-                                >
-                                  <stop offset="0%" stopColor="#f9ce34" />
-                                  <stop offset="50%" stopColor="#ee2a7b" />
-                                  <stop offset="100%" stopColor="#6228d7" />
-                                </linearGradient>
-                              </defs>
-
-                              {/* The Background Square */}
-                              <rect
-                                width="32"
-                                height="32"
-                                rx="8"
-                                fill="url(#instagram-gradient)"
-                              />
-
-                              {/* The White Instagram Path */}
-                              <path
-                                fill="white"
-                                d="M10.202,2.098c-1.49,.07-2.507,.308-3.396,.657-.92,.359-1.7,.84-2.477,1.619-.776,.779-1.254,1.56-1.61,2.481-.345,.891-.578,1.909-.644,3.4-.066,1.49-.08,1.97-.073,5.771s.024,4.278,.096,5.772c.071,1.489,.308,2.506,.657,3.396,.359,.92,.84,1.7,1.619,2.477,.779,.776,1.559,1.253,2.483,1.61,.89,.344,1.909,.579,3.399,.644,1.49,.065,1.97,.08,5.771,.073,3.801-.007,4.279-.024,5.773-.095s2.505-.309,3.395-.657c.92-.36,1.701-.84,2.477-1.62s1.254-1.561,1.609-2.483c.345-.89,.579-1.909,.644-3.398,.065-1.494,.081-1.971,.073-5.773s-.024-4.278-.095-5.771-.308-2.507-.657-3.397c-.36-.92-.84-1.7-1.619-2.477s-1.561-1.254-2.483-1.609c-.891-.345-1.909-.58-3.399-.644s-1.97-.081-5.772-.074-4.278,.024-5.771,.096m.164,25.309c-1.365-.059-2.106-.286-2.6-.476-.654-.252-1.12-.557-1.612-1.044s-.795-.955-1.05-1.608c-.192-.494-.423-1.234-.487-2.599-.069-1.475-.084-1.918-.092-5.656s.006-4.18,.071-5.656c.058-1.364,.286-2.106,.476-2.6,.252-.655,.556-1.12,1.044-1.612s.955-.795,1.608-1.05c.493-.193,1.234-.422,2.598-.487,1.476-.07,1.919-.084,5.656-.092,3.737-.008,4.181,.006,5.658,.071,1.364,.059,2.106,.285,2.599,.476,.654,.252,1.12,.555,1.612,1.044s.795,.954,1.051,1.609c.193,.492,.422,1.232,.486,2.597,.07,1.476,.086,1.919,.093,5.656,.007,3.737-.006,4.181-.071,5.656-.06,1.365-.286,2.106-.476,2.601-.252,.654-.556,1.12-1.045,1.612s-.955,.795-1.608,1.05c-.493,.192-1.234,.422-2.597,.487-1.476,.069-1.919,.084-5.657,.092s-4.18-.007-5.656-.071M21.779,8.517c.002,.928,.755,1.679,1.683,1.677s1.679-.755,1.677-1.683c-.002-.928-.755-1.679-1.683-1.677,0,0,0,0,0,0-.928,.002-1.678,.755-1.677,1.683m-12.967,7.496c.008,3.97,3.232,7.182,7.202,7.174s7.183-3.232,7.176-7.202c-.008-3.97-3.233-7.183-7.203-7.175s-7.182,3.233-7.174,7.203m2.522-.005c-.005-2.577,2.08-4.671,4.658-4.676,2.577-.005,4.671,2.08,4.676,4.658,.005,2.577-2.08,4.671-4.658,4.676-2.577,.005,4.671-2.079-4.676-4.656h0"
-                              />
-                            </svg>
-                          </div>
-                          <input
-                            type="text"
-                            name="instagram"
-                            placeholder="https://www.instagram.com/flower-shop"
-                            value={shop?.branding?.socialLinks?.instagram ?? ""}
-                            onChange={(e) =>
-                              updateSocials("instagram", e.target.value)
-                            }
-                            className="px-2 py-1 border-2 rounded-xl w-full text-center sm:text-sm"
-                          />
-                        </div>
-                        <div className="w-full flex gap-4 justify-center sm:w-auto sm:gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setShowInsta(false)}
-                            className="w-full flex"
-                          >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
-                              X
-                            </span>
-                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
-                              Cancel Edit
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShop((prev) => ({
-                                ...prev,
-                                branding: {
-                                  ...prev.branding,
-                                  socialLinks: {
-                                    ...prev.branding.socialLinks,
-                                    instagram: "",
-                                  },
-                                },
-                              }));
-                            }}
-                            className="w-full flex"
-                          >
-                            <span className="hidden sm:block">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth="1.5"
-                                stroke="currentColor"
-                                className="size-6 text-red-500"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                />
-                              </svg>
-                            </span>
-                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
-                              Remove
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 sm:flex-row md:flex-col md:gap-1 xl:flex-row xl:gap-2 xl:justify-between">
-                        <div className="flex items-center gap-2 sm:w-full md:w-auto">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org"
-                              width="30"
-                              height="30"
-                              viewBox="0 0 32 32"
-                              className="rounded-lg"
-                            >
-                              <defs>
-                                <linearGradient
-                                  id="instagram-gradient"
-                                  x1="0%"
-                                  y1="100%"
-                                  x2="100%"
-                                  y2="0%"
-                                >
-                                  <stop offset="0%" stopColor="#f9ce34" />
-                                  <stop offset="50%" stopColor="#ee2a7b" />
-                                  <stop offset="100%" stopColor="#6228d7" />
-                                </linearGradient>
-                              </defs>
-
-                              {/* The Background Square */}
-                              <rect
-                                width="32"
-                                height="32"
-                                rx="8"
-                                fill="url(#instagram-gradient)"
-                              />
-
-                              {/* The White Instagram Path */}
-                              <path
-                                fill="white"
-                                d="M10.202,2.098c-1.49,.07-2.507,.308-3.396,.657-.92,.359-1.7,.84-2.477,1.619-.776,.779-1.254,1.56-1.61,2.481-.345,.891-.578,1.909-.644,3.4-.066,1.49-.08,1.97-.073,5.771s.024,4.278,.096,5.772c.071,1.489,.308,2.506,.657,3.396,.359,.92,.84,1.7,1.619,2.477,.779,.776,1.559,1.253,2.483,1.61,.89,.344,1.909,.579,3.399,.644,1.49,.065,1.97,.08,5.771,.073,3.801-.007,4.279-.024,5.773-.095s2.505-.309,3.395-.657c.92-.36,1.701-.84,2.477-1.62s1.254-1.561,1.609-2.483c.345-.89,.579-1.909,.644-3.398,.065-1.494,.081-1.971,.073-5.773s-.024-4.278-.095-5.771-.308-2.507-.657-3.397c-.36-.92-.84-1.7-1.619-2.477s-1.561-1.254-2.483-1.609c-.891-.345-1.909-.58-3.399-.644s-1.97-.081-5.772-.074-4.278,.024-5.771,.096m.164,25.309c-1.365-.059-2.106-.286-2.6-.476-.654-.252-1.12-.557-1.612-1.044s-.795-.955-1.05-1.608c-.192-.494-.423-1.234-.487-2.599-.069-1.475-.084-1.918-.092-5.656s.006-4.18,.071-5.656c.058-1.364,.286-2.106,.476-2.6,.252-.655,.556-1.12,1.044-1.612s.955-.795,1.608-1.05c.493-.193,1.234-.422,2.598-.487,1.476-.07,1.919-.084,5.656-.092,3.737-.008,4.181,.006,5.658,.071,1.364,.059,2.106,.285,2.599,.476,.654,.252,1.12,.555,1.612,1.044s.795,.954,1.051,1.609c.193,.492,.422,1.232,.486,2.597,.07,1.476,.086,1.919,.093,5.656,.007,3.737-.006,4.181-.071,5.656-.06,1.365-.286,2.106-.476,2.601-.252,.654-.556,1.12-1.045,1.612s-.955,.795-1.608,1.05c-.493,.192-1.234,.422-2.597,.487-1.476,.069-1.919,.084-5.657,.092s-4.18-.007-5.656-.071M21.779,8.517c.002,.928,.755,1.679,1.683,1.677s1.679-.755,1.677-1.683c-.002-.928-.755-1.679-1.683-1.677,0,0,0,0,0,0-.928,.002-1.678,.755-1.677,1.683m-12.967,7.496c.008,3.97,3.232,7.182,7.202,7.174s7.183-3.232,7.176-7.202c-.008-3.97-3.233-7.183-7.203-7.175s-7.182,3.233-7.174,7.203m2.522-.005c-.005-2.577,2.08-4.671,4.658-4.676,2.577-.005,4.671,2.08,4.676,4.658,.005,2.577-2.08,4.671-4.658,4.676-2.577,.005,4.671-2.079-4.676-4.656h0"
-                              />
-                            </svg>
-                          </div>
-                          <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop?.branding?.socialLinks?.instagram ||
-                              "Add Your Instagram Profile!"}
-                          </p>
-                        </div>
-                        <div className="w-full sm:w-auto md:w-full xl:w-auto">
-                          <button
-                            type="button"
-                            onClick={() => setShowInsta(true)}
-                            className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
-                          >
-                            {shop?.branding?.socialLinks?.instagram
-                              ? "Edit"
-                              : "Add"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Pinterest */}
-                  <div className="w-full">
-                    {showPin ? (
-                      <div className="w-full flex flex-cl items-center gap-2 sm:flex-row">
-                        <div className="w-full flex gap-2 items-center sm:gap-1">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              className="bg-[#BD081C] rounded-full w-full"
-                            >
-                              <path
-                                fill="white"
-                                d="M16,2C8.268,2,2,8.268,2,16c0,5.931,3.69,11.001,8.898,13.041-.122-1.108-.233-2.811,.049-4.02,.254-1.093,1.642-6.959,1.642-6.959,0,0-.419-.839-.419-2.079,0-1.947,1.128-3.4,2.533-3.4,1.194,0,1.771,.897,1.771,1.972,0,1.201-.765,2.997-1.16,4.661-.33,1.393,.699,2.53,2.073,2.53,2.488,0,4.401-2.624,4.401-6.411,0-3.352-2.409-5.696-5.848-5.696-3.983,0-6.322,2.988-6.322,6.076,0,1.203,.464,2.494,1.042,3.195,.114,.139,.131,.26,.097,.402-.106,.442-.342,1.393-.389,1.588-.061,.256-.203,.311-.468,.187-1.749-.814-2.842-3.37-2.842-5.424,0-4.416,3.209-8.472,9.25-8.472,4.857,0,8.631,3.461,8.631,8.086,0,4.825-3.042,8.708-7.265,8.708-1.419,0-2.752-.737-3.209-1.608,0,0-.702,2.673-.872,3.328-.316,1.216-1.169,2.74-1.74,3.67,1.31,.406,2.702,.624,4.145,.624,7.732,0,14-6.268,14-14S23.732,2,16,2Z"
-                              />
-                            </svg>
-                          </div>
-                          <input
-                            type="text"
-                            name="pinterest"
-                            placeholder="https://www.pinterest.com/flower-shop"
-                            value={shop?.branding?.socialLinks?.pinterest ?? ""}
-                            onChange={(e) =>
-                              updateSocials("pinterest", e.target.value)
-                            }
-                            className="px-2 py-1 border-2 rounded-xl w-full text-center sm:text-sm"
-                          />
-                        </div>
-                        <div className="w-full flex gap-4 justify-center sm:w-auto sm:gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setShowPin(false)}
-                            className="w-full flex"
-                          >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
-                              X
-                            </span>
-                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
-                              Cancel Edit
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShop((prev) => ({
-                                ...prev,
-                                branding: {
-                                  ...prev.branding,
-                                  socialLinks: {
-                                    ...prev.branding.socialLinks,
-                                    pinterest: "",
-                                  },
-                                },
-                              }));
-                            }}
-                            className="w-full flex"
-                          >
-                            <span className="hidden sm:block">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth="1.5"
-                                stroke="currentColor"
-                                className="size-6 text-red-500"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                />
-                              </svg>
-                            </span>
-                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
-                              Remove
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 sm:flex-row md:flex-col md:gap-1 xl:flex-row xl:gap-2 xl:justify-between">
-                        <div className="flex items-center gap-2 sm:w-full md:w-auto">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              className="bg-[#BD081C] rounded-full w-full"
-                            >
-                              <path
-                                fill="white"
-                                d="M16,2C8.268,2,2,8.268,2,16c0,5.931,3.69,11.001,8.898,13.041-.122-1.108-.233-2.811,.049-4.02,.254-1.093,1.642-6.959,1.642-6.959,0,0-.419-.839-.419-2.079,0-1.947,1.128-3.4,2.533-3.4,1.194,0,1.771,.897,1.771,1.972,0,1.201-.765,2.997-1.16,4.661-.33,1.393,.699,2.53,2.073,2.53,2.488,0,4.401-2.624,4.401-6.411,0-3.352-2.409-5.696-5.848-5.696-3.983,0-6.322,2.988-6.322,6.076,0,1.203,.464,2.494,1.042,3.195,.114,.139,.131,.26,.097,.402-.106,.442-.342,1.393-.389,1.588-.061,.256-.203,.311-.468,.187-1.749-.814-2.842-3.37-2.842-5.424,0-4.416,3.209-8.472,9.25-8.472,4.857,0,8.631,3.461,8.631,8.086,0,4.825-3.042,8.708-7.265,8.708-1.419,0-2.752-.737-3.209-1.608,0,0-.702,2.673-.872,3.328-.316,1.216-1.169,2.74-1.74,3.67,1.31,.406,2.702,.624,4.145,.624,7.732,0,14-6.268,14-14S23.732,2,16,2Z"
-                              />
-                            </svg>
-                          </div>
-                          <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop?.branding?.socialLinks?.pinterest ||
-                              "Add Your Pinterest Profile!"}
-                          </p>
-                        </div>
-                        <div className="w-full sm:w-auto md:w-full xl:w-auto">
-                          <button
-                            type="button"
-                            onClick={() => setShowPin(true)}
-                            className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
-                          >
-                            {shop?.branding?.socialLinks?.pinterest
-                              ? "Edit"
-                              : "Add"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* TikTok */}
-                  <div className="w-full">
-                    {showTik ? (
-                      <div className="w-full flex flex-cl items-center gap-2 sm:flex-row">
-                        <div className="w-full flex gap-2 items-center sm:gap-1">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              className="w-full"
-                            >
-                              <path d="M24.562,7.613c-1.508-.983-2.597-2.557-2.936-4.391-.073-.396-.114-.804-.114-1.221h-4.814l-.008,19.292c-.081,2.16-1.859,3.894-4.039,3.894-.677,0-1.315-.169-1.877-.465-1.288-.678-2.169-2.028-2.169-3.582,0-2.231,1.815-4.047,4.046-4.047,.417,0,.816,.069,1.194,.187v-4.914c-.391-.053-.788-.087-1.194-.087-4.886,0-8.86,3.975-8.86,8.86,0,2.998,1.498,5.65,3.783,7.254,1.439,1.01,3.19,1.606,5.078,1.606,4.886,0,8.86-3.975,8.86-8.86V11.357c1.888,1.355,4.201,2.154,6.697,2.154v-4.814c-1.345,0-2.597-.4-3.647-1.085Z"></path>
-                            </svg>
-                          </div>
-                          <input
-                            type="text"
-                            name="tiktok"
-                            placeholder="https://www.tiktok.com/flower-shop"
-                            value={shop?.branding?.socialLinks?.tiktok ?? ""}
-                            onChange={(e) =>
-                              updateSocials("tiktok", e.target.value)
-                            }
-                            className="px-2 py-1 border-2 rounded-xl w-full text-center sm:text-sm"
-                          />
-                        </div>
-                        <div className="w-full flex gap-4 justify-center sm:w-auto sm:gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setShowTik(false)}
-                            className="w-full flex"
-                          >
-                            <span className="hidden text-red-500 hover:text-red-600 text-lg sm:block">
-                              X
-                            </span>
-                            <span className="text-red-500 bg-transparent border border-red-500 hover:bg-red-600 hover:border-none transition-all px-4 py-1 rounded-md w-full sm:hidden">
-                              Cancel Edit
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShop((prev) => ({
-                                ...prev,
-                                branding: {
-                                  ...prev.branding,
-                                  socialLinks: {
-                                    ...prev.branding.socialLinks,
-                                    tiktok: "",
-                                  },
-                                },
-                              }));
-                            }}
-                            className="w-full flex"
-                          >
-                            <span className="hidden sm:block">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth="1.5"
-                                stroke="currentColor"
-                                className="size-6 text-red-500"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                />
-                              </svg>
-                            </span>
-                            <span className="text-white bg-red-500 hover:bg-red-600 transition-all px-4 py-1 rounded-md border border-red-500 hover:border-red-600 w-full sm:hidden">
-                              Remove
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 sm:flex-row md:flex-col md:gap-1 xl:flex-row xl:gap-2 xl:justify-between">
-                        <div className="flex items-center gap-2 sm:w-full md:w-auto">
-                          <div className="w-10 h-10 p-1">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              className="w-full"
-                            >
-                              <path d="M24.562,7.613c-1.508-.983-2.597-2.557-2.936-4.391-.073-.396-.114-.804-.114-1.221h-4.814l-.008,19.292c-.081,2.16-1.859,3.894-4.039,3.894-.677,0-1.315-.169-1.877-.465-1.288-.678-2.169-2.028-2.169-3.582,0-2.231,1.815-4.047,4.046-4.047,.417,0,.816,.069,1.194,.187v-4.914c-.391-.053-.788-.087-1.194-.087-4.886,0-8.86,3.975-8.86,8.86,0,2.998,1.498,5.65,3.783,7.254,1.439,1.01,3.19,1.606,5.078,1.606,4.886,0,8.86-3.975,8.86-8.86V11.357c1.888,1.355,4.201,2.154,6.697,2.154v-4.814c-1.345,0-2.597-.4-3.647-1.085Z"></path>
-                            </svg>
-                          </div>
-                          <p className="text-black opacity-75 font-semibold md:text-sm">
-                            {shop?.branding?.socialLinks?.tiktok ||
-                              "Add Your TikTok Profile!"}
-                          </p>
-                        </div>
-                        <div className="w-full sm:w-auto md:w-full xl:w-auto">
-                          <button
-                            type="button"
-                            onClick={() => setShowTik(true)}
-                            className="uppercase font-medium bg-emerald-500 hover:bg-emerald-700 transition-colors text-white w-full py-1 rounded-md sm:w-auto sm:px-2 md:w-full md:px-0 xl:px-2"
-                          >
-                            {shop?.branding?.socialLinks?.tiktok
-                              ? "Edit"
-                              : "Add"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 text-left md:col-span-2 lg:col-span-1">
+                  <p className="font-bold text-purple-900">Social media is shared now.</p>
+                  <p className="mt-1 text-sm leading-6 text-purple-800">
+                    Manage Facebook, Instagram, Pinterest, and TikTok in the
+                    Shared Social Media section above. Those same links are used
+                    on your GetBloomDirect public profile and BloomWebsite.
+                  </p>
                 </div>
 
                 {/* Buttons */}

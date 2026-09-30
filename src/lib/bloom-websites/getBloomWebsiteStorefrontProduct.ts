@@ -8,6 +8,12 @@ import BloomWebsiteProduct from "@/models/BloomWebsiteProduct";
 import Shop from "@/models/Shop";
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
 import {
+  normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteTrustPoints,
+} from "@/lib/bloom-websites/storefront-content";
+import { DEFAULT_BLOOM_WEBSITE_HERO_SUBHEADLINE } from "@/lib/bloom-websites/branding-copy";
+import {
   getBloomWebsiteConfiguredDeliveryZipCodes,
   normalizeBloomWebsiteBusinessHours,
   normalizeBloomWebsiteLocalSeoContent,
@@ -51,7 +57,10 @@ type WebsiteLean = {
     heroHeadline?: string;
     heroSubheadline?: string;
     heroImage?: string;
+    heroInfoCard?: unknown;
+    trustPoints?: unknown;
     aboutText?: string;
+    sectionContent?: unknown;
   };
 
   seo?: {
@@ -616,11 +625,23 @@ export async function getBloomWebsiteStorefrontProduct(
 
         heroSubheadline:
           website.homepage?.heroSubheadline ||
-          "Fresh flowers for life's meaningful moments, designed and delivered by your local florist.",
+          DEFAULT_BLOOM_WEBSITE_HERO_SUBHEADLINE,
 
         heroImage: website.homepage?.heroImage || "",
 
+        heroInfoCard: normalizeBloomWebsiteHeroInfoCardContent(
+          website.homepage?.heroInfoCard,
+        ),
+
+        trustPoints: normalizeBloomWebsiteTrustPoints(
+          website.homepage?.trustPoints,
+        ),
+
         aboutText: website.homepage?.aboutText || "",
+
+        sectionContent: normalizeBloomWebsiteHomepageSectionContent(
+          website.homepage?.sectionContent,
+        ),
       },
 
       seo: {

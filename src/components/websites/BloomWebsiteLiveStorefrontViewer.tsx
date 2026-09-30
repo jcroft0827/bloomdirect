@@ -2,6 +2,11 @@
 
 import { ExternalLink, Loader2, Monitor, Smartphone } from "lucide-react";
 import Link from "next/link";
+import type {
+  BloomWebsiteHeroInfoCardContent,
+  BloomWebsiteHomepageSectionContent,
+  BloomWebsiteTrustPoint,
+} from "@/types/bloom-website";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type PreviewMode = "desktop" | "mobile";
@@ -12,6 +17,16 @@ type Props = {
   logo: string;
   tagline: string;
   heroHeadline: string;
+  heroSubheadline: string;
+  heroInfoCard: BloomWebsiteHeroInfoCardContent;
+  trustPoints: BloomWebsiteTrustPoint[];
+  socialLinks: {
+    facebook: string;
+    instagram: string;
+    pinterest: string;
+    tiktok: string;
+  };
+  sectionContent: BloomWebsiteHomepageSectionContent;
   primaryColor: string;
   accentColor: string;
   heroImage: string;
@@ -40,6 +55,11 @@ function buildPreviewUrl({
   logo,
   tagline,
   heroHeadline,
+  heroSubheadline,
+  heroInfoCard,
+  trustPoints,
+  socialLinks,
+  sectionContent,
   primaryColor,
   accentColor,
   heroImage,
@@ -52,6 +72,11 @@ function buildPreviewUrl({
   params.set("logo", logo);
   params.set("tagline", tagline);
   params.set("heroHeadline", heroHeadline);
+  params.set("heroSubheadline", heroSubheadline);
+  params.set("heroInfoCard", JSON.stringify(heroInfoCard));
+  params.set("trustPoints", JSON.stringify(trustPoints));
+  params.set("socialLinks", JSON.stringify(socialLinks));
+  params.set("sectionContent", JSON.stringify(sectionContent));
   params.set("primaryColor", primaryColor);
   params.set("accentColor", accentColor);
   params.set("heroImage", heroImage);
@@ -74,6 +99,11 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
       props.logo,
       props.tagline,
       props.heroHeadline,
+      props.heroSubheadline,
+      props.heroInfoCard,
+      props.trustPoints,
+      props.socialLinks,
+      props.sectionContent,
       props.primaryColor,
       props.accentColor,
       props.heroImage,

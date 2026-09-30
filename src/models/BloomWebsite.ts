@@ -276,11 +276,180 @@ const bloomWebsiteSchema = new Schema(
         default: "",
       },
 
+      heroInfoCard: {
+        eyebrow: {
+          type: String,
+          trim: true,
+          maxlength: 80,
+          default: "",
+        },
+        heading: {
+          type: String,
+          trim: true,
+          maxlength: 120,
+          default: "",
+        },
+        description: {
+          type: String,
+          trim: true,
+          maxlength: 320,
+          default: "",
+        },
+      },
+
+      trustPoints: {
+        type: [
+          {
+            title: {
+              type: String,
+              trim: true,
+              maxlength: 100,
+              default: "",
+            },
+            description: {
+              type: String,
+              trim: true,
+              maxlength: 260,
+              default: "",
+            },
+          },
+        ],
+        default: [],
+      },
+
       aboutText: {
         type: String,
         trim: true,
         maxlength: 3000,
         default: "",
+      },
+
+      sectionContent: {
+        occasions: {
+          eyebrow: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "",
+          },
+          heading: {
+            type: String,
+            trim: true,
+            maxlength: 140,
+            default: "",
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: 420,
+            default: "",
+          },
+        },
+
+        featured: {
+          eyebrow: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "",
+          },
+          heading: {
+            type: String,
+            trim: true,
+            maxlength: 140,
+            default: "",
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: 420,
+            default: "",
+          },
+        },
+
+        about: {
+          eyebrow: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "",
+          },
+          heading: {
+            type: String,
+            trim: true,
+            maxlength: 140,
+            default: "",
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: 420,
+            default: "",
+          },
+        },
+
+        trust: {
+          eyebrow: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "",
+          },
+          heading: {
+            type: String,
+            trim: true,
+            maxlength: 140,
+            default: "",
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: 420,
+            default: "",
+          },
+        },
+
+        delivery: {
+          eyebrow: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "",
+          },
+          heading: {
+            type: String,
+            trim: true,
+            maxlength: 140,
+            default: "",
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: 420,
+            default: "",
+          },
+        },
+
+        contact: {
+          eyebrow: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "",
+          },
+          heading: {
+            type: String,
+            trim: true,
+            maxlength: 140,
+            default: "",
+          },
+          description: {
+            type: String,
+            trim: true,
+            maxlength: 420,
+            default: "",
+          },
+        },
       },
     },
 

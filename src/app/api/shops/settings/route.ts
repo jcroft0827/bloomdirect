@@ -231,6 +231,22 @@ export async function PATCH(req: Request) {
         break;
       }
 
+      case "socialLinks": {
+        const existingBranding = shop.branding
+          ? shop.branding.toObject()
+          : {};
+
+        shop.branding = {
+          ...existingBranding,
+          socialLinks: {
+            ...(existingBranding.socialLinks || {}),
+            ...(data.socialLinks || {}),
+          },
+        };
+
+        break;
+      }
+
       case "branding": {
         const existingBranding = shop.branding
           ? shop.branding.toObject()

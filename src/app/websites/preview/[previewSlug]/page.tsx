@@ -8,10 +8,14 @@ import authOptions from "@/lib/auth";
 import { getBloomWebsiteStorefront } from "@/lib/bloom-websites/getBloomWebsiteStorefront";
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
 import {
+  normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteTrustPoints,
+} from "@/lib/bloom-websites/storefront-content";
+import {
   buildBloomWebsiteHeroHeadline,
   buildBloomWebsiteHeroSubheadline,
   isBloomWebsiteGeneratedHeroHeadline,
-  isBloomWebsiteGeneratedHeroSubheadline,
 } from "@/lib/bloom-websites/branding-copy";
 import BloomClassicTheme from "@/components/websites/themes/BloomClassicTheme";
 import WebsitePreviewBar from "@/components/websites/WebsitePreviewBar";
@@ -32,6 +36,11 @@ type BuilderPreviewSearchParams = {
   logo?: string | string[];
   tagline?: string | string[];
   heroHeadline?: string | string[];
+  heroSubheadline?: string | string[];
+  heroInfoCard?: string | string[];
+  trustPoints?: string | string[];
+  socialLinks?: string | string[];
+  sectionContent?: string | string[];
   primaryColor?: string | string[];
   accentColor?: string | string[];
   heroImage?: string | string[];
@@ -72,6 +81,26 @@ function applyBuilderPreviewOverrides(
   const logoOverride = clamp(getParam(searchParams.logo), 4096);
   const taglineOverride = clamp(getParam(searchParams.tagline), 180);
   const heroHeadlineOverride = clamp(getParam(searchParams.heroHeadline), 160);
+  const heroSubheadlineOverride = clamp(
+    getParam(searchParams.heroSubheadline),
+    300,
+  );
+  const heroInfoCardOverride = clamp(
+    getParam(searchParams.heroInfoCard),
+    3000,
+  );
+  const trustPointsOverride = clamp(
+    getParam(searchParams.trustPoints),
+    6000,
+  );
+  const socialLinksOverride = clamp(
+    getParam(searchParams.socialLinks),
+    6000,
+  );
+  const sectionContentOverride = clamp(
+    getParam(searchParams.sectionContent),
+    6000,
+  );
   const primaryColorOverride = clamp(getParam(searchParams.primaryColor), 32);
   const accentColorOverride = clamp(getParam(searchParams.accentColor), 32);
   const heroImageOverride = clamp(getParam(searchParams.heroImage), 4096);
@@ -85,12 +114,6 @@ function applyBuilderPreviewOverrides(
     isBloomWebsiteGeneratedHeroHeadline(
       storefront.website.homepage.heroHeadline,
       storefront.shop.businessName,
-    );
-  const previousTagline = storefront.website.storefrontTheme.tagline;
-  const previousSubheadlineWasGenerated =
-    isBloomWebsiteGeneratedHeroSubheadline(
-      storefront.website.homepage.heroSubheadline,
-      previousTagline,
     );
 
   const siteName =
@@ -124,6 +147,55 @@ function applyBuilderPreviewOverrides(
     backgroundStyle: storefront.website.storefrontTheme.backgroundStyle,
   });
 
+  let sectionContent = storefront.website.homepage.sectionContent;
+
+  if (sectionContentOverride !== undefined) {
+    try {
+      sectionContent = normalizeBloomWebsiteHomepageSectionContent(
+        JSON.parse(sectionContentOverride),
+      );
+    } catch {
+      sectionContent = storefront.website.homepage.sectionContent;
+    }
+  }
+
+  let heroInfoCard = storefront.website.homepage.heroInfoCard;
+  if (heroInfoCardOverride !== undefined) {
+    try {
+      heroInfoCard = normalizeBloomWebsiteHeroInfoCardContent(
+        JSON.parse(heroInfoCardOverride),
+      );
+    } catch {
+      heroInfoCard = storefront.website.homepage.heroInfoCard;
+    }
+  }
+
+  let trustPoints = storefront.website.homepage.trustPoints;
+  if (trustPointsOverride !== undefined) {
+    try {
+      trustPoints = normalizeBloomWebsiteTrustPoints(
+        JSON.parse(trustPointsOverride),
+      );
+    } catch {
+      trustPoints = storefront.website.homepage.trustPoints;
+    }
+  }
+
+  let socialLinks = storefront.shop.socialLinks;
+  if (socialLinksOverride !== undefined) {
+    try {
+      const parsed = JSON.parse(socialLinksOverride) as Record<string, unknown>;
+      socialLinks = {
+        facebook: typeof parsed.facebook === "string" ? parsed.facebook.slice(0, 2000) : "",
+        instagram: typeof parsed.instagram === "string" ? parsed.instagram.slice(0, 2000) : "",
+        pinterest: typeof parsed.pinterest === "string" ? parsed.pinterest.slice(0, 2000) : "",
+        tiktok: typeof parsed.tiktok === "string" ? parsed.tiktok.slice(0, 2000) : "",
+      };
+    } catch {
+      socialLinks = storefront.shop.socialLinks;
+    }
+  }
+
   return {
     ...storefront,
     website: {
@@ -146,14 +218,22 @@ function applyBuilderPreviewOverrides(
               ? buildBloomWebsiteHeroHeadline(siteName)
               : storefront.website.homepage.heroHeadline,
         heroSubheadline:
-          taglineOverride !== undefined && previousSubheadlineWasGenerated
-            ? buildBloomWebsiteHeroSubheadline(storefrontTheme.tagline)
+          heroSubheadlineOverride !== undefined
+            ? heroSubheadlineOverride.trim() ||
+              buildBloomWebsiteHeroSubheadline("")
             : storefront.website.homepage.heroSubheadline,
         heroImage:
           heroImageOverride === undefined
             ? storefront.website.homepage.heroImage
             : heroImageOverride.trim(),
+        heroInfoCard,
+        trustPoints,
+        sectionContent,
       },
+    },
+    shop: {
+      ...storefront.shop,
+      socialLinks,
     },
   } satisfies BloomWebsiteStorefront;
 }

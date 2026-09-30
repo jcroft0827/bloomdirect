@@ -3,7 +3,15 @@ import { notFound, redirect } from "next/navigation";
 
 import BloomWebsiteBrandingEditor from "@/components/websites/BloomWebsiteBrandingEditor";
 import authOptions from "@/lib/auth";
-import { buildBloomWebsiteHeroHeadline } from "@/lib/bloom-websites/branding-copy";
+import {
+  buildBloomWebsiteHeroHeadline,
+  isBloomWebsiteGeneratedHeroSubheadline,
+} from "@/lib/bloom-websites/branding-copy";
+import {
+  normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteTrustPoints,
+} from "@/lib/bloom-websites/storefront-content";
 import {
   DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
@@ -33,12 +41,24 @@ type WebsiteLean = {
 
   homepage?: {
     heroHeadline?: string;
+    heroSubheadline?: string;
     heroImage?: string;
+    heroInfoCard?: unknown;
+    trustPoints?: unknown;
+    sectionContent?: unknown;
   };
 };
 
 type ShopLean = {
   isSuspended?: boolean;
+  branding?: {
+    socialLinks?: {
+      facebook?: string;
+      instagram?: string;
+      pinterest?: string;
+      tiktok?: string;
+    };
+  };
 };
 
 export default async function BloomWebsiteBrandingPage() {
@@ -65,13 +85,17 @@ export default async function BloomWebsiteBrandingPage() {
           "branding.accentColor",
           "branding.backgroundStyle",
           "homepage.heroHeadline",
+          "homepage.heroSubheadline",
           "homepage.heroImage",
+          "homepage.heroInfoCard",
+          "homepage.trustPoints",
+          "homepage.sectionContent",
         ].join(" "),
       )
       .lean<WebsiteLean | null>(),
 
     Shop.findById(session.user.id)
-      .select("isSuspended")
+      .select("isSuspended branding.socialLinks")
       .lean<ShopLean | null>(),
   ]);
 
@@ -115,7 +139,33 @@ export default async function BloomWebsiteBrandingPage() {
           website.homepage?.heroHeadline ||
           buildBloomWebsiteHeroHeadline(website.siteName),
 
+        heroSubheadline: isBloomWebsiteGeneratedHeroSubheadline(
+          website.homepage?.heroSubheadline,
+          theme.tagline,
+        )
+          ? ""
+          : website.homepage?.heroSubheadline || "",
+
         heroImage: website.homepage?.heroImage || "",
+
+        heroInfoCard: normalizeBloomWebsiteHeroInfoCardContent(
+          website.homepage?.heroInfoCard,
+        ),
+
+        trustPoints: normalizeBloomWebsiteTrustPoints(
+          website.homepage?.trustPoints,
+        ),
+
+        socialLinks: {
+          facebook: shop.branding?.socialLinks?.facebook || "",
+          instagram: shop.branding?.socialLinks?.instagram || "",
+          pinterest: shop.branding?.socialLinks?.pinterest || "",
+          tiktok: shop.branding?.socialLinks?.tiktok || "",
+        },
+
+        sectionContent: normalizeBloomWebsiteHomepageSectionContent(
+          website.homepage?.sectionContent,
+        ),
       }}
       disabled={Boolean(shop.isSuspended)}
     />
