@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ClipboardList, Code2, CreditCard, MapPin, Store, UserRound } from "lucide-react";
+import { ArrowLeft, ClipboardList, CreditCard, MapPin, Store, UserRound } from "lucide-react";
 
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
@@ -154,17 +154,6 @@ export default async function BloomWebsiteOrderDetailPage({
               />
             </div>
 
-            {order.payment.status === "paid" && (
-              <a
-                href={`/api/websites/orders/${String(order._id)}/tfpos-preview`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-2 text-xs font-black text-purple-800 transition hover:border-purple-300 hover:bg-purple-100"
-              >
-                <Code2 size={14} />
-                Preview TFPOS XML
-              </a>
-            )}
           </div>
         </div>
       </section>

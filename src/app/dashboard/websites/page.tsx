@@ -71,7 +71,7 @@ export default async function WebsitesPage() {
    */
   if (website) {
     return (
-      <div className="mx-auto max-w-6xl space-y-8">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-purple-600">
             BloomWebsites
@@ -81,10 +81,10 @@ export default async function WebsitesPage() {
             <div>
               <h1 className="text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">
                 {website.status === "live"
-                  ? "Your website is live."
+                  ? "Your website is live and ready to grow."
                   : website.status === "paused"
                     ? "Your website is paused."
-                    : "Your website is ready to grow."}
+                    : "Your website is ready when you are."}
               </h1>
 
               <p className="mt-3 max-w-2xl text-base leading-7 text-gray-600">
@@ -92,7 +92,7 @@ export default async function WebsitesPage() {
                   ? "Your BloomWebsite is public. Keep managing products, branding, and launch settings from here."
                   : website.status === "paused"
                     ? "Your public storefront is temporarily unavailable. Review launch readiness before resuming it."
-                    : "Your BloomWebsite has been created. Preview your storefront, then continue building it until you&apos;re ready to go live."}
+                    : "Your BloomWebsite has been created. Preview your storefront, then continue building it until you're ready to go live."}
               </p>
             </div>
 
@@ -108,60 +108,65 @@ export default async function WebsitesPage() {
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-purple-100 bg-white shadow-sm">
-          <div className="bg-gradient-to-br from-purple-950 via-purple-800 to-purple-700 p-7 text-white sm:p-9">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15">
-              <Globe2 size={28} />
-            </div>
+          <div className="bg-gradient-to-br from-purple-950 via-purple-800 to-purple-700 p-6 text-white sm:p-7 lg:p-8">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,auto)] lg:items-center lg:gap-8">
+              <div className="min-w-0">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
+                  <Globe2 size={25} />
+                </div>
 
-            <h2 className="mt-6 text-2xl font-black sm:text-3xl">
-              {website.siteName}
-            </h2>
+                <h2 className="mt-5 text-2xl font-black sm:text-3xl">
+                  {website.siteName}
+                </h2>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-purple-100 sm:text-base">
-              Your personalized storefront is waiting. This preview is private
-              to your BloomWebsite workflow until you complete setup and launch.
-            </p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-purple-100 sm:text-base">
+                  {website.status === "live"
+                    ? "Your public storefront is live. Use these shortcuts to preview it, manage launch settings, or update the look of your site."
+                    : "Your personalized storefront is waiting. Preview it as you build, then launch when everything feels right."}
+                </p>
+              </div>
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              {website.status === "live" && website.customDomain ? (
-                <a
-                  href={`https://${website.customDomain}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-800 transition hover:bg-purple-50"
-                >
-                  View Live Website
-                  <ExternalLink size={17} />
-                </a>
-              ) : (
+              <div className="grid gap-2.5 sm:grid-cols-3 lg:min-w-[230px] lg:grid-cols-1">
+                {website.status === "live" && website.customDomain ? (
+                  <a
+                    href={`https://${website.customDomain}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-purple-800 transition hover:bg-purple-50"
+                  >
+                    View Live Website
+                    <ExternalLink size={16} />
+                  </a>
+                ) : (
+                  <Link
+                    href={`/websites/preview/${website.previewSlug}`}
+                    className="inline-flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-purple-800 transition hover:bg-purple-50"
+                  >
+                    Preview Website
+                    <ExternalLink size={16} />
+                  </Link>
+                )}
+
                 <Link
-                  href={`/websites/preview/${website.previewSlug}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-800 transition hover:bg-purple-50"
+                  href={`/dashboard/websites/launch?website=${website._id.toString()}`}
+                  className="inline-flex items-center justify-between gap-3 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15"
                 >
-                  Preview Website
-                  <ExternalLink size={17} />
+                  {website.status === "live"
+                    ? "Manage Launch"
+                    : website.status === "paused"
+                      ? "Review & Resume"
+                      : "Go Live"}
+                  <ArrowRight size={16} />
                 </Link>
-              )}
 
-              <Link
-                href={`/dashboard/websites/launch?website=${website._id.toString()}`}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/15"
-              >
-                {website.status === "live"
-                  ? "Manage Launch"
-                  : website.status === "paused"
-                    ? "Review & Resume"
-                    : "Go Live"}
-                <ArrowRight size={17} />
-              </Link>
-
-              <Link
-                href="/dashboard/websites/branding"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/15"
-              >
-                Edit Branding
-                <ArrowRight size={17} />
-              </Link>
+                <Link
+                  href="/dashboard/websites/branding"
+                  className="inline-flex items-center justify-between gap-3 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15"
+                >
+                  Edit Branding
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
             </div>
           </div>
 

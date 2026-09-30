@@ -5,9 +5,31 @@
 import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import toast from "react-hot-toast";
-import { ChevronDown } from "lucide-react";
+import {
+  BarChart3,
+  BookOpenText,
+  Cable,
+  CircleHelp,
+  FileText,
+  Globe2,
+  LayoutDashboard,
+  LifeBuoy,
+  LogOut,
+  Network,
+  Package2,
+  Palette,
+  PlugZap,
+  PlusCircle,
+  Rocket,
+  Search,
+  Settings,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  UserRound,
+} from "lucide-react";
 
 interface MonthlySendUsage {
   isPro: boolean;
@@ -25,6 +47,14 @@ interface NavLinksProps {
   role: string;
 }
 
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="px-3 pb-1 pt-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 first:pt-0">
+      {children}
+    </p>
+  );
+}
+
 export const NavLinks = ({
   slug,
   pro,
@@ -32,15 +62,9 @@ export const NavLinks = ({
   role,
   onClose,
 }: NavLinksProps) => {
-  const ordersPathIsActive =
-    pathname === "/dashboard/new-order" ||
-    pathname === "/dashboard/incoming" ||
-    pathname.startsWith("/dashboard/orders/") ||
-    pathname.startsWith("/orders/");
-
-  const websitesPathIsActive =
-    pathname === "/dashboard/websites" ||
-    pathname.startsWith("/dashboard/websites/");
+  const [sendUsage, setSendUsage] = useState<MonthlySendUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const router = useRouter();
 
   const websiteOrdersPathIsActive =
     pathname === "/dashboard/websites/orders" ||
@@ -50,38 +74,6 @@ export const NavLinks = ({
     pathname === "/dashboard/websites/products" ||
     pathname.startsWith("/dashboard/websites/products/") ||
     pathname.startsWith("/dashboard/websites/addons/");
-
-  const shopPathIsActive =
-    pathname === `/dashboard/shops/${slug}` ||
-    pathname === "/dashboard/reports" ||
-    pathname === "/dashboard/pos-integration" ||
-    pathname === "/dashboard/settings";
-
-  const [ordersOpen, setOrdersOpen] = useState(ordersPathIsActive);
-  const [websitesOpen, setWebsitesOpen] = useState(websitesPathIsActive);
-  const [shopOpen, setShopOpen] = useState(shopPathIsActive);
-  const [sendUsage, setSendUsage] = useState<MonthlySendUsage | null>(null);
-  const [usageLoading, setUsageLoading] = useState(true);
-
-  const router = useRouter();
-
-  useEffect(() => {
-    if (ordersPathIsActive) {
-      setOrdersOpen(true);
-    }
-  }, [ordersPathIsActive]);
-
-  useEffect(() => {
-    if (websitesPathIsActive) {
-      setWebsitesOpen(true);
-    }
-  }, [websitesPathIsActive]);
-
-  useEffect(() => {
-    if (shopPathIsActive) {
-      setShopOpen(true);
-    }
-  }, [shopPathIsActive]);
 
   useEffect(() => {
     let mounted = true;
@@ -117,30 +109,19 @@ export const NavLinks = ({
   }, []);
 
   const navItemClass = (active: boolean) =>
-    `block rounded-lg p-3 transition-colors ${
+    `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
       active
-        ? "bg-emerald-100 font-medium text-emerald-700"
-        : "text-gray-600 hover:bg-gray-100"
+        ? "bg-emerald-100 text-emerald-800"
+        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
     }`;
 
-  const childNavItemClass = (active: boolean) =>
-    `block rounded-lg px-3 py-2.5 text-sm transition-colors ${
-      active
-        ? "bg-emerald-100 font-medium text-emerald-700"
-        : "text-gray-600 hover:bg-gray-100"
-    }`;
+  const iconClass = "h-[18px] w-[18px] shrink-0";
 
-  const groupButtonClass = (active: boolean) =>
-    `flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors ${
-      active
-        ? "font-medium text-emerald-700"
-        : "text-gray-600 hover:bg-gray-100"
-    }`;
-
-  const logOut = () => {
-    signOut({ redirect: false });
+  const logOut = async () => {
+    await signOut({ redirect: false });
     onClose?.();
     router.push("/");
+    router.refresh();
   };
 
   const handleSendLimitReached = () => {
@@ -156,281 +137,236 @@ export const NavLinks = ({
   };
 
   return (
-    <>
-      <nav className="space-y-2">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
         <Link
           href="/dashboard"
           onClick={onClose}
           className={navItemClass(pathname === "/dashboard")}
         >
-          Home
+          <LayoutDashboard className={iconClass} aria-hidden="true" />
+          <span>Dashboard</span>
         </Link>
 
-        <div>
+        <SectionLabel>GetBloomDirect</SectionLabel>
+
+        {usageLoading ? (
+          <span className="flex cursor-wait items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400">
+            <PlusCircle className={iconClass} aria-hidden="true" />
+            Create Order
+          </span>
+        ) : sendUsage?.allowed !== false ? (
+          <Link
+            href="/dashboard/new-order"
+            onClick={onClose}
+            className={navItemClass(pathname === "/dashboard/new-order")}
+          >
+            <PlusCircle className={iconClass} aria-hidden="true" />
+            <span>Create Order</span>
+          </Link>
+        ) : (
           <button
             type="button"
-            onClick={() => setOrdersOpen((current) => !current)}
-            className={groupButtonClass(ordersPathIsActive)}
-            aria-expanded={ordersOpen}
-            aria-controls="orders-navigation"
+            onClick={handleSendLimitReached}
+            className={navItemClass(false)}
           >
-            <span>Orders</span>
-            <ChevronDown
-              size={18}
-              className={`transition-transform duration-200 ${
-                ordersOpen ? "rotate-180" : ""
-              }`}
-            />
+            <PlusCircle className={iconClass} aria-hidden="true" />
+            <span>Create Order</span>
           </button>
+        )}
 
-          {ordersOpen && (
-            <div
-              id="orders-navigation"
-              className="ml-3 mt-1 space-y-1 border-l border-gray-200 pl-3"
-            >
-              {usageLoading ? (
-                <span className="block cursor-wait rounded-lg px-3 py-2.5 text-sm text-gray-400">
-                  Create Order
-                </span>
-              ) : sendUsage?.allowed !== false ? (
-                <Link
-                  href="/dashboard/new-order"
-                  onClick={onClose}
-                  className={childNavItemClass(
-                    pathname === "/dashboard/new-order",
-                  )}
-                >
-                  Create Order
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSendLimitReached}
-                  className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-100"
-                >
-                  Create Order
-                </button>
-              )}
-
-              <Link
-                href="/dashboard/incoming"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/incoming" ||
-                    pathname.startsWith("/dashboard/orders/") ||
-                    pathname.startsWith("/orders/"),
-                )}
-              >
-                View Orders
-              </Link>
-            </div>
+        <Link
+          href="/dashboard/incoming"
+          onClick={onClose}
+          className={navItemClass(
+            pathname === "/dashboard/incoming" ||
+              pathname.startsWith("/dashboard/orders/") ||
+              pathname.startsWith("/orders/"),
           )}
-        </div>
+        >
+          <FileText className={iconClass} aria-hidden="true" />
+          <span>Orders</span>
+        </Link>
 
         <Link
           href="/dashboard/network"
           onClick={onClose}
           className={navItemClass(pathname === "/dashboard/network")}
         >
-          Network
+          <Network className={iconClass} aria-hidden="true" />
+          <span>Network</span>
         </Link>
 
-        <div>
-          <button
-            type="button"
-            onClick={() => setWebsitesOpen((current) => !current)}
-            className={groupButtonClass(websitesPathIsActive)}
-            aria-expanded={websitesOpen}
-            aria-controls="bloomwebsites-navigation"
-          >
-            <span>BloomWebsites</span>
-            <ChevronDown
-              size={18}
-              className={`transition-transform duration-200 ${
-                websitesOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
+        <SectionLabel>BloomWebsites</SectionLabel>
 
-          {websitesOpen && (
-            <div
-              id="bloomwebsites-navigation"
-              className="ml-3 mt-1 space-y-1 border-l border-gray-200 pl-3"
-            >
-              <Link
-                href="/dashboard/websites"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites",
-                )}
-              >
-                Overview
-              </Link>
+        <Link
+          href="/dashboard/websites"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites")}
+        >
+          <Globe2 className={iconClass} aria-hidden="true" />
+          <span>Overview</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/orders"
-                onClick={onClose}
-                className={childNavItemClass(websiteOrdersPathIsActive)}
-              >
-                Orders
-              </Link>
+        <Link
+          href="/dashboard/websites/orders"
+          onClick={onClose}
+          className={navItemClass(websiteOrdersPathIsActive)}
+        >
+          <ShoppingBag className={iconClass} aria-hidden="true" />
+          <span>Orders</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/products"
-                onClick={onClose}
-                className={childNavItemClass(websiteCatalogPathIsActive)}
-              >
-                Catalog
-              </Link>
+        <Link
+          href="/dashboard/websites/products"
+          onClick={onClose}
+          className={navItemClass(websiteCatalogPathIsActive)}
+        >
+          <Package2 className={iconClass} aria-hidden="true" />
+          <span>Catalog</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/reports"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/reports",
-                )}
-              >
-                Reports
-              </Link>
+        <Link
+          href="/dashboard/websites/reports"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/reports")}
+        >
+          <BarChart3 className={iconClass} aria-hidden="true" />
+          <span>Reports</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/branding"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/branding",
-                )}
-              >
-                Branding
-              </Link>
+        <Link
+          href="/dashboard/websites/branding"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/branding")}
+        >
+          <Palette className={iconClass} aria-hidden="true" />
+          <span>Branding</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/about"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/about",
-                )}
-              >
-                About Page
-              </Link>
+        <Link
+          href="/dashboard/websites/about"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/about")}
+        >
+          <BookOpenText className={iconClass} aria-hidden="true" />
+          <span>About Page</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/seo"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/seo",
-                )}
-              >
-                SEO
-              </Link>
+        <Link
+          href="/dashboard/websites/seo"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/seo")}
+        >
+          <Search className={iconClass} aria-hidden="true" />
+          <span>SEO</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/launch"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/launch",
-                )}
-              >
-                Launch & Billing
-              </Link>
+        <Link
+          href="/dashboard/websites/launch"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/launch")}
+        >
+          <Rocket className={iconClass} aria-hidden="true" />
+          <span>Launch &amp; Billing</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/domain"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/domain",
-                )}
-              >
-                Domain
-              </Link>
+        <Link
+          href="/dashboard/websites/domain"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/domain")}
+        >
+          <Globe2 className={iconClass} aria-hidden="true" />
+          <span>Domain</span>
+        </Link>
 
-              <Link
-                href="/dashboard/websites/integrations/tfpos"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/websites/integrations/tfpos",
-                )}
-              >
-                TFPOS Integration
-              </Link>
-            </div>
+        <Link
+          href="/dashboard/websites/integrations/tfpos"
+          onClick={onClose}
+          className={navItemClass(
+            pathname === "/dashboard/websites/integrations/tfpos",
           )}
-        </div>
+        >
+          <Cable className={iconClass} aria-hidden="true" />
+          <span>TFPOS Integration</span>
+        </Link>
 
-        <div>
-          <button
-            type="button"
-            onClick={() => setShopOpen((current) => !current)}
-            className={groupButtonClass(shopPathIsActive)}
-            aria-expanded={shopOpen}
-            aria-controls="shop-navigation"
+        <SectionLabel>My Shop</SectionLabel>
+
+        <Link
+          href={`/dashboard/shops/${slug}`}
+          onClick={onClose}
+          className={navItemClass(pathname === `/dashboard/shops/${slug}`)}
+        >
+          <UserRound className={iconClass} aria-hidden="true" />
+          <span>Public Profile</span>
+        </Link>
+
+        {pro && (
+          <Link
+            href="/dashboard/reports"
+            onClick={onClose}
+            className={navItemClass(pathname === "/dashboard/reports")}
           >
-            <span>My Shop</span>
-            <ChevronDown
-              size={18}
-              className={`transition-transform duration-200 ${
-                shopOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
+            <BarChart3 className={iconClass} aria-hidden="true" />
+            <span>GBD Reports</span>
+          </Link>
+        )}
 
-          {shopOpen && (
-            <div
-              id="shop-navigation"
-              className="ml-3 mt-1 space-y-1 border-l border-gray-200 pl-3"
+        {pro && (
+          <Link
+            href="/dashboard/pos-integration"
+            onClick={onClose}
+            className={navItemClass(pathname === "/dashboard/pos-integration")}
+          >
+            <PlugZap className={iconClass} aria-hidden="true" />
+            <span>POS Integration</span>
+          </Link>
+        )}
+
+        <Link
+          href="/dashboard/settings"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/settings")}
+        >
+          <Settings className={iconClass} aria-hidden="true" />
+          <span>Settings</span>
+        </Link>
+
+        {role === "admin" && (
+          <>
+            <SectionLabel>Administration</SectionLabel>
+            <Link
+              href="/admin"
+              onClick={onClose}
+              className={navItemClass(pathname.startsWith("/admin"))}
             >
-              <Link
-                href={`/dashboard/shops/${slug}`}
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === `/dashboard/shops/${slug}`,
-                )}
-              >
-                Profile
-              </Link>
+              <Store className={iconClass} aria-hidden="true" />
+              <span>Admin Panel</span>
+            </Link>
+          </>
+        )}
+      </nav>
 
-              {pro && (
-                <Link
-                  href="/dashboard/reports"
-                  onClick={onClose}
-                  className={childNavItemClass(
-                    pathname === "/dashboard/reports",
-                  )}
-                >
-                  Reports
-                </Link>
-              )}
-
-              {pro && (
-                <Link
-                  href="/dashboard/pos-integration"
-                  onClick={onClose}
-                  className={childNavItemClass(
-                    pathname === "/dashboard/pos-integration",
-                  )}
-                >
-                  POS Integration
-                </Link>
-              )}
-
-              <Link
-                href="/dashboard/settings"
-                onClick={onClose}
-                className={childNavItemClass(
-                  pathname === "/dashboard/settings",
-                )}
-              >
-                Settings
-              </Link>
-            </div>
-          )}
-        </div>
+      <div className="mt-4 shrink-0 space-y-1 border-t border-slate-200 pt-4">
+        {!pro && (
+          <Link
+            href="/dashboard/upgrade"
+            onClick={onClose}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-orange-600 transition hover:bg-orange-50"
+          >
+            <Sparkles className={iconClass} aria-hidden="true" />
+            <span>Upgrade Plan</span>
+          </Link>
+        )}
 
         <Link
           href="/dashboard/getting-started"
           onClick={onClose}
           className={navItemClass(pathname === "/dashboard/getting-started")}
         >
-          Getting Started
+          <CircleHelp className={iconClass} aria-hidden="true" />
+          <span>Getting Started</span>
         </Link>
 
         <Link
@@ -438,38 +374,19 @@ export const NavLinks = ({
           onClick={onClose}
           className={navItemClass(pathname === "/support")}
         >
-          Support
+          <LifeBuoy className={iconClass} aria-hidden="true" />
+          <span>Support</span>
         </Link>
 
-        {role === "admin" && (
-          <Link
-            href="/admin"
-            onClick={onClose}
-            className={navItemClass(pathname.startsWith("/admin"))}
-          >
-            Admin Panel
-          </Link>
-        )}
-      </nav>
-
-      <div className="mt-auto space-y-2 border-t pt-6">
-        {!pro && (
-          <Link
-            href="/dashboard/upgrade"
-            onClick={onClose}
-            className="block p-3 font-medium text-orange-600 hover:underline"
-          >
-            Upgrade Plan
-          </Link>
-        )}
         <button
           type="button"
           onClick={logOut}
-          className="w-full rounded-lg p-3 text-left text-red-600 hover:bg-red-50"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50"
         >
-          Logout
+          <LogOut className={iconClass} aria-hidden="true" />
+          <span>Logout</span>
         </button>
       </div>
-    </>
+    </div>
   );
 };

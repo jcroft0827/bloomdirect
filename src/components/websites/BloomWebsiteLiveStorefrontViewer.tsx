@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Monitor, Smartphone } from "lucide-react";
+import { ExternalLink, Loader2, Monitor, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -11,6 +11,7 @@ type Props = {
   siteName: string;
   logo: string;
   tagline: string;
+  heroHeadline: string;
   primaryColor: string;
   accentColor: string;
   heroImage: string;
@@ -38,6 +39,7 @@ function buildPreviewUrl({
   siteName,
   logo,
   tagline,
+  heroHeadline,
   primaryColor,
   accentColor,
   heroImage,
@@ -49,6 +51,7 @@ function buildPreviewUrl({
   params.set("siteName", siteName);
   params.set("logo", logo);
   params.set("tagline", tagline);
+  params.set("heroHeadline", heroHeadline);
   params.set("primaryColor", primaryColor);
   params.set("accentColor", accentColor);
   params.set("heroImage", heroImage);
@@ -59,6 +62,7 @@ function buildPreviewUrl({
 export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
   const [mode, setMode] = useState<PreviewMode>("desktop");
   const [previewUrl, setPreviewUrl] = useState(() => buildPreviewUrl(props));
+  const [previewLoading, setPreviewLoading] = useState(true);
   const [availableWidth, setAvailableWidth] = useState(0);
   const measureRef = useRef<HTMLDivElement | null>(null);
 
@@ -69,6 +73,7 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
       props.siteName,
       props.logo,
       props.tagline,
+      props.heroHeadline,
       props.primaryColor,
       props.accentColor,
       props.heroImage,
@@ -76,12 +81,17 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
   );
 
   useEffect(() => {
+    if (nextPreviewUrl === previewUrl) {
+      return;
+    }
+
     const timer = window.setTimeout(() => {
+      setPreviewLoading(true);
       setPreviewUrl(nextPreviewUrl);
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [nextPreviewUrl]);
+  }, [nextPreviewUrl, previewUrl]);
 
   useEffect(() => {
     const node = measureRef.current;
@@ -183,6 +193,7 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
             <iframe
               title={`${mode === "desktop" ? "Desktop" : "Mobile"} storefront preview`}
               src={previewUrl}
+              onLoad={() => setPreviewLoading(false)}
               className="absolute left-0 top-0 border-0 bg-white"
               style={{
                 width: viewport.width,
@@ -191,6 +202,22 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
                 transformOrigin: "top left",
               }}
             />
+
+            {previewLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-center shadow-lg">
+                  <Loader2 size={24} className="animate-spin text-purple-700" />
+                  <div>
+                    <p className="text-sm font-black text-gray-900">
+                      Loading storefront preview
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Applying your latest branding changes...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

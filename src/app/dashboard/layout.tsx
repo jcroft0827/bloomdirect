@@ -1,4 +1,5 @@
 "use client";
+
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { NavLinks } from "@/components/NavLinks";
@@ -21,25 +22,31 @@ interface Shop {
   suspensionReason?: string;
 }
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
 
   const [shop, setShop] = useState<Shop | null>(null);
+
   const today = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
   }).format(new Date());
+
   const [showNav, setShowNav] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Load shop info
   async function loadShop() {
     try {
       const res = await fetch("/api/shops/me");
       const data = await res.json();
+
       if (data?.shop) {
         setShop(data.shop);
         console.log("Shop data loaded:", data.shop);
@@ -49,7 +56,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   }
 
-  // load notifications
   async function loadNotifications() {
     try {
       const res = await fetch("/api/notifications/pull");
@@ -89,12 +95,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Click Notification
   const handleClickNotification = async (notification: any) => {
     try {
       if (notification.type === "NewMessage") {
         router.push(
-          `/dashboard/orders/messages/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
+          `/dashboard/orders/messages/${
+            notification.order?._id?.toString?.() ||
+            notification.order?.toString?.()
+          }`,
         );
       } else if (
         notification.type === "NewOrder" ||
@@ -104,15 +112,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         notification.type === "OrderComplete" ||
         notification.type === "Rated"
       ) {
-        // Mark notification as read
-
-        // For order update notifications, navigate to the order details page
         router.push(
-          `/orders/${notification.order?._id?.toString?.() || notification.order?.toString?.()}`,
+          `/orders/${
+            notification.order?._id?.toString?.() ||
+            notification.order?.toString?.()
+          }`,
         );
-      } else {
-        // For other notification types, just mark as read for now
       }
+
       await loadNotifications();
       setShowNotifications(false);
     } catch (error) {}
@@ -191,223 +198,282 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <SettingsDirtyStateProvider>
       <SettingsNavigationGuard />
-      <div className="flex h-screen overflow-hidden bg-emerald-50 md:p-4 lg:gap-10 lg:p-10 print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
-      {/* Desktop Sidebar (Static) */}
-      {shop && (
-        <aside className="hidden w-64 flex-col justify-between rounded-2xl border-r bg-white p-6 shadow-lg lg:flex print:!hidden">
-          <div>
-            <h2 className="text-xl font-bold mb-8">GetBloomDirect</h2>
+
+      <div className="flex h-screen overflow-hidden bg-emerald-50 md:p-4 lg:gap-4 xl:gap-6 xl:p-6 2xl:gap-8 2xl:p-8 print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
+        {/* Desktop Sidebar */}
+        {shop && (
+          <aside className="hidden h-full min-h-0 w-56 shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-lg lg:flex xl:w-64 print:!hidden">
+            <div className="mb-5 flex shrink-0 items-center gap-3 border-b border-slate-100 pb-5">
+              <img src="/logo.svg" alt="" className="h-9 w-9" />
+
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-black text-slate-900">
+                  GetBloomDirect
+                </h2>
+
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-purple-600">
+                  Florist technology
+                </p>
+              </div>
+            </div>
+
             <NavLinks
               slug={shop.slug}
               pro={shop.isPro}
               pathname={pathname}
               role={shop.role}
             />
-          </div>
-        </aside>
-      )}
+          </aside>
+        )}
 
-      {/* Mobile Sidebar (Overlay) */}
-      {/* Background Dimmer */}
-      {showNav && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden print:hidden"
-          onClick={() => setShowNav(false)}
-        />
-      )}
+        {/* Mobile Sidebar Overlay */}
+        {showNav && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden print:hidden"
+            onClick={() => setShowNav(false)}
+          />
+        )}
 
-      {/* Sliding Menu */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white p-6 shadow-2xl transition-transform duration-300 lg:hidden print:hidden ${showNav ? "translate-x-0" : "-translate-x-full"}`}
-      >
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-xl font-bold">Menu</h2>
-          <button onClick={() => setShowNav(false)}>
-            <X size={24} />
-          </button>
-        </div>
+        {/* Mobile Sidebar */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 transform flex-col overflow-hidden bg-white p-5 shadow-2xl transition-transform duration-300 lg:hidden print:hidden ${
+            showNav ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="mb-5 flex shrink-0 items-center justify-between border-b border-slate-100 pb-5">
+            <div className="flex items-center gap-3">
+              <img src="/logo.svg" alt="" className="h-9 w-9" />
 
-        <NavLinks
-          slug={shop?.slug || ""}
-          pro={shop?.isPro || false}
-          pathname={pathname}
-          onClose={() => setShowNav(false)}
-          role={shop?.role || ""}
-        />
-      </aside>
-
-      <div className="flex w-full flex-col print:block print:w-full">
-        <header className="mb-5 flex w-screen bg-white px-4 py-2 md:w-full md:rounded-2xl print:hidden">
-          <div className="flex items-center justify-between w-full">
-            {/* Logo + Greeting */}
-            <div>
-              {/* Greeting */}
               <div>
-                <h1 className="font-semibold text-gray-700 capitalize md:text-xl lg:text-start lg:text-base xl:text-xl">
-                  Welcome back,{" "}
-                  <span className="text-purple-600">{shop?.businessName}</span>!
-                </h1>
+                <h2 className="text-lg font-black text-slate-900">Menu</h2>
 
-                <p className="text-gray-500 text-sm hidden md:block lg:text-xs xl:text-sm">
-                  Everything you need to run your flower shop.
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-purple-600">
+                  GetBloomDirect
                 </p>
               </div>
             </div>
 
-            {/* Path */}
-            <div className="hidden lg:block">
-              <h2 className="text-2xl font-bold text-purple-600 lg:text-xl xl:text-2xl">
-                <span
-                  className={pathname === "/dashboard" ? "block" : "hidden"}
-                >
-                  Dashboard
-                </span>
-                <span
-                  className={
-                    pathname === "/dashboard/new-order" ? "block" : "hidden"
-                  }
-                >
-                  New Order
-                </span>
-                <span
-                  className={
-                    pathname === "/dashboard/network" ? "block" : "hidden"
-                  }
-                >
-                  Network
-                </span>
-                <span
-                  className={
-                    pathname === "/dashboard/incoming" ? "block" : "hidden"
-                  }
-                >
-                  Orders
-                </span>
-                <span
-                  className={
-                    pathname.startsWith("/dashboard/websites/orders")
-                      ? "block"
-                      : "hidden"
-                  }
-                >
-                  Website Orders
-                </span>
-                <span
-                  className={
-                    pathname === "/dashboard/settings" ? "block" : "hidden"
-                  }
-                >
-                  Settings
-                </span>
-                <span
-                  className={
-                    pathname === "/dashboard/pos-integration"
-                      ? "block"
-                      : "hidden"
-                  }
-                >
-                  POS Integration
-                </span>
-                <span
-                  className={
-                    pathname === "/dashboard/getting-started"
-                      ? "block"
-                      : "hidden"
-                  }
-                >
-                  Getting Started
-                </span>
-                {shop?.role === "admin" && (
-                  <span className={pathname === "/admin" ? "block" : "hidden"}>
-                    Admin Panel
-                  </span>
-                )}
-              </h2>
-            </div>
-            {/* Today's Date + Search + Notifications + Emails */}
-            <div className="flex gap-2">
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  type="button"
-                  className="p-2 rounded-full hover:text-yellow-400 transition-colors"
-                  onClick={() => setShowNotifications(!showNotifications)}
-                >
-                  <Bell size={24} />
-
-                  {notifications.length > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                      {notifications.length}
-                    </div>
-                  )}
-                </button>
-
-                {/* Notifications Dropdown */}
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50">
-                    <div className="p-4 border-b">
-                      <h3 className="text-lg font-semibold">Notifications</h3>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <p className="p-4 text-gray-500">
-                          No new notifications
-                        </p>
-                      ) : (
-                        notifications.map((notification: any) => (
-                          <div
-                            key={notification._id}
-                            className="hover:bg-gray-100 transition-colors p-2"
-                          >
-                            <button
-                              onClick={() =>
-                                handleClickNotification(notification)
-                              }
-                              className="w-full text-left"
-                            >
-                              <p>
-                                <strong>Type:</strong> {notification.type}
-                              </p>
-                              <p>
-                                <strong>From: </strong>{" "}
-                                {notification.sendingShop?.businessName ||
-                                  "Unknown"}
-                              </p>
-                              {notification.message.length > 10 ? (
-                                <p>
-                                  <strong>Message: </strong>
-                                  {notification.message.substring(0, 20)}...
-                                </p>
-                              ) : (
-                                <p>
-                                  <strong>Message: </strong>
-                                  {notification.message}
-                                </p>
-                              )}
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Today's Date */}
-              <div className="hidden lg:block border px-4 py-1 rounded-xl shadow-lg font-semibold lg:px-2 cursor-default">
-                {today}
-              </div>
-            </div>
+            <button onClick={() => setShowNav(false)}>
+              <X size={24} />
+            </button>
           </div>
 
-          {/* MOBILE TOGGLE BUTTON */}
-          <button className="lg:hidden" onClick={() => setShowNav(true)}>
-            <Menu size={24} />
-          </button>
-        </header>
+          <NavLinks
+            slug={shop?.slug || ""}
+            pro={shop?.isPro || false}
+            pathname={pathname}
+            onClose={() => setShowNav(false)}
+            role={shop?.role || ""}
+          />
+        </aside>
 
-        <main className="flex-1 overflow-auto print:block print:overflow-visible">{children}</main>
-      </div>
+        {/* Main Dashboard Workspace */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col print:block print:w-full">
+          <header className="mb-5 flex w-full shrink-0 bg-white px-4 py-2 md:rounded-2xl print:hidden">
+            <div className="flex w-full items-center justify-between">
+              {/* Greeting */}
+              <div>
+                <h1 className="font-semibold capitalize text-gray-700 md:text-xl xl:text-start xl:text-base 2xl:text-xl">
+                  Welcome back,{" "}
+                  <span className="text-purple-600">
+                    {shop?.businessName}
+                  </span>
+                  !
+                </h1>
+
+                <p className="hidden text-sm text-gray-500 md:block xl:text-xs 2xl:text-sm">
+                  Everything you need to run your flower shop.
+                </p>
+              </div>
+
+              {/* Current Page */}
+              <div className="hidden xl:block">
+                <h2 className="text-2xl font-bold text-purple-600 xl:text-xl 2xl:text-2xl">
+                  <span
+                    className={
+                      pathname === "/dashboard" ? "block" : "hidden"
+                    }
+                  >
+                    Dashboard
+                  </span>
+
+                  <span
+                    className={
+                      pathname === "/dashboard/new-order"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    New Order
+                  </span>
+
+                  <span
+                    className={
+                      pathname === "/dashboard/network"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    Network
+                  </span>
+
+                  <span
+                    className={
+                      pathname === "/dashboard/incoming"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    Orders
+                  </span>
+
+                  <span
+                    className={
+                      pathname.startsWith("/dashboard/websites/orders")
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    Website Orders
+                  </span>
+
+                  <span
+                    className={
+                      pathname === "/dashboard/settings"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    Settings
+                  </span>
+
+                  <span
+                    className={
+                      pathname === "/dashboard/pos-integration"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    POS Integration
+                  </span>
+
+                  <span
+                    className={
+                      pathname === "/dashboard/getting-started"
+                        ? "block"
+                        : "hidden"
+                    }
+                  >
+                    Getting Started
+                  </span>
+
+                  {shop?.role === "admin" && (
+                    <span
+                      className={
+                        pathname === "/admin" ? "block" : "hidden"
+                      }
+                    >
+                      Admin Panel
+                    </span>
+                  )}
+                </h2>
+              </div>
+
+              {/* Notifications / Date */}
+              <div className="flex gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="rounded-full p-2 transition-colors hover:text-yellow-400"
+                    onClick={() =>
+                      setShowNotifications(!showNotifications)
+                    }
+                  >
+                    <Bell size={24} />
+
+                    {notifications.length > 0 && (
+                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                        {notifications.length}
+                      </div>
+                    )}
+                  </button>
+
+                  {showNotifications && (
+                    <div className="absolute right-0 z-50 mt-2 w-80 rounded-lg border bg-white shadow-lg">
+                      <div className="border-b p-4">
+                        <h3 className="text-lg font-semibold">
+                          Notifications
+                        </h3>
+                      </div>
+
+                      <div className="max-h-60 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <p className="p-4 text-gray-500">
+                            No new notifications
+                          </p>
+                        ) : (
+                          notifications.map((notification: any) => (
+                            <div
+                              key={notification._id}
+                              className="p-2 transition-colors hover:bg-gray-100"
+                            >
+                              <button
+                                onClick={() =>
+                                  handleClickNotification(notification)
+                                }
+                                className="w-full text-left"
+                              >
+                                <p>
+                                  <strong>Type:</strong>{" "}
+                                  {notification.type}
+                                </p>
+
+                                <p>
+                                  <strong>From:</strong>{" "}
+                                  {notification.sendingShop?.businessName ||
+                                    "Unknown"}
+                                </p>
+
+                                {notification.message.length > 10 ? (
+                                  <p>
+                                    <strong>Message:</strong>{" "}
+                                    {notification.message.substring(0, 20)}
+                                    ...
+                                  </p>
+                                ) : (
+                                  <p>
+                                    <strong>Message:</strong>{" "}
+                                    {notification.message}
+                                  </p>
+                                )}
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="hidden cursor-default rounded-xl border px-4 py-1 font-semibold shadow-lg xl:block xl:px-2">
+                  {today}
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Nav Button */}
+            <button
+              className="lg:hidden"
+              onClick={() => setShowNav(true)}
+            >
+              <Menu size={24} />
+            </button>
+          </header>
+
+          <main className="min-h-0 flex-1 overflow-auto overscroll-contain print:block print:overflow-visible">
+            {children}
+          </main>
+        </div>
       </div>
     </SettingsDirtyStateProvider>
   );

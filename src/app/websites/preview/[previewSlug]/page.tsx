@@ -7,6 +7,12 @@ import { notFound, redirect } from "next/navigation";
 import authOptions from "@/lib/auth";
 import { getBloomWebsiteStorefront } from "@/lib/bloom-websites/getBloomWebsiteStorefront";
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
+import {
+  buildBloomWebsiteHeroHeadline,
+  buildBloomWebsiteHeroSubheadline,
+  isBloomWebsiteGeneratedHeroHeadline,
+  isBloomWebsiteGeneratedHeroSubheadline,
+} from "@/lib/bloom-websites/branding-copy";
 import BloomClassicTheme from "@/components/websites/themes/BloomClassicTheme";
 import WebsitePreviewBar from "@/components/websites/WebsitePreviewBar";
 import {
@@ -25,6 +31,7 @@ type BuilderPreviewSearchParams = {
   siteName?: string | string[];
   logo?: string | string[];
   tagline?: string | string[];
+  heroHeadline?: string | string[];
   primaryColor?: string | string[];
   accentColor?: string | string[];
   heroImage?: string | string[];
@@ -64,18 +71,27 @@ function applyBuilderPreviewOverrides(
   const siteNameOverride = clamp(getParam(searchParams.siteName), 120);
   const logoOverride = clamp(getParam(searchParams.logo), 4096);
   const taglineOverride = clamp(getParam(searchParams.tagline), 180);
+  const heroHeadlineOverride = clamp(getParam(searchParams.heroHeadline), 160);
   const primaryColorOverride = clamp(getParam(searchParams.primaryColor), 32);
   const accentColorOverride = clamp(getParam(searchParams.accentColor), 32);
   const heroImageOverride = clamp(getParam(searchParams.heroImage), 4096);
 
   const previousSiteName = storefront.website.siteName;
-  const previousDefaultHeadline = `Beautiful flowers from ${previousSiteName}.`;
-  const genericSubheadline =
-    "Fresh flowers for life's meaningful moments, designed and delivered by your local florist.";
+  const previousHeadlineWasGenerated =
+    isBloomWebsiteGeneratedHeroHeadline(
+      storefront.website.homepage.heroHeadline,
+      previousSiteName,
+    ) ||
+    isBloomWebsiteGeneratedHeroHeadline(
+      storefront.website.homepage.heroHeadline,
+      storefront.shop.businessName,
+    );
   const previousTagline = storefront.website.storefrontTheme.tagline;
   const previousSubheadlineWasGenerated =
-    storefront.website.homepage.heroSubheadline === previousTagline ||
-    storefront.website.homepage.heroSubheadline === genericSubheadline;
+    isBloomWebsiteGeneratedHeroSubheadline(
+      storefront.website.homepage.heroSubheadline,
+      previousTagline,
+    );
 
   const siteName =
     siteNameOverride === undefined
@@ -124,13 +140,14 @@ function applyBuilderPreviewOverrides(
       homepage: {
         ...storefront.website.homepage,
         heroHeadline:
-          siteNameOverride !== undefined &&
-          storefront.website.homepage.heroHeadline === previousDefaultHeadline
-            ? `Beautiful flowers from ${siteName}.`
-            : storefront.website.homepage.heroHeadline,
+          heroHeadlineOverride !== undefined
+            ? heroHeadlineOverride.trim() || buildBloomWebsiteHeroHeadline(siteName)
+            : siteNameOverride !== undefined && previousHeadlineWasGenerated
+              ? buildBloomWebsiteHeroHeadline(siteName)
+              : storefront.website.homepage.heroHeadline,
         heroSubheadline:
           taglineOverride !== undefined && previousSubheadlineWasGenerated
-            ? storefrontTheme.tagline || genericSubheadline
+            ? buildBloomWebsiteHeroSubheadline(storefrontTheme.tagline)
             : storefront.website.homepage.heroSubheadline,
         heroImage:
           heroImageOverride === undefined

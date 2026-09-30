@@ -174,9 +174,9 @@ export default function HomeHeaderClient({
     <header className="relative z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3">
-          <img src="/logo.svg" alt="" className="h-10 w-10" />
+          <img src="/logo.svg" alt="" className="h-12 w-12 sm:h-14 sm:w-14" />
           <div className="leading-tight">
-            <p className="text-lg font-black tracking-tight text-slate-950">
+            <p className="text-xl font-black tracking-tight text-slate-950">
               GetBloomDirect
             </p>
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-purple-600">

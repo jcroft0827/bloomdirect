@@ -15,6 +15,9 @@ import Link from "next/link";
 import { ChangeEvent, useMemo, useState } from "react";
 
 import {
+  buildBloomWebsiteHeroHeadline,
+} from "@/lib/bloom-websites/branding-copy";
+import {
   DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
   normalizeStorefrontHexColor,
@@ -28,6 +31,8 @@ type BrandingValues = {
   logo: string;
 
   tagline: string;
+
+  heroHeadline: string;
 
   primaryColor: string;
   accentColor: string;
@@ -169,10 +174,16 @@ export default function BloomWebsiteBrandingEditor({
     }
 
     const siteName = values.siteName.trim();
+    const heroHeadline = values.heroHeadline.trim();
 
     if (!siteName) {
       setError("Your website needs a site name.");
 
+      return;
+    }
+
+    if (!heroHeadline) {
+      setError("Your homepage needs a hero headline.");
       return;
     }
 
@@ -202,6 +213,7 @@ export default function BloomWebsiteBrandingEditor({
           },
 
           homepage: {
+            heroHeadline,
             heroImage: values.heroImage,
           },
         }),
@@ -223,6 +235,8 @@ export default function BloomWebsiteBrandingEditor({
         primaryColor: data.website?.branding?.primaryColor || primaryColor,
 
         accentColor: data.website?.branding?.accentColor || accentColor,
+
+        heroHeadline: data.website?.homepage?.heroHeadline || heroHeadline,
 
         heroImage: data.website?.homepage?.heroImage || "",
       };
@@ -316,7 +330,9 @@ export default function BloomWebsiteBrandingEditor({
                 </label>
 
                 <p className="mt-1 text-xs leading-5 text-gray-500">
-                  Usually your flower shop&apos;s public business name.
+                  Usually your flower shop&apos;s public business name. Your hero
+                  headline is edited separately below, so changing this name
+                  will not overwrite custom homepage copy.
                 </p>
 
                 <input
@@ -330,6 +346,53 @@ export default function BloomWebsiteBrandingEditor({
                   }
                   className="mt-3 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-950 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:bg-gray-100"
                 />
+              </div>
+
+              <div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <label
+                      htmlFor="website-hero-headline"
+                      className="text-sm font-bold text-gray-800"
+                    >
+                      Hero Headline
+                    </label>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      The large headline customers see first on your homepage.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() =>
+                      updateValue(
+                        "heroHeadline",
+                        buildBloomWebsiteHeroHeadline(values.siteName),
+                      )
+                    }
+                    className="inline-flex w-fit items-center rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 transition hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Use suggested headline
+                  </button>
+                </div>
+
+                <textarea
+                  id="website-hero-headline"
+                  maxLength={160}
+                  rows={3}
+                  value={values.heroHeadline}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    updateValue("heroHeadline", event.target.value)
+                  }
+                  placeholder="Beautiful flowers for life's meaningful moments."
+                  className="mt-3 w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm leading-6 text-gray-950 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                />
+
+                <div className="mt-1 text-right text-xs text-gray-400">
+                  {values.heroHeadline.length}/160
+                </div>
               </div>
 
               <div>
@@ -472,6 +535,12 @@ export default function BloomWebsiteBrandingEditor({
               design the homepage around it.
             </p>
 
+            <p className="mt-2 rounded-xl bg-purple-50 px-3 py-2 text-xs leading-5 text-purple-800">
+              With a hero photo, Bloom intentionally uses the image as the
+              visual focus and hides the desktop information card that appears
+              on image-free heroes.
+            </p>
+
             <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
               {values.heroImage ? (
                 <div className="relative aspect-[16/7]">
@@ -544,6 +613,7 @@ export default function BloomWebsiteBrandingEditor({
             siteName={values.siteName}
             logo={values.logo}
             tagline={values.tagline}
+            heroHeadline={values.heroHeadline}
             primaryColor={primaryColor}
             accentColor={accentColor}
             heroImage={values.heroImage}

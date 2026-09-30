@@ -437,7 +437,7 @@ export default function BloomClassicTheme({
                     </p>
 
                     <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950">
-                      {shop.businessName}
+                      {website.siteName}
                     </h2>
 
                     <p className="mt-4 text-sm leading-7 text-gray-600">

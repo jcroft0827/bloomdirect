@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import BloomWebsiteBrandingEditor from "@/components/websites/BloomWebsiteBrandingEditor";
 import authOptions from "@/lib/auth";
+import { buildBloomWebsiteHeroHeadline } from "@/lib/bloom-websites/branding-copy";
 import {
   DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
@@ -31,6 +32,7 @@ type WebsiteLean = {
   };
 
   homepage?: {
+    heroHeadline?: string;
     heroImage?: string;
   };
 };
@@ -62,6 +64,7 @@ export default async function BloomWebsiteBrandingPage() {
           "branding.primaryColor",
           "branding.accentColor",
           "branding.backgroundStyle",
+          "homepage.heroHeadline",
           "homepage.heroImage",
         ].join(" "),
       )
@@ -107,6 +110,10 @@ export default async function BloomWebsiteBrandingPage() {
         primaryColor: theme.primaryColor || DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
 
         accentColor: theme.accentColor || DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
+
+        heroHeadline:
+          website.homepage?.heroHeadline ||
+          buildBloomWebsiteHeroHeadline(website.siteName),
 
         heroImage: website.homepage?.heroImage || "",
       }}

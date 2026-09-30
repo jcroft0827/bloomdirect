@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock3, Loader2, RefreshCcw, Send, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Clock3, Code2, Loader2, RefreshCcw, Send, TriangleAlert } from "lucide-react";
 
 type Attempt = {
   attemptNumber: number;
@@ -100,30 +100,42 @@ export default function TfposOrderExportCard({ orderId }: { orderId: string }) {
           </p>
         </div>
 
-        {state.integrationConfigured && state.integrationEnabled ? (
-          <button
-            type="button"
-            onClick={send}
-            disabled={sending || state.export?.status === "processing"}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-black text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-50"
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <a
+            href={`/api/websites/orders/${orderId}/tfpos-preview`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-black text-purple-800 transition hover:border-purple-300 hover:bg-purple-100"
           >
-            {sending || state.export?.status === "processing" ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : state.export ? (
-              <RefreshCcw size={16} />
-            ) : (
-              <Send size={16} />
-            )}
-            {state.export ? "Resend to TFPOS" : "Send to TFPOS"}
-          </button>
-        ) : (
-          <Link
-            href="/dashboard/websites/integrations/tfpos"
-            className="inline-flex items-center justify-center rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-black text-purple-800"
-          >
-            Configure TFPOS
-          </Link>
-        )}
+            <Code2 size={16} />
+            Preview XML
+          </a>
+
+          {state.integrationConfigured && state.integrationEnabled ? (
+            <button
+              type="button"
+              onClick={send}
+              disabled={sending || state.export?.status === "processing"}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2.5 text-sm font-black text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sending || state.export?.status === "processing" ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : state.export ? (
+                <RefreshCcw size={16} />
+              ) : (
+                <Send size={16} />
+              )}
+              {state.export ? "Resend to TFPOS" : "Send to TFPOS"}
+            </button>
+          ) : (
+            <Link
+              href="/dashboard/websites/integrations/tfpos"
+              className="inline-flex items-center justify-center rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-black text-purple-800"
+            >
+              Configure TFPOS
+            </Link>
+          )}
+        </div>
       </div>
 
       {error && (

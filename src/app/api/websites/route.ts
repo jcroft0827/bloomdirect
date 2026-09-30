@@ -11,6 +11,12 @@ import {
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
   normalizeStorefrontHexColor,
 } from "@/lib/bloom-websites/storefront-theme";
+import {
+  buildBloomWebsiteHeroHeadline,
+  buildBloomWebsiteHeroSubheadline,
+  isBloomWebsiteGeneratedHeroHeadline,
+  isBloomWebsiteGeneratedHeroSubheadline,
+} from "@/lib/bloom-websites/branding-copy";
 
 type BloomWebsiteLean = {
   _id: {
@@ -29,15 +35,6 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-function buildHeroHeadline(businessName: string) {
-  const headline = `Beautiful flowers, thoughtfully designed by ${businessName}.`;
-
-  if (headline.length <= 160) {
-    return headline;
-  }
-
-  return `Beautiful flowers from ${businessName}.`.slice(0, 160);
-}
 
 export async function POST() {
   try {
@@ -136,10 +133,9 @@ export async function POST() {
         },
 
         homepage: {
-          heroHeadline: buildHeroHeadline(shop.businessName),
+          heroHeadline: buildBloomWebsiteHeroHeadline(shop.businessName),
 
-          heroSubheadline:
-            "Fresh flowers for life's meaningful moments, designed and delivered by your local florist.",
+          heroSubheadline: buildBloomWebsiteHeroSubheadline(""),
 
           heroImage: shop.branding?.bannerImage || "",
 
@@ -221,6 +217,7 @@ type UpdateBloomWebsiteBrandingBody = {
   };
 
   homepage?: {
+    heroHeadline?: unknown;
     heroImage?: unknown;
   };
 };
@@ -281,14 +278,28 @@ export async function PATCH(request: Request) {
       DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
     );
 
+    const heroHeadlineWasProvided =
+      typeof body.homepage?.heroHeadline === "string";
+    const heroHeadline = cleanBrandingString(
+      body.homepage?.heroHeadline,
+      160,
+    );
     const heroImage = cleanBrandingString(body.homepage?.heroImage, 2000);
+
+    if (heroHeadlineWasProvided && !heroHeadline) {
+      return NextResponse.json(
+        { error: "Your homepage needs a hero headline." },
+        { status: 400 },
+      );
+    }
 
     await connectToDB();
 
     const shop = await Shop.findById(session.user.id)
-      .select("_id isSuspended")
+      .select("_id businessName isSuspended")
       .lean<{
         _id: unknown;
+        businessName: string;
         isSuspended?: boolean;
       } | null>();
 
@@ -314,24 +325,83 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const existingWebsite = await BloomWebsite.findOne({
+      shop: session.user.id,
+    })
+      .select(
+        "_id siteName branding.tagline homepage.heroHeadline homepage.heroSubheadline",
+      )
+      .lean<{
+        _id: unknown;
+        siteName: string;
+        branding?: {
+          tagline?: string;
+        };
+        homepage?: {
+          heroHeadline?: string;
+          heroSubheadline?: string;
+        };
+      } | null>();
+
+    if (!existingWebsite) {
+      return NextResponse.json(
+        {
+          error: "BloomWebsite not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    const updateSet: Record<string, string> = {
+      siteName,
+      "branding.logo": logo,
+      "branding.tagline": tagline,
+      "branding.primaryColor": primaryColor,
+      "branding.accentColor": accentColor,
+      "homepage.heroImage": heroImage,
+    };
+
+    /*
+     * Keep Bloom's generated hero copy in sync with Site Name, but never
+     * overwrite a headline that has been customized outside the default
+     * generation path.
+     */
+    const heroHeadlineIsGenerated =
+      isBloomWebsiteGeneratedHeroHeadline(
+        existingWebsite.homepage?.heroHeadline,
+        existingWebsite.siteName,
+      ) ||
+      isBloomWebsiteGeneratedHeroHeadline(
+        existingWebsite.homepage?.heroHeadline,
+        shop.businessName,
+      );
+
+    if (heroHeadlineWasProvided) {
+      updateSet["homepage.heroHeadline"] = heroHeadline;
+    } else if (heroHeadlineIsGenerated) {
+      updateSet["homepage.heroHeadline"] =
+        buildBloomWebsiteHeroHeadline(siteName);
+    }
+
+    if (
+      isBloomWebsiteGeneratedHeroSubheadline(
+        existingWebsite.homepage?.heroSubheadline,
+        existingWebsite.branding?.tagline,
+      )
+    ) {
+      updateSet["homepage.heroSubheadline"] =
+        buildBloomWebsiteHeroSubheadline(tagline);
+    }
+
     const website = await BloomWebsite.findOneAndUpdate(
       {
+        _id: existingWebsite._id,
         shop: session.user.id,
       },
       {
-        $set: {
-          siteName,
-
-          "branding.logo": logo,
-
-          "branding.tagline": tagline,
-
-          "branding.primaryColor": primaryColor,
-
-          "branding.accentColor": accentColor,
-
-          "homepage.heroImage": heroImage,
-        },
+        $set: updateSet,
       },
       {
         new: true,
@@ -347,6 +417,7 @@ export async function PATCH(request: Request) {
           "branding.tagline",
           "branding.primaryColor",
           "branding.accentColor",
+          "homepage.heroHeadline",
           "homepage.heroImage",
         ].join(" "),
       )
@@ -366,6 +437,7 @@ export async function PATCH(request: Request) {
         };
 
         homepage?: {
+          heroHeadline?: string;
           heroImage?: string;
         };
       } | null>();
@@ -405,6 +477,7 @@ export async function PATCH(request: Request) {
         },
 
         homepage: {
+          heroHeadline: website.homepage?.heroHeadline || "",
           heroImage: website.homepage?.heroImage || "",
         },
       },

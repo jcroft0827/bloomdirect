@@ -122,16 +122,32 @@ export default async function WebsiteLaunchPage({
   }
 
   const {
-    website: websiteId,
+    website: requestedWebsiteId,
     billing: billingResult,
     session_id: checkoutSessionId,
   } = await searchParams;
 
-  if (!websiteId) {
-    redirect("/dashboard/websites");
-  }
-
   await connectToDB();
+
+  let websiteId = requestedWebsiteId;
+
+  if (!websiteId) {
+    const defaultWebsite = (await BloomWebsite.findOne({
+      shop: session.user.id,
+    })
+      .select("_id")
+      .lean()) as { _id: { toString(): string } } | null;
+
+    if (!defaultWebsite) {
+      redirect("/dashboard/websites");
+    }
+
+    redirect(
+      `/dashboard/websites/launch?website=${encodeURIComponent(
+        defaultWebsite._id.toString(),
+      )}`,
+    );
+  }
 
   const website = (await BloomWebsite.findOne({
     _id: websiteId,

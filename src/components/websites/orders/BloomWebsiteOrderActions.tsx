@@ -1,8 +1,8 @@
 "use client";
 
-import { Ban, Loader2, RotateCcw } from "lucide-react";
+import { Ban, Loader2, RotateCcw, TriangleAlert, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import BloomWebsiteRefundBuilder, {
@@ -65,6 +65,7 @@ export default function BloomWebsiteOrderActions({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const completionLabel =
     fulfillmentType === "delivery"
@@ -162,6 +163,22 @@ export default function BloomWebsiteOrderActions({
 
   const canCancel = !["fulfilled", "canceled"].includes(status);
 
+  useEffect(() => {
+    if (!cancelConfirmOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && busy === null) {
+        setCancelConfirmOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [cancelConfirmOpen, busy]);
+
   async function patchStatus(nextStatus: Status) {
     const response = await fetch(
       `/api/websites/orders/${orderId}/status`,
@@ -207,7 +224,7 @@ export default function BloomWebsiteOrderActions({
     }
   }
 
-  async function cancelOrder() {
+  function openCancelConfirmation() {
     if (refundContext.pendingRefundCents > 0) {
       toast.error(
         "Wait for the pending refund to finish before canceling this order.",
@@ -215,17 +232,11 @@ export default function BloomWebsiteOrderActions({
       return;
     }
 
+    setCancelConfirmOpen(true);
+  }
+
+  async function cancelOrder() {
     const needsRefund = canRefund;
-
-    const confirmed = window.confirm(
-      needsRefund
-        ? `Cancel this order and refund the remaining ${money(
-            remainingRefundCents,
-          )}?`
-        : "Cancel this order?",
-    );
-
-    if (!confirmed) return;
 
     setBusy("cancel");
 
@@ -262,6 +273,7 @@ export default function BloomWebsiteOrderActions({
           : "Order canceled.",
       );
 
+      setCancelConfirmOpen(false);
       router.refresh();
     } catch (error) {
       toast.error(
@@ -311,7 +323,7 @@ export default function BloomWebsiteOrderActions({
         <button
           type="button"
           disabled={busy !== null}
-          onClick={cancelOrder}
+          onClick={openCancelConfirmation}
           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-black text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
         >
           {busy === "cancel" ? (
@@ -321,6 +333,77 @@ export default function BloomWebsiteOrderActions({
           )}
           {canRefund ? "Refund & Cancel" : "Cancel Order"}
         </button>
+      )}
+
+      {cancelConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-order-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && busy === null) {
+              setCancelConfirmOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-6">
+              <div className="flex min-w-0 gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-700">
+                  <TriangleAlert size={21} />
+                </div>
+
+                <div>
+                  <h2
+                    id="cancel-order-title"
+                    className="text-xl font-black text-gray-950"
+                  >
+                    {canRefund ? "Refund & cancel order?" : "Cancel order?"}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">
+                    {canRefund
+                      ? `Bloom will refund the remaining ${money(remainingRefundCents)} and then cancel this order. This action cannot be undone.`
+                      : "This order will be canceled. This action cannot be undone."}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Close confirmation"
+                disabled={busy !== null}
+                onClick={() => setCancelConfirmOpen(false)}
+                className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 p-6 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => setCancelConfirmOpen(false)}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-black text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={cancelOrder}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white transition hover:bg-red-800 disabled:opacity-50"
+              >
+                {busy === "cancel" && (
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                )}
+                {canRefund ? "Refund & Cancel" : "Cancel Order"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {refundOpen && (

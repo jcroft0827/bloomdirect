@@ -10,6 +10,14 @@ import BloomSpinner from "@/components/BloomSpinner";
 import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
 import VerificationProgressBar from "@/components/verification/ProgressBar";
 import DashboardWelcome from "@/components/dashboard/DashboardWelcome";
+import {
+  ArrowRight,
+  Globe2,
+  Network,
+  Package2,
+  PlusCircle,
+  ShoppingBag,
+} from "lucide-react";
 
 type DashboardReportPeriod = "month" | "year" | "all";
 
@@ -576,6 +584,111 @@ export default function DashboardClient() {
             onDismiss={handleDismissWelcome}
           />
         )}
+
+        <section className="mb-10 grid gap-5 xl:grid-cols-2">
+          <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-lg">
+            <div className="bg-gradient-to-br from-emerald-700 to-teal-700 p-6 text-white sm:p-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
+                    GetBloomDirect
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black">
+                    Florist-to-florist network
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-emerald-50">
+                    Send, receive, and manage network orders from one place.
+                  </p>
+                </div>
+                <Network className="h-8 w-8 shrink-0 text-emerald-100" aria-hidden="true" />
+              </div>
+            </div>
+
+            <div className="grid gap-2 p-4 sm:grid-cols-3 sm:p-5">
+              <Link
+                href="/dashboard/new-order"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                <PlusCircle size={17} aria-hidden="true" />
+                Create Order
+              </Link>
+              <Link
+                href="/dashboard/incoming"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                <ShoppingBag size={17} aria-hidden="true" />
+                View Orders
+              </Link>
+              <Link
+                href="/dashboard/network"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                <Network size={17} aria-hidden="true" />
+                Network
+              </Link>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-lg">
+            <div className="bg-gradient-to-br from-purple-800 to-violet-700 p-6 text-white sm:p-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-purple-100">
+                    BloomWebsites
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black">
+                    Your website workspace
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-purple-50">
+                    Build your storefront, manage the catalog, and run website orders.
+                  </p>
+                </div>
+                <Globe2 className="h-8 w-8 shrink-0 text-purple-100" aria-hidden="true" />
+              </div>
+            </div>
+
+            <div className="grid gap-2 p-4 sm:grid-cols-3 sm:p-5">
+              <Link
+                href="/dashboard/websites"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-800"
+              >
+                <Globe2 size={17} aria-hidden="true" />
+                Overview
+              </Link>
+              <Link
+                href="/dashboard/websites/orders"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-800"
+              >
+                <ShoppingBag size={17} aria-hidden="true" />
+                Orders
+              </Link>
+              <Link
+                href="/dashboard/websites/products"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-800"
+              >
+                <Package2 size={17} aria-hidden="true" />
+                Catalog
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <div className="mb-5 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+              GetBloomDirect
+            </p>
+            <h2 className="mt-1 text-2xl font-black text-slate-900">
+              Network activity &amp; readiness
+            </h2>
+          </div>
+          <Link
+            href="/dashboard/network"
+            className="hidden items-center gap-1 text-sm font-bold text-emerald-700 transition hover:text-emerald-900 sm:inline-flex"
+          >
+            Open Network <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </div>
 
         {/* Verification Status */}
         <VerificationProgressBar
