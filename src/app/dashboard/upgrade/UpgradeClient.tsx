@@ -211,6 +211,18 @@ export default function UpgradeClient({ initialShop }: UpgradeClientProps) {
             Bloom Pro gives your shop unlimited sending, advanced reporting,
             expanded fulfillment tools, and deeper GetBloomDirect integration.
           </p>
+
+          <div className="mx-auto mt-5 max-w-3xl rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 text-sm leading-6 text-purple-800">
+            Bloom Pro is a separate GetBloomDirect subscription. If you already
+            pay for BloomWebsites, your website subscription is managed under{" "}
+            <Link
+              href="/dashboard/websites/launch"
+              className="font-bold underline decoration-purple-300 underline-offset-2 hover:text-purple-950"
+            >
+              Launch &amp; Billing
+            </Link>
+            .
+          </div>
         </div>
 
         <div className="mx-auto mt-8 flex w-fit rounded-xl border border-slate-200 bg-white p-1 shadow-sm">

@@ -197,6 +197,22 @@ export const NavLinks = ({
           <span>Network</span>
         </Link>
 
+        <Link
+          href="/dashboard/upgrade"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/upgrade")}
+        >
+          <Sparkles className={iconClass} aria-hidden="true" />
+          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+            <span>Bloom Pro</span>
+            {!pro && (
+              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-700">
+                Upgrade
+              </span>
+            )}
+          </span>
+        </Link>
+
         <SectionLabel>BloomWebsites</SectionLabel>
 
         <Link
@@ -302,28 +318,6 @@ export const NavLinks = ({
           <span>Public Profile</span>
         </Link>
 
-        {pro && (
-          <Link
-            href="/dashboard/reports"
-            onClick={onClose}
-            className={navItemClass(pathname === "/dashboard/reports")}
-          >
-            <BarChart3 className={iconClass} aria-hidden="true" />
-            <span>GBD Reports</span>
-          </Link>
-        )}
-
-        {pro && (
-          <Link
-            href="/dashboard/pos-integration"
-            onClick={onClose}
-            className={navItemClass(pathname === "/dashboard/pos-integration")}
-          >
-            <PlugZap className={iconClass} aria-hidden="true" />
-            <span>POS Integration</span>
-          </Link>
-        )}
-
         <Link
           href="/dashboard/settings"
           onClick={onClose}
@@ -349,17 +343,6 @@ export const NavLinks = ({
       </nav>
 
       <div className="mt-4 shrink-0 space-y-1 border-t border-slate-200 pt-4">
-        {!pro && (
-          <Link
-            href="/dashboard/upgrade"
-            onClick={onClose}
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-orange-600 transition hover:bg-orange-50"
-          >
-            <Sparkles className={iconClass} aria-hidden="true" />
-            <span>Upgrade Plan</span>
-          </Link>
-        )}
-
         <Link
           href="/dashboard/getting-started"
           onClick={onClose}
