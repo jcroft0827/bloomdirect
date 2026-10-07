@@ -165,7 +165,7 @@ const bloomWebsiteWalkthroughs: Walkthrough[] = [
     title: "BloomWebsites Overview",
     description:
       "Start here to see website readiness, preview your storefront, and jump into the major website setup areas.",
-    topics: ["Website status", "Preview storefront", "Setup shortcuts"],
+    topics: ["Website status", "Preview storefront", "Quick Setup Links"],
     icon: Globe2,
     href: "/dashboard/websites",
     actionLabel: "Open website overview",
