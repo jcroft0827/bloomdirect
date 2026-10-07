@@ -31,12 +31,7 @@ import {
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type BloomWebsitePaymentCheckoutProps = {
   previewSlug: string;
@@ -205,6 +200,7 @@ export default function BloomWebsitePaymentCheckout({
     itemCount,
     openCart,
     clearCart,
+    syncArrangementContainerNotes,
   } = useBloomWebsiteCart();
 
   const {
@@ -353,10 +349,7 @@ export default function BloomWebsitePaymentCheckout({
 
   function persistStoredAttempt(value: StoredAttempt) {
     try {
-      window.sessionStorage.setItem(
-        attemptStorageKey,
-        JSON.stringify(value),
-      );
+      window.sessionStorage.setItem(attemptStorageKey, JSON.stringify(value));
     } catch {
       // Checkout can continue without persistence.
     }
@@ -397,8 +390,7 @@ export default function BloomWebsitePaymentCheckout({
         return true;
       }
 
-      lastMessage =
-        typeof data?.error === "string" ? data.error : lastMessage;
+      lastMessage = typeof data?.error === "string" ? data.error : lastMessage;
 
       if (data?.retryable !== true) {
         break;
@@ -704,8 +696,7 @@ export default function BloomWebsitePaymentCheckout({
           }
 
           throw new Error(
-            preflight?.error ||
-              "We couldn't verify your order before payment.",
+            preflight?.error || "We couldn't verify your order before payment.",
           );
         }
 
@@ -716,6 +707,65 @@ export default function BloomWebsitePaymentCheckout({
           idempotencyKey,
           attemptId,
         });
+
+        const authoritativeItems: unknown[] = Array.isArray(
+          preflight?.cart?.items,
+        )
+          ? preflight.cart.items
+          : [];
+
+        const authoritativeNotes = authoritativeItems
+          .filter(
+            (
+              item: unknown,
+            ): item is {
+              productId: string;
+              tier: "standard" | "deluxe" | "premium";
+              arrangementContainerNote?: string;
+            } => {
+              if (!item || typeof item !== "object") return false;
+
+              const candidate = item as Record<string, unknown>;
+
+              return (
+                typeof candidate.productId === "string" &&
+                (candidate.tier === "standard" ||
+                  candidate.tier === "deluxe" ||
+                  candidate.tier === "premium")
+              );
+            },
+          )
+          .map((item) => ({
+            productId: item.productId,
+            tier: item.tier,
+            arrangementContainerNote:
+              typeof item.arrangementContainerNote === "string"
+                ? item.arrangementContainerNote
+                : "",
+          }));
+
+        const noteMap = new Map(
+          authoritativeNotes.map((item) => [
+            `${item.productId}::${item.tier}`,
+            item.arrangementContainerNote,
+          ]),
+        );
+
+        const arrangementNoteChanged = items.some((item) => {
+          const key = `${item.productId}::${item.tier.label}`;
+
+          return (
+            noteMap.has(key) &&
+            (item.arrangementContainerNote ?? "") !== noteMap.get(key)
+          );
+        });
+
+        if (arrangementNoteChanged) {
+          syncArrangementContainerNotes(authoritativeNotes);
+          throw new Error(
+            "Arrangement details were updated. Please review the arrangement & container note, then continue to payment again.",
+          );
+        }
       }
 
       const prepareResponse = await fetch(
@@ -805,9 +855,7 @@ export default function BloomWebsitePaymentCheckout({
       !stripeRef.current ||
       !stripeElementsRef.current
     ) {
-      setPaymentError(
-        "Secure payment is still loading. Please wait a moment.",
-      );
+      setPaymentError("Secure payment is still loading. Please wait a moment.");
       return;
     }
 
@@ -1106,7 +1154,10 @@ export default function BloomWebsitePaymentCheckout({
                     value={customer.firstName}
                     disabled={formLocked}
                     onChange={(event) =>
-                      setCustomer({ ...customer, firstName: event.target.value })
+                      setCustomer({
+                        ...customer,
+                        firstName: event.target.value,
+                      })
                     }
                     className={inputClassName}
                     autoComplete="given-name"
@@ -1154,7 +1205,9 @@ export default function BloomWebsitePaymentCheckout({
                   <span className="flex items-center gap-2">
                     <Phone size={15} />
                     Phone
-                    <span className="font-semibold text-gray-400">Optional</span>
+                    <span className="font-semibold text-gray-400">
+                      Optional
+                    </span>
                   </span>
                   <input
                     type="tel"
@@ -1321,6 +1374,17 @@ export default function BloomWebsitePaymentCheckout({
                           ))}
                         </div>
                       )}
+
+                      {item.arrangementContainerNote && (
+                        <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-gray-500">
+                            Arrangement &amp; container note
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-gray-600">
+                            {item.arrangementContainerNote}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1364,8 +1428,8 @@ export default function BloomWebsitePaymentCheckout({
                     {formatDeliveryDate(validatedPickup.requestedDate)}
                   </p>
                   <p className="mt-2 text-xs font-semibold leading-5 text-gray-500">
-                    Preparation estimate:{" "}
-                    {validatedPickup.preparationMinutes} minutes
+                    Preparation estimate: {validatedPickup.preparationMinutes}{" "}
+                    minutes
                   </p>
                 </div>
               )}

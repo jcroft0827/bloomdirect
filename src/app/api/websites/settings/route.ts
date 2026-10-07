@@ -1087,6 +1087,23 @@ export async function PATCH(request: Request) {
         website.set("seo.localDelivery.venues", cleanedLocalLists.venues);
         website.set("seo.localDelivery.businesses", cleanedLocalLists.businesses);
       }
+    } else if (body.section === "productDisplay") {
+      const arrangementContainerNote =
+        typeof data.arrangementContainerNote === "string"
+          ? data.arrangementContainerNote.trim()
+          : "";
+
+      if (arrangementContainerNote.length > 1000) {
+        return NextResponse.json(
+          { error: "Arrangement & container note cannot exceed 1,000 characters." },
+          { status: 400 },
+        );
+      }
+
+      website.set(
+        "settings.arrangementContainerNote",
+        arrangementContainerNote,
+      );
     } else if (body.section === "contactDisplay") {
       const showPhone = data.showPhone;
 

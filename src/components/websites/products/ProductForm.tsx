@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import BloomCataloguePicker from "@/components/websites/products/BloomCataloguePicker";
 import ProductRecipeEditor from "@/components/websites/products/ProductRecipeEditor";
 import ProductFormQuickNavigation from "@/components/websites/products/ProductFormQuickNavigation";
 import {
@@ -67,10 +68,15 @@ export type ProductFormInitialData = {
       | "premium";
     price: number;
     enabled: boolean;
+    imageUrl: string;
     recipe: BloomWebsiteProductRecipe;
   }>;
 
   allowsSubstitutions: boolean;
+  arrangementContainerNote: {
+    mode: "default" | "custom" | "none";
+    text: string;
+  };
   localOnly: boolean;
   taxable: boolean;
   taxRatePercent?: number | null;
@@ -117,11 +123,13 @@ type ProductAddonOption = {
 type ProductFormProps = {
   initialData?: ProductFormInitialData;
   addonOptions?: ProductAddonOption[];
+  defaultArrangementContainerNote?: string;
 };
 
 export default function ProductForm({
   initialData,
   addonOptions = [],
+  defaultArrangementContainerNote = "",
 }: ProductFormProps) {
   const router = useRouter();
 
@@ -267,6 +275,15 @@ export default function ProductForm({
       : "",
   );
 
+  /*
+   * Tier-specific images can be populated by CSV imports and are
+   * already used by the storefront configurator. Keep them in form
+   * state so editing unrelated product fields never erases them.
+   */
+  const [standardTierImageUrl] = useState(standardTier?.imageUrl ?? "");
+  const [deluxeTierImageUrl] = useState(deluxeTier?.imageUrl ?? "");
+  const [premiumTierImageUrl] = useState(premiumTier?.imageUrl ?? "");
+
   const [standardRecipe, setStandardRecipe] =
     useState<BloomWebsiteProductRecipe>(
       cloneBloomWebsiteProductRecipe(standardTier?.recipe),
@@ -292,6 +309,20 @@ export default function ProductForm({
   ] = useState(
     initialData
       ?.allowsSubstitutions ?? true,
+  );
+
+  const [
+    arrangementNoteMode,
+    setArrangementNoteMode,
+  ] = useState<"default" | "custom" | "none">(
+    initialData?.arrangementContainerNote?.mode ?? "default",
+  );
+
+  const [
+    arrangementNoteText,
+    setArrangementNoteText,
+  ] = useState(
+    initialData?.arrangementContainerNote?.text ?? "",
   );
 
   const [
@@ -633,6 +664,53 @@ export default function ProductForm({
     );
   }
 
+  function useCatalogueAsPrimary(catalogueImageUrl: string) {
+    if (!catalogueImageUrl || catalogueImageUrl === imageUrl) {
+      return;
+    }
+
+    if (galleryImages.includes(catalogueImageUrl)) {
+      setPrimaryImage(catalogueImageUrl);
+      return;
+    }
+
+    const previousPrimary = imageUrl;
+    setImageUrl(catalogueImageUrl);
+
+    setGalleryImages((current) => {
+      const withoutSelected = current.filter((image) => image !== catalogueImageUrl);
+
+      /*
+       * A product can contain at most eight images. If all eight slots
+       * are already occupied, choosing a new shared image replaces the
+       * old primary instead of silently creating a ninth image.
+       */
+      if (previousPrimary && 1 + current.length < 8) {
+        return [previousPrimary, ...withoutSelected].slice(0, 7);
+      }
+
+      return withoutSelected.slice(0, 7);
+    });
+  }
+
+  function addCatalogueToGallery(catalogueImageUrl: string) {
+    if (!catalogueImageUrl || productImages.includes(catalogueImageUrl)) {
+      return;
+    }
+
+    if (productImages.length >= 8) {
+      setError("You can add up to 8 product photos.");
+      return;
+    }
+
+    if (!imageUrl) {
+      setImageUrl(catalogueImageUrl);
+      return;
+    }
+
+    setGalleryImages((current) => [...current, catalogueImageUrl]);
+  }
+
   // ===============================
   // SEO AUTO FILL
   // ===============================
@@ -763,11 +841,17 @@ export default function ProductForm({
             premiumEnabled,
             premiumPrice,
 
+            standardTierImageUrl,
+            deluxeTierImageUrl,
+            premiumTierImageUrl,
+
             standardRecipe,
             deluxeRecipe,
             premiumRecipe,
 
             allowsSubstitutions,
+            arrangementNoteMode,
+            arrangementNoteText,
             localOnly,
             taxable,
             taxRatePercent: taxable ? taxRatePercent : "",
@@ -1018,9 +1102,22 @@ export default function ProductForm({
               </div>
             )}
 
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <BloomCataloguePicker
+                currentImages={productImages}
+                canAddGalleryImage={productImages.length < 8}
+                onUsePrimary={useCatalogueAsPrimary}
+                onAddGallery={addCatalogueToGallery}
+              />
+
+              <p className="max-w-xl text-xs leading-5 text-gray-500 sm:text-right">
+                Bloom catalogue images are shared illustrative examples. Choosing one only changes this product&apos;s image selection; it does not replace your title, description, pricing, recipes, or other settings.
+              </p>
+            </div>
+
             {productImages.length <
               8 && (
-              <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center transition hover:border-purple-300 hover:bg-purple-50">
+              <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center transition hover:border-purple-300 hover:bg-purple-50">
                 {uploadingImage ? (
                   <Loader2
                     size={30}
@@ -1335,6 +1432,80 @@ export default function ProductForm({
               title="Allow substitutions"
               description="Allow appropriate flower or container substitutions when necessary."
             />
+
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="text-sm font-black text-gray-900">
+                Arrangement &amp; container note
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Explain reasonable differences between the product image and what customers may receive.
+              </p>
+
+              <div className="mt-4 space-y-3">
+                <label className="flex cursor-pointer gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                  <input
+                    type="radio"
+                    name="arrangementNoteMode"
+                    value="default"
+                    checked={arrangementNoteMode === "default"}
+                    onChange={() => setArrangementNoteMode("default")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-gray-900">Use shop default</span>
+                    <span className="mt-1 block text-sm text-gray-500">
+                      {defaultArrangementContainerNote
+                        ? defaultArrangementContainerNote
+                        : "No shop-wide default is currently set."}
+                    </span>
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                  <input
+                    type="radio"
+                    name="arrangementNoteMode"
+                    value="custom"
+                    checked={arrangementNoteMode === "custom"}
+                    onChange={() => setArrangementNoteMode("custom")}
+                    className="mt-1"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-gray-900">Use a custom note for this product</span>
+                    {arrangementNoteMode === "custom" && (
+                      <>
+                        <textarea
+                          value={arrangementNoteText}
+                          onChange={(event) => setArrangementNoteText(event.target.value)}
+                          maxLength={1000}
+                          rows={3}
+                          placeholder="Example: Arrangement may come in a pink vase."
+                          className="mt-3 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm"
+                        />
+                        <span className="mt-1 block text-right text-xs text-gray-400">
+                          {arrangementNoteText.length}/1000
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                  <input
+                    type="radio"
+                    name="arrangementNoteMode"
+                    value="none"
+                    checked={arrangementNoteMode === "none"}
+                    onChange={() => setArrangementNoteMode("none")}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-gray-900">Do not show a note for this product</span>
+                    <span className="mt-1 block text-sm text-gray-500">Suppresses the shop-wide default on this product.</span>
+                  </span>
+                </label>
+              </div>
+            </div>
 
             <ToggleRow
               checked={localOnly}

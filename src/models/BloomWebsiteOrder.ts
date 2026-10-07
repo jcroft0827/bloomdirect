@@ -262,6 +262,12 @@ const itemSnapshotSchema = new Schema(
       type: Boolean,
       required: true,
     },
+    arrangementContainerNote: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: "",
+    },
 
     unitPriceCents: nonNegativeCents,
     productSubtotalCents: nonNegativeCents,

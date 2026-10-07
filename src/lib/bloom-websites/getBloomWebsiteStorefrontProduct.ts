@@ -112,6 +112,7 @@ type WebsiteLean = {
     showPhone?: boolean;
     showAddress?: boolean;
     showSocialLinks?: boolean;
+    arrangementContainerNote?: string;
   };
 };
 
@@ -207,6 +208,11 @@ type ProductLean = {
   availableAddons?: ObjectIdLike[];
 
   allowsSubstitutions?: boolean;
+
+  arrangementContainerNote?: {
+    mode?: "default" | "custom" | "none";
+    text?: string;
+  };
 
   localOnly?: boolean;
 
@@ -396,6 +402,7 @@ export async function getBloomWebsiteStorefrontProduct(
         "seo",
         "availableAddons",
         "allowsSubstitutions",
+        "arrangementContainerNote",
         "localOnly",
         "isFeatured",
         "soldOut",
@@ -406,6 +413,14 @@ export async function getBloomWebsiteStorefrontProduct(
   if (!product) {
     return null;
   }
+
+  const arrangementNoteMode = product.arrangementContainerNote?.mode ?? "default";
+  const arrangementContainerNote =
+    arrangementNoteMode === "none"
+      ? ""
+      : arrangementNoteMode === "custom"
+        ? product.arrangementContainerNote?.text?.trim() || ""
+        : website.settings?.arrangementContainerNote?.trim() || "";
 
   const shop = (await Shop.findById(website.shop)
     .select(
@@ -833,6 +848,8 @@ export async function getBloomWebsiteStorefrontProduct(
       },
 
       allowsSubstitutions: product.allowsSubstitutions !== false,
+
+      arrangementContainerNote,
 
       localOnly: product.localOnly !== false,
 

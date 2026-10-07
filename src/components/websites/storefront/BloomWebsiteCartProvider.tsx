@@ -37,6 +37,8 @@ export type BloomWebsiteCartItemInput = {
 
   addons: BloomWebsiteCartAddon[];
 
+  arrangementContainerNote?: string;
+
   quantity: number;
 };
 
@@ -60,6 +62,14 @@ type BloomWebsiteCartContextValue = {
   removeItem: (lineId: string) => void;
 
   updateQuantity: (lineId: string, quantity: number) => void;
+
+  syncArrangementContainerNotes: (
+    notes: Array<{
+      productId: string;
+      tier: BloomWebsiteCartTier["label"];
+      arrangementContainerNote: string;
+    }>,
+  ) => void;
 
   clearCart: () => void;
 };
@@ -197,6 +207,11 @@ export default function BloomWebsiteCartProvider({
             ? {
                 ...item,
 
+                arrangementContainerNote:
+                  incomingItem.arrangementContainerNote ??
+                  item.arrangementContainerNote ??
+                  "",
+
                 quantity: item.quantity + normalizedQuantity,
               }
             : item,
@@ -256,6 +271,36 @@ export default function BloomWebsiteCartProvider({
     invalidateDeliveryValidation();
   }
 
+  function syncArrangementContainerNotes(
+    notes: Array<{
+      productId: string;
+      tier: BloomWebsiteCartTier["label"];
+      arrangementContainerNote: string;
+    }>,
+  ) {
+    const noteMap = new Map(
+      notes.map((note) => [
+        `${note.productId}::${note.tier}`,
+        note.arrangementContainerNote,
+      ]),
+    );
+
+    setItems((currentItems) =>
+      currentItems.map((item) => {
+        const key = `${item.productId}::${item.tier.label}`;
+
+        if (!noteMap.has(key)) {
+          return item;
+        }
+
+        return {
+          ...item,
+          arrangementContainerNote: noteMap.get(key) ?? "",
+        };
+      }),
+    );
+  }
+
   function clearCart() {
     setItems([]);
 
@@ -290,6 +335,8 @@ export default function BloomWebsiteCartProvider({
       removeItem,
 
       updateQuantity,
+
+      syncArrangementContainerNotes,
 
       clearCart,
     }),
@@ -438,6 +485,17 @@ export default function BloomWebsiteCartProvider({
                                 </span>
                               </p>
                             ))}
+                          </div>
+                        )}
+
+                        {item.arrangementContainerNote && (
+                          <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                            <p className="text-[11px] font-black uppercase tracking-wide text-gray-500">
+                              Arrangement &amp; container note
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-gray-600">
+                              {item.arrangementContainerNote}
+                            </p>
                           </div>
                         )}
 

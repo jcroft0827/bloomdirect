@@ -410,6 +410,20 @@ const bloomWebsiteProductSchema = new Schema(
       default: true,
     },
 
+    arrangementContainerNote: {
+      mode: {
+        type: String,
+        enum: ["default", "custom", "none"],
+        default: "default",
+      },
+      text: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+        default: "",
+      },
+    },
+
     localOnly: {
       type: Boolean,
       default: true,

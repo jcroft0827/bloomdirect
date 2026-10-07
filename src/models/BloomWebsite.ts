@@ -1104,6 +1104,17 @@ const bloomWebsiteSchema = new Schema(
         type: Boolean,
         default: true,
       },
+
+      /**
+       * Optional shop-wide customer-facing note for arrangement/container
+       * variability. Individual products may inherit, override, or suppress it.
+       */
+      arrangementContainerNote: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+        default: "",
+      },
     },
   },
   {

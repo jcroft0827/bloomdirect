@@ -748,6 +748,17 @@ export default function BloomWebsiteCardMessageCheckout({
                           ))}
                         </div>
                       )}
+
+                      {item.arrangementContainerNote && (
+                        <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-gray-500">
+                            Arrangement &amp; container note
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-gray-600">
+                            {item.arrangementContainerNote}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

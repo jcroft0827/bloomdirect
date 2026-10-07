@@ -166,6 +166,8 @@ export default function ProductConfigurator({
         price: addon.price,
       })),
 
+      arrangementContainerNote: product.arrangementContainerNote,
+
       quantity,
     });
   }
@@ -525,6 +527,17 @@ export default function ProductConfigurator({
                 </div>
               </div>
 
+              {product.arrangementContainerNote && (
+                <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-gray-500">
+                    Arrangement &amp; container note
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-gray-700">
+                    {product.arrangementContainerNote}
+                  </p>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleAddToCart}
@@ -555,13 +568,6 @@ export default function ProductConfigurator({
           )}
         </div>
 
-        {product.allowsSubstitutions && (
-          <p className="mt-6 text-xs leading-5 text-gray-400">
-            Flowers and containers may vary slightly based on freshness and
-            local availability while preserving the overall style and value of
-            the arrangement.
-          </p>
-        )}
       </section>
     </div>
   );

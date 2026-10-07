@@ -8,6 +8,7 @@ import {
   Globe2,
   LayoutDashboard,
   LifeBuoy,
+  Images,
   LogOut,
   Menu,
   Send,
@@ -44,6 +45,11 @@ const navigationItems = [
     name: "Website Verification",
     href: "/admin/websites",
     icon: Globe2,
+  },
+  {
+    name: "Image Catalogue",
+    href: "/admin/catalogue",
+    icon: Images,
   },
   {
     name: "Support",

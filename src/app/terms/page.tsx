@@ -3,13 +3,13 @@ import { LegalList, LegalPageLayout, LegalSection } from "@/components/LegalPage
 import type { Metadata } from "next";
 import { FileText } from "lucide-react";
 
-const LAST_UPDATED = "July 24, 2026";
+const LAST_UPDATED = "October 7, 2026";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
 
   description:
-    "Review the terms that govern access to and use of the GetBloomDirect florist-to-florist order network.",
+    "Review the terms that govern GetBloomDirect, the florist-to-florist network, and BloomWebsites storefront services.",
 
   alternates: {
     canonical: "/terms",
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     siteName: "GetBloomDirect",
     title: "Terms of Service | GetBloomDirect",
     description:
-      "The terms governing access to and use of the GetBloomDirect platform.",
+      "The terms governing access to and use of GetBloomDirect and BloomWebsites services.",
     images: [
       {
         url: "/og-image.png",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Terms of Service | GetBloomDirect",
     description:
-      "Review the terms governing access to and use of the GetBloomDirect platform.",
+      "Review the terms governing access to GetBloomDirect and BloomWebsites services.",
     images: ["/og-image.png"],
   },
 };
@@ -71,8 +71,9 @@ export default function TermsPage() {
       <LegalSection title="2. The GetBloomDirect platform">
         <p>
           GetBloomDirect provides technology that helps florists discover one
-          another, maintain profiles, communicate, and send or fulfill
-          florist-to-florist orders directly.
+          another, maintain profiles, communicate, send or fulfill
+          florist-to-florist orders directly, and build and operate
+          BloomWebsites storefronts for their own customers.
         </p>
         <p>
           GetBloomDirect is not a traditional wire service, is not the seller
@@ -83,17 +84,22 @@ export default function TermsPage() {
         </p>
         <p>
           Florists remain independently responsible for deciding whether to
-          accept an order, agreeing on payment, fulfilling orders, communicating
-          with customers and recipients, resolving disputes, and complying with
-          applicable laws.
+          accept an order, setting and communicating product and fulfillment
+          terms, fulfilling orders, communicating with customers and recipients,
+          resolving disputes, and complying with applicable laws. Unless
+          expressly stated otherwise, GetBloomDirect is not the florist that
+          designs, sells, or delivers products offered through a BloomWebsite.
         </p>
       </LegalSection>
 
       <LegalSection title="3. Eligibility and business use">
         <p>
-          You must be at least 18 years old and legally able to enter into a
-          binding agreement. The Services are intended for legitimate florist
-          businesses and authorized representatives of those businesses.
+          Florist account holders and authorized business representatives must
+          be at least 18 years old and legally able to enter into a binding
+          agreement. Florist account features are intended for legitimate
+          florist businesses and authorized representatives of those
+          businesses. Public BloomWebsite storefront features may also be used
+          by customers placing or managing orders.
         </p>
         <p>
           You must provide accurate information and keep account, contact,
@@ -118,7 +124,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Bloom Free and Bloom Pro">
+      <LegalSection title="5. GetBloomDirect plans and BloomWebsites">
         <p>
           Bloom Free currently permits up to 15 sent orders per calendar month
           and unlimited received orders, together with the features described
@@ -132,20 +138,27 @@ export default function TermsPage() {
           the Services improve. We will not retroactively charge you for a free
           feature without your agreement.
         </p>
+        <p>
+          BloomWebsites is a separate paid website service. A florist may build
+          and preview a BloomWebsite before activating a paid live website,
+          subject to the plans, pricing, features, and launch requirements shown
+          in the Services at the time of purchase.
+        </p>
       </LegalSection>
 
       <LegalSection title="6. Subscriptions, billing, and cancellation">
         <p>
-          Bloom Pro subscriptions are billed in advance on a monthly or annual
-          basis through Stripe or another payment provider identified at
-          checkout. By purchasing a subscription, you authorize recurring
-          charges to the selected payment method until cancellation.
+          Paid GetBloomDirect and BloomWebsites subscriptions may be billed in
+          advance on a monthly or annual basis through Stripe or another payment
+          provider identified at checkout. By purchasing a recurring
+          subscription, you authorize charges to the selected payment method
+          until cancellation.
         </p>
         <p>
-          You may cancel Bloom Pro through the available account or billing
-          tools. Unless otherwise stated, cancellation takes effect at the end
-          of the current paid billing period, and access to paid features may
-          continue until then.
+          You may cancel an eligible subscription through the available account
+          or billing tools. Unless otherwise stated for the applicable plan,
+          cancellation takes effect at the end of the current paid billing
+          period, and access to paid features may continue until then.
         </p>
         <p>
           Subscription payments are generally non-refundable except where
@@ -155,12 +168,41 @@ export default function TermsPage() {
         </p>
         <p>
           Failed, reversed, disputed, or overdue payments may result in
-          suspension or loss of Bloom Pro features. Taxes imposed on the
-          subscription may be added where required.
+          suspension or loss of the applicable paid features. Taxes imposed on
+          the subscription may be added where required.
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Florist-to-florist orders">
+
+      <LegalSection title="7. BloomWebsites and customer storefront orders">
+        <p>
+          BloomWebsites provides hosted storefront, catalogue, cart, checkout,
+          order-management, and related tools for a florist to offer products to
+          its own customers. The florist operating the storefront remains
+          responsible for its products and business practices, including product
+          descriptions and images, pricing, taxes, availability, delivery or
+          pickup settings, substitution practices, refunds, customer service,
+          and compliance with consumer-protection and other applicable laws.
+        </p>
+        <p>
+          When website payments are enabled, customer payments are processed
+          through the florist&apos;s connected third-party payment processor.
+          GetBloomDirect may create and verify payment requests, store payment
+          status and processor references, and support refunds or payment
+          recovery, but does not store full payment-card numbers or CVV.
+        </p>
+        <p>
+          BloomWebsite order records may include customer and recipient details,
+          fulfillment instructions, card messages, product and add-on details,
+          taxes, payment status, and the arrangement/container note shown for an
+          item. A florist may also configure a supported POS integration to send
+          paid order data to its own external system. The florist is responsible
+          for configuring an authorized destination and for its use and security
+          of customer and order data after receipt.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="8. Florist-to-florist orders">
         <p>
           Sending and fulfilling florists are responsible for reviewing and
           agreeing to all order details, including products, substitutions,
@@ -184,7 +226,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Profiles, offerings, reviews, and user content">
+      <LegalSection title="9. Profiles, offerings, reviews, and user content">
         <p>
           You retain ownership of logos, photos, descriptions, messages,
           reviews, offerings, and other content you submit (“User Content”). You
@@ -192,6 +234,21 @@ export default function TermsPage() {
           to host, store, reproduce, format, display, and use User Content as
           reasonably necessary to operate, secure, promote, and improve the
           Services.
+        </p>
+        <p>
+          GetBloomDirect may also make shared Bloom catalogue images available
+          for optional use within BloomWebsites. Catalogue images may include
+          AI-generated illustrative examples and are not photographs of a
+          particular florist&apos;s actual inventory. Selecting a catalogue image
+          does not supply a stem recipe, stem count, product size, price, or
+          promise of exact flowers or containers.
+        </p>
+        <p>
+          If you use a shared catalogue image, you are responsible for offering
+          a product that reasonably matches the design represented and for using
+          accurate product descriptions, substitution settings, and arrangement
+          or container notes when actual flowers, colors, or containers may
+          differ.
         </p>
         <p>
           You represent that you have the rights needed to submit User Content
@@ -207,7 +264,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="9. Acceptable use">
+      <LegalSection title="10. Acceptable use">
         <p>You may not use the Services to:</p>
         <LegalList>
           <li>Break the law or facilitate unlawful, fraudulent, or deceptive activity</li>
@@ -222,7 +279,7 @@ export default function TermsPage() {
         </LegalList>
       </LegalSection>
 
-      <LegalSection title="10. POS API and integrations">
+      <LegalSection title="11. POS API and integrations">
         <p>
           Access to the GetBloomDirect POS API or other integrations may require
           Bloom Pro, valid credentials, and compliance with published technical
@@ -236,9 +293,19 @@ export default function TermsPage() {
           integration when reasonably necessary for security, reliability,
           legal compliance, or platform development.
         </p>
+        <p>
+          BloomWebsite POS export may transmit a paid order snapshot to a
+          florist-configured FTP, FTPS, or SFTP destination supported by the
+          integration. Export records may retain the exact historical payload
+          and attempt history so a florist can review status or resend the same
+          order snapshot. POS exports do not include full payment-card numbers
+          or CVV. You are responsible for using correct credentials, an
+          authorized destination, and appropriate safeguards for exported order
+          data.
+        </p>
       </LegalSection>
 
-      <LegalSection title="11. Verification and platform moderation">
+      <LegalSection title="12. Verification and platform moderation">
         <p>
           Verification badges, profile information, reviews, statistics, and
           other trust signals are informational tools, not guarantees or
@@ -253,7 +320,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="12. Intellectual property">
+      <LegalSection title="13. Intellectual property">
         <p>
           The Services, including GetBloomDirect branding, software, design,
           text, graphics, interfaces, and platform-created content, are owned by
@@ -267,17 +334,17 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="13. Third-party services and links">
+      <LegalSection title="14. Third-party services and links">
         <p>
           The Services may interact with third-party providers, websites,
-          payment methods, mapping tools, email providers, POS systems, or other
-          products. GetBloomDirect does not control those services and is not
+          payment processors, mapping tools, email providers, POS systems, or
+          other products. GetBloomDirect does not control those services and is not
           responsible for their availability, content, security, or practices.
           Your use of third-party services is governed by their own terms.
         </p>
       </LegalSection>
 
-      <LegalSection title="14. Availability and changes">
+      <LegalSection title="15. Availability and changes">
         <p>
           We work to keep GetBloomDirect reliable, but the Services are provided
           on an “as available” basis. Maintenance, outages, internet failures,
@@ -291,7 +358,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="15. Suspension and termination">
+      <LegalSection title="16. Suspension and termination">
         <p>
           You may stop using the Services at any time. We may suspend, restrict,
           or terminate access when we reasonably believe you violated these
@@ -306,7 +373,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="16. Disclaimers">
+      <LegalSection title="17. Disclaimers">
         <p>
           To the fullest extent permitted by law, the Services are provided “as
           is” and “as available,” without warranties of any kind, whether
@@ -323,7 +390,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="17. Limitation of liability">
+      <LegalSection title="18. Limitation of liability">
         <p>
           To the fullest extent permitted by law, GetBloomDirect and its owners,
           personnel, affiliates, and service providers will not be liable for
@@ -344,7 +411,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="18. Indemnification">
+      <LegalSection title="19. Indemnification">
         <p>
           To the fullest extent permitted by law, you agree to defend,
           indemnify, and hold harmless GetBloomDirect and its owners, personnel,
@@ -356,7 +423,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="19. Governing law and disputes">
+      <LegalSection title="20. Governing law and disputes">
         <p>
           These Terms are governed by the laws of the State of New York, without
           regard to conflict-of-law principles. Before filing a formal claim,
@@ -371,7 +438,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="20. Changes to these terms">
+      <LegalSection title="21. Changes to these terms">
         <p>
           We may update these Terms as the Services and laws change. The updated
           date at the top shows when the Terms were most recently revised. If a
@@ -381,7 +448,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="21. General terms">
+      <LegalSection title="22. General terms">
         <p>
           These Terms and incorporated policies are the entire agreement
           between you and GetBloomDirect concerning the Services. If any
@@ -393,7 +460,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="22. Contact us">
+      <LegalSection title="23. Contact us">
         <p>
           Questions about these Terms may be submitted through the{" "}
           <a

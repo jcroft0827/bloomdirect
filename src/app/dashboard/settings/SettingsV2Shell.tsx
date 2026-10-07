@@ -29,6 +29,7 @@ const quickNavByArea: Record<SettingsArea, SettingsQuickNavItem[]> = {
   ],
   bloomwebsites: [
     { id: "website-orders", label: "Website Orders" },
+    { id: "website-product-display", label: "Product Display" },
     { id: "website-payments", label: "Payments" },
     { id: "website-taxes", label: "Taxes & Tips" },
     { id: "website-announcement", label: "Announcement" },

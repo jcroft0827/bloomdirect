@@ -1,10 +1,7 @@
 // src/app/dashboard/websites/products/[productId]/edit/page.tsx
 
 import { getServerSession } from "next-auth";
-import {
-  notFound,
-  redirect,
-} from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import ProductForm, {
   type ProductFormInitialData,
@@ -46,10 +43,15 @@ type ProductLean = {
     label?: string;
     price?: number;
     enabled?: boolean;
+    imageUrl?: string;
     recipe?: BloomWebsiteProductRecipe;
   }>;
 
   allowsSubstitutions?: boolean;
+  arrangementContainerNote?: {
+    mode?: "default" | "custom" | "none";
+    text?: string;
+  };
   localOnly?: boolean;
   taxable?: boolean;
   taxRatePercent?: number | null;
@@ -100,47 +102,28 @@ type AddonOptionLean = {
   eligibleProductCategories?: string[];
 };
 
-function formatDateForInput(
-  value:
-    | Date
-    | string
-    | null
-    | undefined,
-) {
+function formatDateForInput(value: Date | string | null | undefined) {
   if (!value) {
     return "";
   }
 
-  const date =
-    value instanceof Date
-      ? value
-      : new Date(value);
+  const date = value instanceof Date ? value : new Date(value);
 
-  if (
-    Number.isNaN(date.getTime())
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return "";
   }
 
-  return date
-    .toISOString()
-    .slice(0, 10);
+  return date.toISOString().slice(0, 10);
 }
 
-export default async function EditProductPage({
-  params,
-}: PageProps) {
-  const session =
-    await getServerSession(
-      authOptions,
-    );
+export default async function EditProductPage({ params }: PageProps) {
+  const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
     redirect("/login");
   }
 
-  const { productId } =
-    await params;
+  const { productId } = await params;
 
   await connectToDB();
 
@@ -156,75 +139,71 @@ export default async function EditProductPage({
    * website so shops can never load another
    * florist's products or add-ons.
    */
-  const website =
-    await BloomWebsite.findOne({
-      shop: session.user.id,
-    })
-      .select("_id")
-      .lean();
+  const website = await BloomWebsite.findOne({
+    shop: session.user.id,
+  })
+    .select("_id settings.arrangementContainerNote")
+    .lean<{
+      _id: unknown;
+      settings?: {
+        arrangementContainerNote?: string;
+      };
+    } | null>();
 
   if (!website) {
     notFound();
   }
 
-  const websiteId = String(
-    (
-      website as {
-        _id: unknown;
-      }
-    )._id,
-  );
+  const websiteId = String(website._id);
 
   // ===============================
   // PRODUCT
   // ===============================
 
-  const product =
-    (await BloomWebsiteProduct.findOne({
-      _id: productId,
+  const product = (await BloomWebsiteProduct.findOne({
+    _id: productId,
 
-      shop: session.user.id,
+    shop: session.user.id,
 
-      website: websiteId,
-    })
-      .select(
-        [
-          "_id",
+    website: websiteId,
+  })
+    .select(
+      [
+        "_id",
 
-          "sku",
-          "name",
-          "shortDescription",
-          "description",
+        "sku",
+        "name",
+        "shortDescription",
+        "description",
 
-          "category",
-          "occasions",
-          "tags",
+        "category",
+        "occasions",
+        "tags",
 
-          "imageUrl",
-          "galleryImages",
+        "imageUrl",
+        "galleryImages",
 
-          "pricingTiers",
+        "pricingTiers",
 
-          "allowsSubstitutions",
-          "localOnly",
-          "taxable",
-          "taxRatePercent",
+        "allowsSubstitutions",
+        "arrangementContainerNote",
+        "localOnly",
+        "taxable",
+        "taxRatePercent",
 
-          "inventory",
-          "availability",
+        "inventory",
+        "availability",
 
-          "availableAddons",
+        "availableAddons",
 
-          "isFeatured",
-          "isActive",
-          "soldOut",
+        "isFeatured",
+        "isActive",
+        "soldOut",
 
-          "seo",
-        ].join(" "),
-      )
-      .lean()) as
-      | ProductLean
-      | null;
+        "seo",
+      ].join(" "),
+    )
+    .lean()) as ProductLean | null;
 
   if (!product) {
     notFound();
@@ -246,65 +225,51 @@ export default async function EditProductPage({
    * 2. Non-universal add-ons can be manually
    *    attached to this specific product.
    */
-  const addonOptionsRaw =
-    (await BloomWebsiteAddon.find({
-      shop: session.user.id,
+  const addonOptionsRaw = (await BloomWebsiteAddon.find({
+    shop: session.user.id,
 
-      website: websiteId,
+    website: websiteId,
 
-      isActive: true,
+    isActive: true,
+  })
+    .select(
+      [
+        "_id",
+        "name",
+        "price",
+        "category",
+        "imageUrl",
+        "isUniversal",
+        "eligibleProductCategories",
+      ].join(" "),
+    )
+    .sort({
+      isUniversal: -1,
+      sortOrder: 1,
+      createdAt: 1,
     })
-      .select(
-        [
-          "_id",
-          "name",
-          "price",
-          "category",
-          "imageUrl",
-          "isUniversal",
-          "eligibleProductCategories",
-        ].join(" "),
-      )
-      .sort({
-        isUniversal: -1,
-        sortOrder: 1,
-        createdAt: 1,
-      })
-      .lean()) as unknown as AddonOptionLean[];
+    .lean()) as unknown as AddonOptionLean[];
 
   /*
    * Convert Mongoose values into plain,
    * serializable values before passing them
    * to the Client Component.
    */
-  const addonOptions =
-    addonOptionsRaw.map(
-      (addon) => ({
-        id: addon._id.toString(),
+  const addonOptions = addonOptionsRaw.map((addon) => ({
+    id: addon._id.toString(),
 
-        name:
-          addon.name ?? "",
+    name: addon.name ?? "",
 
-        price:
-          addon.price ?? 0,
+    price: addon.price ?? 0,
 
-        category:
-          addon.category ??
-          "Extras",
+    category: addon.category ?? "Extras",
 
-        imageUrl:
-          addon.imageUrl ?? "",
+    imageUrl: addon.imageUrl ?? "",
 
-        isUniversal:
-          addon.isUniversal ===
-          true,
+    isUniversal: addon.isUniversal === true,
 
-        eligibleProductCategories:
-          addon
-            .eligibleProductCategories ??
-          [],
-      }),
-    );
+    eligibleProductCategories: addon.eligibleProductCategories ?? [],
+  }));
 
   // ===============================
   // PRICING TIERS
@@ -315,44 +280,37 @@ export default async function EditProductPage({
    * crossing the Server Component ->
    * Client Component boundary.
    */
-  const pricingTiers: ProductFormInitialData["pricingTiers"] =
-    (
-      product.pricingTiers ??
-      []
+  const pricingTiers: ProductFormInitialData["pricingTiers"] = (
+    product.pricingTiers ?? []
+  )
+    .filter(
+      (
+        tier,
+      ): tier is {
+        label: "standard" | "deluxe" | "premium";
+
+        price: number;
+
+        enabled?: boolean;
+        imageUrl?: string;
+        recipe?: BloomWebsiteProductRecipe;
+      } =>
+        (tier.label === "standard" ||
+          tier.label === "deluxe" ||
+          tier.label === "premium") &&
+        typeof tier.price === "number",
     )
-      .filter(
-        (
-          tier,
-        ): tier is {
-          label:
-            | "standard"
-            | "deluxe"
-            | "premium";
+    .map((tier) => ({
+      label: tier.label,
 
-          price: number;
+      price: tier.price,
 
-          enabled?: boolean;
-          recipe?: BloomWebsiteProductRecipe;
-        } =>
-          (tier.label ===
-            "standard" ||
-            tier.label ===
-              "deluxe" ||
-            tier.label ===
-              "premium") &&
-          typeof tier.price ===
-            "number",
-      )
-      .map((tier) => ({
-        label: tier.label,
+      enabled: tier.enabled !== false,
 
-        price: tier.price,
+      imageUrl: tier.imageUrl ?? "",
 
-        enabled:
-          tier.enabled !== false,
-
-        recipe: parseBloomWebsiteProductRecipe(tier.recipe),
-      }));
+      recipe: parseBloomWebsiteProductRecipe(tier.recipe),
+    }));
 
   // ===============================
   // INITIAL FORM DATA
@@ -366,156 +324,109 @@ export default async function EditProductPage({
    * ProductForm uses this to preload the
    * Edit Product screen.
    */
-  const initialData: ProductFormInitialData =
-    {
-      id:
-        product._id.toString(),
+  const initialData: ProductFormInitialData = {
+    id: product._id.toString(),
 
-      sku:
-        product.sku ?? "",
+    sku: product.sku ?? "",
 
-      name:
-        product.name ?? "",
+    name: product.name ?? "",
 
-      shortDescription:
-        product.shortDescription ??
-        "",
+    shortDescription: product.shortDescription ?? "",
 
-      description:
-        product.description ?? "",
+    description: product.description ?? "",
 
-      category:
-        product.category ??
-        "Flowers",
+    category: product.category ?? "Flowers",
 
-      occasions:
-        product.occasions ?? [],
+    occasions: product.occasions ?? [],
 
-      tags:
-        product.tags ?? [],
+    tags: product.tags ?? [],
 
-      imageUrl:
-        product.imageUrl ?? "",
+    imageUrl: product.imageUrl ?? "",
 
-      galleryImages:
-        product.galleryImages ??
-        [],
+    galleryImages: product.galleryImages ?? [],
 
-      pricingTiers,
+    pricingTiers,
 
-      allowsSubstitutions:
-        product
-          .allowsSubstitutions ??
-        true,
+    allowsSubstitutions: product.allowsSubstitutions ?? true,
 
-      localOnly:
-        product.localOnly ?? true,
+    arrangementContainerNote: {
+      mode:
+        product.arrangementContainerNote?.mode === "custom" ||
+        product.arrangementContainerNote?.mode === "none"
+          ? product.arrangementContainerNote.mode
+          : "default",
+      text: product.arrangementContainerNote?.text ?? "",
+    },
 
-      taxable:
-        product.taxable ?? true,
-      taxRatePercent:
-        typeof product.taxRatePercent === "number"
-          ? product.taxRatePercent
-          : null,
+    localOnly: product.localOnly ?? true,
 
-      inventory: {
-        trackInventory:
-          product.inventory
-            ?.trackInventory ??
-          false,
+    taxable: product.taxable ?? true,
+    taxRatePercent:
+      typeof product.taxRatePercent === "number"
+        ? product.taxRatePercent
+        : null,
 
-        quantity:
-          product.inventory
-            ?.quantity ?? 0,
-      },
+    inventory: {
+      trackInventory: product.inventory?.trackInventory ?? false,
 
-      availability: {
-        type:
-          product.availability
-            ?.type ===
-          "date_range"
-            ? "date_range"
-            : "always",
+      quantity: product.inventory?.quantity ?? 0,
+    },
 
-        startDate:
-          formatDateForInput(
-            product.availability
-              ?.startDate,
-          ),
+    availability: {
+      type:
+        product.availability?.type === "date_range" ? "date_range" : "always",
 
-        endDate:
-          formatDateForInput(
-            product.availability
-              ?.endDate,
-          ),
-      },
+      startDate: formatDateForInput(product.availability?.startDate),
 
-      /*
-       * These are the manually attached,
-       * non-universal add-ons already saved
-       * on the product.
-       */
-      availableAddons:
-        product.availableAddons?.map(
-          (addonId) =>
-            addonId.toString(),
-        ) ?? [],
+      endDate: formatDateForInput(product.availability?.endDate),
+    },
 
-      isFeatured:
-        product.isFeatured ??
-        false,
+    /*
+     * These are the manually attached,
+     * non-universal add-ons already saved
+     * on the product.
+     */
+    availableAddons:
+      product.availableAddons?.map((addonId) => addonId.toString()) ?? [],
 
-      isActive:
-        product.isActive ?? true,
+    isFeatured: product.isFeatured ?? false,
 
-      soldOut:
-        product.soldOut ?? false,
+    isActive: product.isActive ?? true,
 
-      seo: {
-        title:
-          product.seo?.title ??
-          "",
+    soldOut: product.soldOut ?? false,
 
-        description:
-          product.seo
-            ?.description ?? "",
+    seo: {
+      title: product.seo?.title ?? "",
 
-        imageAltText:
-          product.seo
-            ?.imageAltText ?? "",
+      description: product.seo?.description ?? "",
 
-        allowIndexing:
-          product.seo
-            ?.allowIndexing ??
-          true,
+      imageAltText: product.seo?.imageAltText ?? "",
 
-        canonicalUrl:
-          product.seo
-            ?.canonicalUrl ?? "",
+      allowIndexing: product.seo?.allowIndexing ?? true,
 
-        socialTitle:
-          product.seo
-            ?.socialTitle ?? "",
+      canonicalUrl: product.seo?.canonicalUrl ?? "",
 
-        socialDescription:
-          product.seo
-            ?.socialDescription ??
-          "",
+      socialTitle: product.seo?.socialTitle ?? "",
 
-        socialImageUrl:
-          product.seo
-            ?.socialImageUrl ?? "",
-      },
-    };
+      socialDescription: product.seo?.socialDescription ?? "",
+
+      socialImageUrl: product.seo?.socialImageUrl ?? "",
+    },
+  };
 
   // ===============================
   // RENDER
   // ===============================
 
+  const websiteSettings = website.settings;
+
   return (
     <ProductForm
       initialData={initialData}
       addonOptions={addonOptions}
+      defaultArrangementContainerNote={
+        websiteSettings?.arrangementContainerNote ?? ""
+      }
     />
   );
 }

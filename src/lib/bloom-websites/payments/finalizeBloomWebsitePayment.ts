@@ -71,6 +71,7 @@ function orderItemSnapshots(cart: any) {
     taxable: item.taxable === true,
     localOnly: item.localOnly === true,
     allowsSubstitutions: item.allowsSubstitutions !== false,
+    arrangementContainerNote: clean(item.arrangementContainerNote),
     unitPriceCents: item.unitPriceCents,
     productSubtotalCents: item.productSubtotalCents,
     addonSubtotalCents: item.addonSubtotalCents,

@@ -39,11 +39,17 @@ type UpdateProductBody = {
   premiumEnabled?: unknown;
   premiumPrice?: unknown;
 
+  standardTierImageUrl?: unknown;
+  deluxeTierImageUrl?: unknown;
+  premiumTierImageUrl?: unknown;
+
   standardRecipe?: unknown;
   deluxeRecipe?: unknown;
   premiumRecipe?: unknown;
 
   allowsSubstitutions?: unknown;
+  arrangementNoteMode?: unknown;
+  arrangementNoteText?: unknown;
   localOnly?: unknown;
   taxable?: unknown;
   taxRatePercent?: unknown;
@@ -218,6 +224,19 @@ export async function PATCH(
         ? parsePrice(body.premiumPrice)
         : null;
 
+    const standardTierImageUrl =
+      typeof body.standardTierImageUrl === "string"
+        ? body.standardTierImageUrl.trim()
+        : "";
+    const deluxeTierImageUrl =
+      typeof body.deluxeTierImageUrl === "string"
+        ? body.deluxeTierImageUrl.trim()
+        : "";
+    const premiumTierImageUrl =
+      typeof body.premiumTierImageUrl === "string"
+        ? body.premiumTierImageUrl.trim()
+        : "";
+
     const standardRecipe = parseBloomWebsiteProductRecipe(body.standardRecipe);
     const deluxeRecipe = parseBloomWebsiteProductRecipe(body.deluxeRecipe);
     const premiumRecipe = parseBloomWebsiteProductRecipe(body.premiumRecipe);
@@ -228,6 +247,29 @@ export async function PATCH(
 
     const allowsSubstitutions =
       body.allowsSubstitutions !== false;
+
+    const arrangementNoteMode =
+      body.arrangementNoteMode === "custom" || body.arrangementNoteMode === "none"
+        ? body.arrangementNoteMode
+        : "default";
+    const arrangementNoteText =
+      typeof body.arrangementNoteText === "string"
+        ? body.arrangementNoteText.trim()
+        : "";
+
+    if (arrangementNoteText.length > 1000) {
+      return NextResponse.json(
+        { error: "Arrangement & container note must be 1000 characters or fewer." },
+        { status: 400 },
+      );
+    }
+
+    if (arrangementNoteMode === "custom" && !arrangementNoteText) {
+      return NextResponse.json(
+        { error: "Enter a custom arrangement & container note or choose another note option." },
+        { status: 400 },
+      );
+    }
 
     const localOnly =
       body.localOnly !== false;
@@ -731,6 +773,7 @@ export async function PATCH(
         label: "standard",
         price: standardPrice,
         enabled: true,
+        imageUrl: standardTierImageUrl,
         recipe: standardRecipe,
       },
     ];
@@ -743,6 +786,7 @@ export async function PATCH(
         label: "deluxe",
         price: deluxePrice,
         enabled: true,
+        imageUrl: deluxeTierImageUrl,
         recipe: deluxeRecipe,
       });
     }
@@ -755,6 +799,7 @@ export async function PATCH(
         label: "premium",
         price: premiumPrice,
         enabled: true,
+        imageUrl: premiumTierImageUrl,
         recipe: premiumRecipe,
       });
     }
@@ -798,6 +843,11 @@ export async function PATCH(
 
     product.allowsSubstitutions =
       allowsSubstitutions;
+
+    product.arrangementContainerNote = {
+      mode: arrangementNoteMode,
+      text: arrangementNoteMode === "custom" ? arrangementNoteText : "",
+    };
 
     product.localOnly =
       localOnly;

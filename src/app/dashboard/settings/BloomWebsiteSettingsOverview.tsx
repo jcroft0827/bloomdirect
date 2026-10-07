@@ -7,6 +7,7 @@ import BloomWebsiteContactDisplaySettings from "./BloomWebsiteContactDisplaySett
 import BloomWebsitePickupSettings from "./BloomWebsitePickupSettings";
 import BloomWebsiteTaxSettings from "./BloomWebsiteTaxSettings";
 import BloomWebsitePaymentSettings from "./BloomWebsitePaymentSettings";
+import BloomWebsiteProductDisplaySettings from "./BloomWebsiteProductDisplaySettings";
 
 type BloomWebsiteSettingsOverviewProps = {
   initialWebsite: any;
@@ -33,6 +34,10 @@ export default function BloomWebsiteSettingsOverview({
       </div>
 
       <BloomWebsiteOrderSettings initialWebsite={initialWebsite} />
+
+      <div className="mt-5">
+        <BloomWebsiteProductDisplaySettings initialWebsite={initialWebsite} />
+      </div>
 
       <div className="mt-5">
         <BloomWebsitePaymentSettings initialWebsite={initialWebsite} />

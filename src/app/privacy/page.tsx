@@ -1,8 +1,12 @@
-import { LegalList, LegalPageLayout, LegalSection } from "@/components/LegalPageLayout";
+import {
+  LegalList,
+  LegalPageLayout,
+  LegalSection,
+} from "@/components/LegalPageLayout";
 import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 
-const LAST_UPDATED = "July 24, 2026";
+const LAST_UPDATED = "October 7, 2026";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -53,19 +57,23 @@ export default function PrivacyPage() {
         <p>
           GetBloomDirect is built to help independent florists work directly
           with one another. We collect information needed to operate, secure,
-          support, and improve the platform. We do not sell personal
-          information for money, and we do not use personal information for
-          third-party targeted advertising.
+          support, and improve the platform. We do not sell personal information
+          for money, and we do not use personal information for third-party
+          targeted advertising.
         </p>
         <p>
-          This Privacy Policy applies to the GetBloomDirect website,
-          applications, accounts, and related services (collectively, the
-          “Services”).
+          This Privacy Policy applies to the GetBloomDirect website, accounts,
+          florist-to-florist network, BloomWebsites storefronts and checkout,
+          and related services (collectively, the “Services”). It applies both
+          to florist account users and, where relevant, customers and recipients
+          whose information is processed through a BloomWebsite or an order.
         </p>
       </LegalSection>
 
       <LegalSection title="2. Information we collect">
-        <p className="font-bold text-gray-900">Account and business information</p>
+        <p className="font-bold text-gray-900">
+          Account and business information
+        </p>
         <p>When a shop creates or manages an account, we may collect:</p>
         <LegalList>
           <li>Business name, contact name, email address, and phone number</li>
@@ -74,24 +82,60 @@ export default function PrivacyPage() {
           <li>Subscription status and limited billing-related information</li>
         </LegalList>
 
-        <p className="font-bold text-gray-900">Profile and network information</p>
-        <p>Shops may provide information displayed to other users, including:</p>
+        <p className="font-bold text-gray-900">
+          Profile and network information
+        </p>
+        <p>
+          Shops may provide information displayed to other users, including:
+        </p>
         <LegalList>
-          <li>Logos, banners, photos, descriptions, and public profile details</li>
-          <li>Fulfillment offerings, prices, delivery areas, and availability</li>
+          <li>
+            Logos, banners, photos, descriptions, and public profile details
+          </li>
+          <li>
+            BloomWebsite branding, products, galleries, add-ons, site content,
+            and SEO information
+          </li>
+          <li>
+            Images uploaded by a shop or selected from a shared Bloom catalogue
+          </li>
+          <li>
+            Fulfillment offerings, prices, delivery areas, pickup settings, and
+            availability
+          </li>
           <li>Accepted payment methods, reviews, and network activity</li>
         </LegalList>
 
-        <p className="font-bold text-gray-900">Order and communication information</p>
+        <p className="font-bold text-gray-900">
+          Order, customer, and communication information
+        </p>
         <p>
-          When florists use the Services to send or fulfill orders, we may
-          process order-related information such as:
+          When florists use the network or when a customer places an order
+          through a BloomWebsite, we may process order-related information such
+          as:
         </p>
         <LegalList>
           <li>Sending and fulfilling florist information</li>
-          <li>Recipient name, delivery address, phone number, and delivery notes</li>
-          <li>Arrangement details, card messages, prices, taxes, and fees</li>
-          <li>Order status, activity history, messages, reviews, and support records</li>
+          <li>
+            Customer name, email address, phone number, and order contact
+            details
+          </li>
+          <li>
+            Recipient name, delivery or pickup details, address, phone number,
+            and instructions
+          </li>
+          <li>
+            Arrangement, tier, add-on, substitution, arrangement/container-note,
+            and card-message details
+          </li>
+          <li>
+            Prices, taxes, delivery or pickup charges, payment status, refunds,
+            and processor references
+          </li>
+          <li>
+            Order status, activity history, messages, reviews, and support
+            records
+          </li>
         </LegalList>
         <p>
           Florists who submit information about customers, recipients, or other
@@ -111,13 +155,43 @@ export default function PrivacyPage() {
         <p>We may use information to:</p>
         <LegalList>
           <li>Create, authenticate, and manage accounts</li>
-          <li>Operate florist profiles, search, ordering, messaging, and reviews</li>
-          <li>Deliver account, order, verification, billing, and security notices</li>
-          <li>Provide support and respond to questions or disputes</li>
-          <li>Process Bloom Pro subscriptions through our payment provider</li>
-          <li>Detect, prevent, investigate, and address fraud, abuse, or security issues</li>
+          <li>
+            Operate florist profiles, search, ordering, messaging, and reviews
+          </li>
+          <li>
+            Build and operate BloomWebsites storefronts, catalogues, carts,
+            checkout, and order management
+          </li>
+          <li>
+            Validate inventory, fulfillment, tax, and payment status for
+            BloomWebsite orders
+          </li>
+          <li>
+            Deliver account, order, verification, billing, and security notices
+          </li>
+          <li>
+            Provide support and respond to questions, refunds, or disputes
+          </li>
+          <li>
+            Process GetBloomDirect and BloomWebsites subscription billing
+            through our payment provider
+          </li>
+          <li>
+            Support customer payments through a florist&apos;s connected payment
+            processor
+          </li>
+          <li>
+            Send paid BloomWebsite orders to a POS destination when the florist
+            enables and configures that integration
+          </li>
+          <li>
+            Detect, prevent, investigate, and address fraud, abuse, or security
+            issues
+          </li>
           <li>Analyze reliability and improve the Services</li>
-          <li>Enforce our Terms of Service and comply with legal obligations</li>
+          <li>
+            Enforce our Terms of Service and comply with legal obligations
+          </li>
         </LegalList>
       </LegalSection>
 
@@ -125,32 +199,53 @@ export default function PrivacyPage() {
         <p>We may share information in the following circumstances:</p>
         <LegalList>
           <li>
-            <strong className="text-gray-900">With other florists:</strong>{" "}
-            Public profile information and information needed to send, accept,
-            fulfill, communicate about, and review orders may be shared with
-            the relevant shops.
+            <strong className="text-gray-900">With florists:</strong> Public
+            profile information and information needed to send, accept, fulfill,
+            communicate about, and review florist-to-florist orders may be
+            shared with the relevant shops. Information submitted through a
+            BloomWebsite is made available to the florist operating that
+            storefront so the florist can process and fulfill the order.
           </li>
           <li>
             <strong className="text-gray-900">With service providers:</strong>{" "}
-            Vendors may process information for hosting, database services,
-            file storage, email delivery, geocoding, maps, analytics, security,
-            and subscription billing.
+            Vendors may process information for hosting, database services, file
+            storage, email delivery, geocoding, maps, analytics, security, and
+            subscription billing.
           </li>
           <li>
-            <strong className="text-gray-900">For legal and safety reasons:</strong>{" "}
-            We may disclose information when reasonably necessary to comply
-            with law, legal process, protect rights or safety, investigate
-            misuse, or enforce agreements.
+            <strong className="text-gray-900">With payment processors:</strong>{" "}
+            Subscription and BloomWebsite customer-payment information may be
+            sent to the applicable payment processor to create, verify, refund,
+            or otherwise service a payment.
           </li>
           <li>
-            <strong className="text-gray-900">During a business transaction:</strong>{" "}
+            <strong className="text-gray-900">
+              With florist-configured POS systems:
+            </strong>{" "}
+            When a florist enables a POS integration, paid BloomWebsite order
+            information may be transmitted to the server or system the florist
+            configured for that purpose.
+          </li>
+
+          <li>
+            <strong className="text-gray-900">
+              For legal and safety reasons:
+            </strong>{" "}
+            We may disclose information when reasonably necessary to comply with
+            law, legal process, protect rights or safety, investigate misuse, or
+            enforce agreements.
+          </li>
+          <li>
+            <strong className="text-gray-900">
+              During a business transaction:
+            </strong>{" "}
             Information may be transferred as part of a merger, financing,
             acquisition, reorganization, or sale of all or part of the business,
             subject to appropriate protections.
           </li>
           <li>
-            <strong className="text-gray-900">With your direction:</strong>{" "}
-            We may share information when you ask or authorize us to do so.
+            <strong className="text-gray-900">With your direction:</strong> We
+            may share information when you ask or authorize us to do so.
           </li>
         </LegalList>
       </LegalSection>
@@ -158,15 +253,32 @@ export default function PrivacyPage() {
       <LegalSection title="5. Service providers">
         <p>
           GetBloomDirect currently relies on service providers that may include
-          Stripe for subscription billing, Resend for transactional email,
-          MongoDB Atlas for database hosting, Amazon Web Services for file
-          storage, Vercel for application hosting, and mapping or geocoding
-          providers used to support address and delivery features.
+          Stripe for subscription billing and, where a florist connects Stripe,
+          BloomWebsite customer payments; Resend for transactional email;
+          MongoDB Atlas for database hosting; Amazon Web Services for file
+          storage and delivery; Vercel for application hosting; and mapping or
+          geocoding providers used to support address and delivery features.
         </p>
         <p>
           These providers process information under their own terms and privacy
           notices. Their services and our provider list may change as the
           platform develops.
+        </p>
+        <p>
+          For BloomWebsite checkout using Stripe, payment-card entry is handled
+          through Stripe&apos;s payment interface. GetBloomDirect does not
+          request or store the full payment-card number or CVV. We do store
+          payment status and processor references needed to verify payments,
+          manage orders, support refunds, and maintain transaction records.
+        </p>
+        <p>
+          When a florist enables the current TFPOS export integration, a paid
+          order can be sent to the florist&apos;s configured file-transfer
+          destination. GetBloomDirect retains the exact exported order payload
+          and delivery-attempt history so the florist can view status and resend
+          the same historical order snapshot. Those exports may contain
+          customer, recipient, and order information, but they do not include
+          full payment-card numbers or CVV.
         </p>
       </LegalSection>
 
@@ -198,14 +310,18 @@ export default function PrivacyPage() {
       </LegalSection>
 
       <LegalSection title="8. Your choices and privacy rights">
-        <p>Depending on your location and applicable law, you may be able to:</p>
+        <p>
+          Depending on your location and applicable law, you may be able to:
+        </p>
         <LegalList>
           <li>Access or correct certain account information</li>
           <li>Update or remove information from your public profile</li>
           <li>Request a copy of certain personal information</li>
           <li>Request deletion of certain personal information</li>
           <li>Object to or request limits on certain processing</li>
-          <li>Appeal a decision concerning a privacy request, where required</li>
+          <li>
+            Appeal a decision concerning a privacy request, where required
+          </li>
         </LegalList>
         <p>
           We may need to verify your identity and authority before completing a
@@ -222,10 +338,10 @@ export default function PrivacyPage() {
 
       <LegalSection title="9. Security">
         <p>
-          We use reasonable administrative and technical safeguards designed
-          to protect information, including encrypted connections, access
-          controls, password hashing, private file storage where appropriate,
-          and trusted infrastructure providers.
+          We use reasonable administrative and technical safeguards designed to
+          protect information, including encrypted connections, access controls,
+          password hashing, private file storage where appropriate, and trusted
+          infrastructure providers.
         </p>
         <p>
           No online service can guarantee absolute security. Users are also

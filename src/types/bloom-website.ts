@@ -365,6 +365,8 @@ export type BloomWebsiteStorefrontProductDetail = {
 
   allowsSubstitutions: boolean;
 
+  arrangementContainerNote: string;
+
   localOnly: boolean;
 
   isFeatured: boolean;

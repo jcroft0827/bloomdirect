@@ -17,13 +17,28 @@ export default async function NewWebsiteProductPage() {
 
   await connectToDB();
 
-  const website = await BloomWebsite.exists({
+  const website = await BloomWebsite.findOne({
     shop: session.user.id,
-  });
+  })
+    .select("_id settings.arrangementContainerNote")
+    .lean<{
+      _id: unknown;
+      settings?: {
+        arrangementContainerNote?: string;
+      };
+    } | null>();
 
   if (!website) {
     redirect("/dashboard/websites");
   }
 
-  return <ProductForm />;
+  const websiteSettings = website.settings;
+
+  return (
+    <ProductForm
+      defaultArrangementContainerNote={
+        websiteSettings?.arrangementContainerNote ?? ""
+      }
+    />
+  );
 }

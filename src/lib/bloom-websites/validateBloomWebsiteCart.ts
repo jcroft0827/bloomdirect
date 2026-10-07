@@ -74,6 +74,7 @@ export type ValidatedBloomWebsiteCartItem = {
   taxRatePercent: number | null;
   localOnly: boolean;
   allowsSubstitutions: boolean;
+  arrangementContainerNote: string;
 
   addons: ValidatedBloomWebsiteCartAddon[];
 };
@@ -179,6 +180,10 @@ type LeanProduct = {
   taxRatePercent?: number | null;
   localOnly?: boolean;
   allowsSubstitutions?: boolean;
+  arrangementContainerNote?: {
+    mode?: "default" | "custom" | "none";
+    text?: string;
+  };
 
   inventory?: LeanInventory;
 
@@ -223,6 +228,9 @@ type LeanWebsite = {
   _id: unknown;
   shop: unknown;
   previewSlug?: string;
+  settings?: {
+    arrangementContainerNote?: string;
+  };
 };
 
 function toIdString(value: unknown) {
@@ -254,6 +262,23 @@ function dollarsToCents(value: unknown) {
   }
 
   return Math.round(amount * 100);
+}
+
+function getEffectiveArrangementContainerNote(
+  product: LeanProduct,
+  website: LeanWebsite,
+) {
+  const mode = product.arrangementContainerNote?.mode ?? "default";
+
+  if (mode === "none") {
+    return "";
+  }
+
+  if (mode === "custom") {
+    return product.arrangementContainerNote?.text?.trim() || "";
+  }
+
+  return website.settings?.arrangementContainerNote?.trim() || "";
 }
 
 function normalizeCategory(value: string | null | undefined) {
@@ -472,7 +497,7 @@ export async function validateBloomWebsiteCart(
   const website = (await BloomWebsite.findOne({
     previewSlug,
   })
-    .select("_id shop previewSlug")
+    .select("_id shop previewSlug settings.arrangementContainerNote")
     .lean()) as unknown as LeanWebsite | null;
 
   if (!website) {
@@ -511,6 +536,7 @@ export async function validateBloomWebsiteCart(
         "taxable",
         "localOnly",
         "allowsSubstitutions",
+        "arrangementContainerNote",
         "inventory",
         "availability",
         "availableAddons",
@@ -877,6 +903,11 @@ export async function validateBloomWebsiteCart(
       localOnly: product.localOnly !== false,
 
       allowsSubstitutions: product.allowsSubstitutions !== false,
+
+      arrangementContainerNote: getEffectiveArrangementContainerNote(
+        product,
+        website,
+      ),
 
       addons: validatedAddons,
     });

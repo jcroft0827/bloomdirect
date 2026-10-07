@@ -215,6 +215,17 @@ export default async function BloomWebsiteOrderDetailPage({
                             ))}
                           </div>
                         )}
+
+                        {item.arrangementContainerNote && (
+                          <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                            <p className="text-xs font-black uppercase tracking-wide text-gray-500">
+                              Arrangement &amp; container note
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-gray-700">
+                              {item.arrangementContainerNote}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
