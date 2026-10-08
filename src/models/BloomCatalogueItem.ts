@@ -58,7 +58,11 @@ const catalogueAssetSchema = new Schema(
   { _id: false },
 );
 
-
+/*
+ * Kept for backwards compatibility with catalogue entries created before
+ * unified product/catalogue copy was introduced. New writes mirror the
+ * unified fields into this object so older deployed clients remain safe.
+ */
 const suggestedProductSchema = new Schema(
   {
     name: {
@@ -97,6 +101,42 @@ const suggestedProductSchema = new Schema(
   { _id: false },
 );
 
+const suggestedSeoSchema = new Schema(
+  {
+    title: {
+      type: String,
+      trim: true,
+      maxlength: 70,
+      default: "",
+    },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 170,
+      default: "",
+    },
+    imageAltText: {
+      type: String,
+      trim: true,
+      maxlength: 250,
+      default: "",
+    },
+    socialTitle: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: "",
+    },
+    socialDescription: {
+      type: String,
+      trim: true,
+      maxlength: 250,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
 const bloomCatalogueItemSchema = new Schema(
   {
     title: {
@@ -105,10 +145,16 @@ const bloomCatalogueItemSchema = new Schema(
       trim: true,
       maxlength: 160,
     },
+    shortDescription: {
+      type: String,
+      trim: true,
+      maxlength: 240,
+      default: "",
+    },
     description: {
       type: String,
       trim: true,
-      maxlength: 1200,
+      maxlength: 3000,
       default: "",
     },
     flowers: {
@@ -133,6 +179,10 @@ const bloomCatalogueItemSchema = new Schema(
     },
     suggestedProduct: {
       type: suggestedProductSchema,
+      default: () => ({}),
+    },
+    suggestedSeo: {
+      type: suggestedSeoSchema,
       default: () => ({}),
     },
     image: {

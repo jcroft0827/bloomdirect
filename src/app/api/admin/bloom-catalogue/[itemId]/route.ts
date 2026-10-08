@@ -30,20 +30,18 @@ function cleanStringArray(value: unknown, maxItemLength = 100) {
   ].slice(0, MAX_ARRAY_ITEMS);
 }
 
-
-function parseSuggestedProduct(value: unknown) {
-  const suggested =
+function parseSuggestedSeo(value: unknown) {
+  const seo =
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
       : {};
 
   return {
-    name: cleanString(suggested.name, 160),
-    shortDescription: cleanString(suggested.shortDescription, 240),
-    description: cleanString(suggested.description, 3000),
-    category: cleanString(suggested.category, 100),
-    occasions: cleanStringArray(suggested.occasions),
-    tags: cleanStringArray(suggested.tags),
+    title: cleanString(seo.title, 70),
+    description: cleanString(seo.description, 170),
+    imageAltText: cleanString(seo.imageAltText, 250),
+    socialTitle: cleanString(seo.socialTitle, 100),
+    socialDescription: cleanString(seo.socialDescription, 250),
   };
 }
 
@@ -110,14 +108,29 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "The replacement catalogue image is invalid." }, { status: 400 });
     }
 
+    const shortDescription = cleanString(body?.shortDescription, 240);
+    const description = cleanString(body?.description, 3000);
+    const category = cleanString(body?.category, 100);
+    const occasions = cleanStringArray(body?.occasions);
+    const tags = cleanStringArray(body?.tags);
+
     item.title = title;
-    item.description = cleanString(body?.description, 1200);
+    item.shortDescription = shortDescription;
+    item.description = description;
     item.flowers = cleanStringArray(body?.flowers);
     item.colors = cleanStringArray(body?.colors);
-    item.occasions = cleanStringArray(body?.occasions);
-    item.categories = cleanStringArray(body?.categories);
-    item.tags = cleanStringArray(body?.tags);
-    item.suggestedProduct = parseSuggestedProduct(body?.suggestedProduct);
+    item.occasions = occasions;
+    item.categories = category ? [category] : [];
+    item.tags = tags;
+    item.suggestedProduct = {
+      name: title,
+      shortDescription,
+      description,
+      category,
+      occasions,
+      tags,
+    };
+    item.suggestedSeo = parseSuggestedSeo(body?.suggestedSeo);
     item.isDesignerChoice = body?.isDesignerChoice === true;
     item.isActive = body?.isActive !== false;
     item.sortOrder = Number.isFinite(Number(body?.sortOrder)) ? Number(body.sortOrder) : 0;

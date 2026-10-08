@@ -25,20 +25,18 @@ function cleanStringArray(value: unknown, maxItemLength = 100) {
   ].slice(0, MAX_ARRAY_ITEMS);
 }
 
-
-function parseSuggestedProduct(value: unknown) {
-  const suggested =
+function parseSuggestedSeo(value: unknown) {
+  const seo =
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
       : {};
 
   return {
-    name: cleanString(suggested.name, 160),
-    shortDescription: cleanString(suggested.shortDescription, 240),
-    description: cleanString(suggested.description, 3000),
-    category: cleanString(suggested.category, 100),
-    occasions: cleanStringArray(suggested.occasions),
-    tags: cleanStringArray(suggested.tags),
+    title: cleanString(seo.title, 70),
+    description: cleanString(seo.description, 170),
+    imageAltText: cleanString(seo.imageAltText, 250),
+    socialTitle: cleanString(seo.socialTitle, 100),
+    socialDescription: cleanString(seo.socialDescription, 250),
   };
 }
 
@@ -107,7 +105,11 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const title = cleanString(body?.title, 160);
-    const description = cleanString(body?.description, 1200);
+    const shortDescription = cleanString(body?.shortDescription, 240);
+    const description = cleanString(body?.description, 3000);
+    const category = cleanString(body?.category, 100);
+    const occasions = cleanStringArray(body?.occasions);
+    const tags = cleanStringArray(body?.tags);
     const image = parseImage(body?.image);
 
     if (!title) {
@@ -125,13 +127,24 @@ export async function POST(request: Request) {
 
     const item = await BloomCatalogueItem.create({
       title,
+      shortDescription,
       description,
       flowers: cleanStringArray(body?.flowers),
       colors: cleanStringArray(body?.colors),
-      occasions: cleanStringArray(body?.occasions),
-      categories: cleanStringArray(body?.categories),
-      tags: cleanStringArray(body?.tags),
-      suggestedProduct: parseSuggestedProduct(body?.suggestedProduct),
+      occasions,
+      categories: category ? [category] : [],
+      tags,
+      // Mirror unified product copy for compatibility with entries/clients from
+      // the first catalogue release. The admin only edits each value once.
+      suggestedProduct: {
+        name: title,
+        shortDescription,
+        description,
+        category,
+        occasions,
+        tags,
+      },
+      suggestedSeo: parseSuggestedSeo(body?.suggestedSeo),
       image,
       isDesignerChoice: body?.isDesignerChoice === true,
       isActive: body?.isActive !== false,

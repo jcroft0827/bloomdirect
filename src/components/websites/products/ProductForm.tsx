@@ -815,6 +815,34 @@ export default function ProductForm({
     if (selected.has("tags") && suggestedProduct.tags.length > 0) {
       setTagsInput([...new Set(suggestedProduct.tags)].join(", "));
     }
+
+    if (selected.has("seoTitle") && suggestedProduct.seoTitle.trim()) {
+      setSeoTitle(suggestedProduct.seoTitle.trim().slice(0, 70));
+    }
+
+    if (
+      selected.has("seoDescription") &&
+      suggestedProduct.seoDescription.trim()
+    ) {
+      setSeoDescription(suggestedProduct.seoDescription.trim().slice(0, 170));
+    }
+
+    if (selected.has("imageAltText") && suggestedProduct.imageAltText.trim()) {
+      setImageAltText(suggestedProduct.imageAltText.trim().slice(0, 250));
+    }
+
+    if (selected.has("socialTitle") && suggestedProduct.socialTitle.trim()) {
+      setSocialTitle(suggestedProduct.socialTitle.trim().slice(0, 100));
+    }
+
+    if (
+      selected.has("socialDescription") &&
+      suggestedProduct.socialDescription.trim()
+    ) {
+      setSocialDescription(
+        suggestedProduct.socialDescription.trim().slice(0, 250),
+      );
+    }
   }
 
   // ===============================
@@ -1166,6 +1194,11 @@ export default function ProductForm({
                     .split(",")
                     .map((tag) => tag.trim())
                     .filter(Boolean),
+                  seoTitle,
+                  seoDescription,
+                  imageAltText,
+                  socialTitle,
+                  socialDescription,
                 }}
                 onUsePrimary={useCatalogueAsPrimary}
                 onAddGallery={addCatalogueToGallery}
@@ -1173,7 +1206,7 @@ export default function ProductForm({
               />
 
               <p className="max-w-xl text-xs leading-5 text-gray-500 sm:text-right">
-                Bloom catalogue images are shared illustrative examples. Choosing one never changes product details automatically; when starter copy is available, you can review exactly which fields to use.
+                Bloom catalogue images are shared illustrative examples. Choosing one never changes product details automatically; when starter copy and SEO recommendations are available, you can review exactly which fields to use.
               </p>
             </div>
 

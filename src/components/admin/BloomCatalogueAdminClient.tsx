@@ -28,39 +28,26 @@ const PRODUCT_CATEGORIES = [
   "Other",
 ] as const;
 
-const PRODUCT_OCCASIONS = [
-  "Birthday",
-  "Anniversary",
-  "Love & Romance",
-  "Get Well",
-  "New Baby",
-  "Congratulations",
-  "Thank You",
-  "Thinking of You",
-  "Sympathy",
-  "Funeral",
-  "Just Because",
-] as const;
 
-export type CatalogueSuggestedProduct = {
-  name: string;
-  shortDescription: string;
+export type CatalogueSuggestedSeo = {
+  title: string;
   description: string;
-  category: string;
-  occasions: string[];
-  tags: string[];
+  imageAltText: string;
+  socialTitle: string;
+  socialDescription: string;
 };
 
 export type AdminBloomCatalogueItem = {
   id: string;
   title: string;
+  shortDescription: string;
   description: string;
   flowers: string[];
   colors: string[];
   occasions: string[];
-  categories: string[];
+  category: string;
   tags: string[];
-  suggestedProduct: CatalogueSuggestedProduct;
+  suggestedSeo: CatalogueSuggestedSeo;
   image: BloomCatalogueImageUpload;
   isDesignerChoice: boolean;
   isActive: boolean;
@@ -73,18 +60,18 @@ type Props = {
 
 type FormState = {
   title: string;
+  shortDescription: string;
   description: string;
   flowers: string;
   colors: string;
   occasions: string;
-  categories: string;
+  category: string;
   tags: string;
-  suggestedName: string;
-  suggestedShortDescription: string;
-  suggestedDescription: string;
-  suggestedCategory: string;
-  suggestedOccasions: string[];
-  suggestedTags: string;
+  seoTitle: string;
+  seoDescription: string;
+  imageAltText: string;
+  socialTitle: string;
+  socialDescription: string;
   isDesignerChoice: boolean;
   isActive: boolean;
   sortOrder: string;
@@ -106,18 +93,18 @@ const MAX_BULK_IMPORT_FILES = 50;
 
 const EMPTY_FORM: FormState = {
   title: "",
+  shortDescription: "",
   description: "",
   flowers: "",
   colors: "",
   occasions: "",
-  categories: "",
+  category: "",
   tags: "",
-  suggestedName: "",
-  suggestedShortDescription: "",
-  suggestedDescription: "",
-  suggestedCategory: "",
-  suggestedOccasions: [],
-  suggestedTags: "",
+  seoTitle: "",
+  seoDescription: "",
+  imageAltText: "",
+  socialTitle: "",
+  socialDescription: "",
   isDesignerChoice: false,
   isActive: true,
   sortOrder: "0",
@@ -157,41 +144,46 @@ function bulkRowId(file: File, index: number) {
 }
 
 function normalizeItem(item: Record<string, unknown>): AdminBloomCatalogueItem {
+  const legacySuggested =
+    item.suggestedProduct && typeof item.suggestedProduct === "object"
+      ? (item.suggestedProduct as Record<string, unknown>)
+      : {};
+  const seo =
+    item.suggestedSeo && typeof item.suggestedSeo === "object"
+      ? (item.suggestedSeo as Record<string, unknown>)
+      : {};
+  const categories = Array.isArray(item.categories)
+    ? item.categories.map(String)
+    : [];
+  const occasions = Array.isArray(item.occasions) && item.occasions.length > 0
+    ? item.occasions.map(String)
+    : Array.isArray(legacySuggested.occasions)
+      ? (legacySuggested.occasions as unknown[]).map(String)
+      : [];
+  const tags = Array.isArray(item.tags) && item.tags.length > 0
+    ? item.tags.map(String)
+    : Array.isArray(legacySuggested.tags)
+      ? (legacySuggested.tags as unknown[]).map(String)
+      : [];
+
   return {
     id: String(item._id || item.id || ""),
-    title: String(item.title || ""),
-    description: String(item.description || ""),
+    title: String(legacySuggested.name || item.title || ""),
+    shortDescription: String(
+      item.shortDescription || legacySuggested.shortDescription || "",
+    ),
+    description: String(legacySuggested.description || item.description || ""),
     flowers: Array.isArray(item.flowers) ? item.flowers.map(String) : [],
     colors: Array.isArray(item.colors) ? item.colors.map(String) : [],
-    occasions: Array.isArray(item.occasions) ? item.occasions.map(String) : [],
-    categories: Array.isArray(item.categories) ? item.categories.map(String) : [],
-    tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
-    suggestedProduct: {
-      name: String(
-        (item.suggestedProduct as Record<string, unknown> | undefined)?.name || "",
-      ),
-      shortDescription: String(
-        (item.suggestedProduct as Record<string, unknown> | undefined)
-          ?.shortDescription || "",
-      ),
-      description: String(
-        (item.suggestedProduct as Record<string, unknown> | undefined)?.description || "",
-      ),
-      category: String(
-        (item.suggestedProduct as Record<string, unknown> | undefined)?.category || "",
-      ),
-      occasions: Array.isArray(
-        (item.suggestedProduct as Record<string, unknown> | undefined)?.occasions,
-      )
-        ? ((item.suggestedProduct as Record<string, unknown>).occasions as unknown[]).map(
-            String,
-          )
-        : [],
-      tags: Array.isArray(
-        (item.suggestedProduct as Record<string, unknown> | undefined)?.tags,
-      )
-        ? ((item.suggestedProduct as Record<string, unknown>).tags as unknown[]).map(String)
-        : [],
+    occasions,
+    category: String(legacySuggested.category || categories[0] || ""),
+    tags,
+    suggestedSeo: {
+      title: String(seo.title || ""),
+      description: String(seo.description || ""),
+      imageAltText: String(seo.imageAltText || ""),
+      socialTitle: String(seo.socialTitle || ""),
+      socialDescription: String(seo.socialDescription || ""),
     },
     image: (item.image || {}) as BloomCatalogueImageUpload,
     isDesignerChoice: item.isDesignerChoice === true,
@@ -221,18 +213,18 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
     return items.filter((item) =>
       [
         item.title,
+        item.shortDescription,
         item.description,
         ...item.flowers,
         ...item.colors,
         ...item.occasions,
-        ...item.categories,
+        item.category,
         ...item.tags,
-        item.suggestedProduct.name,
-        item.suggestedProduct.shortDescription,
-        item.suggestedProduct.description,
-        item.suggestedProduct.category,
-        ...item.suggestedProduct.occasions,
-        ...item.suggestedProduct.tags,
+        item.suggestedSeo.title,
+        item.suggestedSeo.description,
+        item.suggestedSeo.imageAltText,
+        item.suggestedSeo.socialTitle,
+        item.suggestedSeo.socialDescription,
       ]
         .join(" ")
         .toLowerCase()
@@ -252,18 +244,18 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
     setEditingId(item.id);
     setForm({
       title: item.title,
+      shortDescription: item.shortDescription,
       description: item.description,
       flowers: join(item.flowers),
       colors: join(item.colors),
       occasions: join(item.occasions),
-      categories: join(item.categories),
+      category: item.category,
       tags: join(item.tags),
-      suggestedName: item.suggestedProduct.name,
-      suggestedShortDescription: item.suggestedProduct.shortDescription,
-      suggestedDescription: item.suggestedProduct.description,
-      suggestedCategory: item.suggestedProduct.category,
-      suggestedOccasions: item.suggestedProduct.occasions,
-      suggestedTags: join(item.suggestedProduct.tags),
+      seoTitle: item.suggestedSeo.title,
+      seoDescription: item.suggestedSeo.description,
+      imageAltText: item.suggestedSeo.imageAltText,
+      socialTitle: item.suggestedSeo.socialTitle,
+      socialDescription: item.suggestedSeo.socialDescription,
       isDesignerChoice: item.isDesignerChoice,
       isActive: item.isActive,
       sortOrder: String(item.sortOrder),
@@ -272,6 +264,32 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
     setError("");
     setSuccess("");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function fillEmptySeoRecommendations() {
+    setForm((current) => {
+      const cleanName = current.title.trim() || "Flower Arrangement";
+      const shortCopy = current.shortDescription.trim();
+      const fullCopy = current.description.trim();
+      const fallbackDescription =
+        shortCopy ||
+        fullCopy ||
+        `Order ${cleanName} for local flower delivery from your local florist.`;
+      const generatedTitle =
+        cleanName.length <= 52 ? `${cleanName} | Local Florist` : cleanName;
+
+      return {
+        ...current,
+        seoTitle: current.seoTitle || generatedTitle.slice(0, 70),
+        seoDescription:
+          current.seoDescription || fallbackDescription.slice(0, 170),
+        imageAltText:
+          current.imageAltText || `${cleanName} flower arrangement`.slice(0, 250),
+        socialTitle: current.socialTitle || cleanName.slice(0, 100),
+        socialDescription:
+          current.socialDescription || fallbackDescription.slice(0, 250),
+      };
+    });
   }
 
   function handleBulkFiles(fileList: FileList | null) {
@@ -359,19 +377,19 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: pendingRow.title.trim(),
+            shortDescription: "",
             description: "",
             flowers: [],
             colors: [],
             occasions: [],
-            categories: [],
+            category: "",
             tags: [],
-            suggestedProduct: {
-              name: "",
-              shortDescription: "",
+            suggestedSeo: {
+              title: "",
               description: "",
-              category: "",
-              occasions: [],
-              tags: [],
+              imageAltText: "",
+              socialTitle: "",
+              socialDescription: "",
             },
             image: uploaded,
             isDesignerChoice: pendingRow.isDesignerChoice,
@@ -467,19 +485,19 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: form.title,
+            shortDescription: form.shortDescription,
             description: form.description,
             flowers: csv(form.flowers),
             colors: csv(form.colors),
             occasions: csv(form.occasions),
-            categories: csv(form.categories),
+            category: form.category,
             tags: csv(form.tags),
-            suggestedProduct: {
-              name: form.suggestedName,
-              shortDescription: form.suggestedShortDescription,
-              description: form.suggestedDescription,
-              category: form.suggestedCategory,
-              occasions: form.suggestedOccasions,
-              tags: csv(form.suggestedTags),
+            suggestedSeo: {
+              title: form.seoTitle,
+              description: form.seoDescription,
+              imageAltText: form.imageAltText,
+              socialTitle: form.socialTitle,
+              socialDescription: form.socialDescription,
             },
             image,
             isDesignerChoice: form.isDesignerChoice,
@@ -694,7 +712,7 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
               {editingId ? "Edit catalogue item" : "Add catalogue item"}
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Search metadata helps florists find an image. Optional starter copy can be offered separately when they choose it.
+              Build one polished catalogue record. The same product copy powers search and can be offered to florists as optional starter content, with separate curated SEO recommendations below.
             </p>
           </div>
           {editingId && (
@@ -745,175 +763,222 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Title"
+              label="Product / catalogue title"
               value={form.title}
-              onChange={(value) => setForm((current) => ({ ...current, title: value }))}
-              placeholder="Soft Pink Garden"
+              onChange={(value) =>
+                setForm((current) => ({ ...current, title: value }))
+              }
+              placeholder="Classic Red Roses"
+              maxLength={160}
               required
             />
             <Field
               label="Sort order"
               value={form.sortOrder}
-              onChange={(value) => setForm((current) => ({ ...current, sortOrder: value }))}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, sortOrder: value }))
+              }
               type="number"
               placeholder="0"
             />
 
+            <div className="sm:col-span-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.05] px-4 py-3 text-sm leading-6 text-emerald-100/80">
+              Enter the product details once. Bloom uses the same information for catalogue search and offers it to florists as optional starter copy when they choose this image. Nothing is applied without the florist choosing it.
+            </div>
+
             <div className="sm:col-span-2">
-              <label className="text-sm font-bold text-slate-200">Description</label>
+              <Field
+                label="Short description"
+                value={form.shortDescription}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, shortDescription: value }))
+                }
+                placeholder="Rich red roses arranged with fresh greenery in a clear glass vase."
+                maxLength={240}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Keep this concise for product cards, quick previews, and starter copy.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-slate-200">Product category</label>
+              <select
+                value={form.category}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    category: event.target.value,
+                  }))
+                }
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
+              >
+                <option value="">No category selected</option>
+                {PRODUCT_CATEGORIES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Field
+              label="Flowers (comma separated)"
+              value={form.flowers}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, flowers: value }))
+              }
+              placeholder="roses, lilies, hydrangea"
+            />
+
+            <div className="sm:col-span-2">
+              <label className="text-sm font-bold text-slate-200">Full description</label>
               <textarea
                 value={form.description}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, description: event.target.value }))
                 }
-                maxLength={1200}
-                rows={3}
-                placeholder="Short visual description for catalogue search and administration."
+                maxLength={3000}
+                rows={4}
+                placeholder="A timeless arrangement of rich red roses accented with fresh greenery in a clear glass vase..."
                 className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
               />
+              <p className="mt-1 text-right text-xs text-slate-500">
+                {form.description.length}/3000
+              </p>
             </div>
 
-            {([
-              ["flowers", "Flowers", "roses, lilies, hydrangea"],
-              ["colors", "Colors", "pink, white, green"],
-              ["occasions", "Occasions", "birthday, anniversary"],
-              ["categories", "Categories", "everyday, romance"],
-              ["tags", "Tags", "garden style, clear vase, soft"],
-            ] as const).map(([key, label, placeholder]) => (
-              <div key={key}>
-                <Field
-                  label={`${label} (comma separated)`}
-                  value={form[key]}
-                  onChange={(value) =>
-                    setForm((current) => ({ ...current, [key]: value }))
-                  }
-                  placeholder={placeholder}
-                />
-              </div>
-            ))}
+            <Field
+              label="Colors (comma separated)"
+              value={form.colors}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, colors: value }))
+              }
+              placeholder="red, green, clear"
+            />
+            <Field
+              label="Occasions (comma separated)"
+              value={form.occasions}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, occasions: value }))
+              }
+              placeholder="Anniversary, Love & Romance, Valentine's Day"
+            />
+            <div className="sm:col-span-2">
+              <Field
+                label="Tags (comma separated)"
+                value={form.tags}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, tags: value }))
+                }
+                placeholder="red roses, romantic, classic, elegant, clear vase"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Use tags for useful search concepts that do not belong in the product category, such as style, container, mood, or seasonal terms.
+              </p>
+            </div>
 
             <div className="sm:col-span-2 rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-4 sm:p-5">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-300">
-                  Suggested starter product details
-                </p>
-                <h3 className="mt-2 text-lg font-black text-white">
-                  Optional copy florists can choose to auto-fill
-                </h3>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-                  These fields are never applied automatically. When a florist chooses this image as the primary product image, Bloom can offer these details as an editable starting point. Pricing, recipes, inventory, tax settings, and product sizes are never filled from the catalogue.
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-300">
+                    SEO recommendations
+                  </p>
+                  <h3 className="mt-2 text-lg font-black text-white">
+                    Curated search and social defaults for the florist
+                  </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                    These recommendations appear in the same optional starter-details modal. Florists can accept all, choose individual fields, or keep their own SEO. Canonical URLs, indexing controls, prices, recipes, inventory, and other product settings are never changed.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fillEmptySeoRecommendations}
+                  className="shrink-0 rounded-xl border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs font-black text-violet-200 hover:bg-violet-500/20"
+                >
+                  Fill empty SEO fields
+                </button>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="Suggested product name"
-                  value={form.suggestedName}
-                  onChange={(value) =>
-                    setForm((current) => ({ ...current, suggestedName: value }))
-                  }
-                  placeholder="Classic Red Roses"
-                />
-
                 <div>
-                  <label className="text-sm font-bold text-slate-200">Suggested category</label>
-                  <select
-                    value={form.suggestedCategory}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        suggestedCategory: event.target.value,
-                      }))
+                  <Field
+                    label="SEO title"
+                    value={form.seoTitle}
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, seoTitle: value }))
                     }
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
-                  >
-                    <option value="">No suggested category</option>
-                    {PRODUCT_CATEGORIES.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Classic Red Roses | Local Florist"
+                    maxLength={70}
+                  />
+                  <p className="mt-1 text-right text-xs text-slate-500">
+                    {form.seoTitle.length}/70
+                  </p>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
                   <Field
-                    label="Suggested short description"
-                    value={form.suggestedShortDescription}
+                    label="Image alt text"
+                    value={form.imageAltText}
                     onChange={(value) =>
-                      setForm((current) => ({
-                        ...current,
-                        suggestedShortDescription: value,
-                      }))
+                      setForm((current) => ({ ...current, imageAltText: value }))
                     }
-                    placeholder="Rich red roses arranged with fresh greenery in a clear glass vase."
+                    placeholder="Red rose arrangement with greenery in a clear glass vase"
+                    maxLength={250}
                   />
-                  <p className="mt-1 text-xs text-slate-500">
-                    Keep this concise for product cards and quick previews.
+                  <p className="mt-1 text-right text-xs text-slate-500">
+                    {form.imageAltText.length}/250
                   </p>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-sm font-bold text-slate-200">
-                    Suggested full description
-                  </label>
+                  <label className="text-sm font-bold text-slate-200">Meta description</label>
                   <textarea
-                    value={form.suggestedDescription}
+                    value={form.seoDescription}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        suggestedDescription: event.target.value,
+                        seoDescription: event.target.value,
                       }))
                     }
-                    maxLength={3000}
-                    rows={4}
-                    placeholder="A timeless arrangement of rich red roses accented with fresh greenery in a clear glass vase..."
+                    maxLength={170}
+                    rows={3}
+                    placeholder="Send classic red roses arranged in a clear glass vase for anniversaries, romance, birthdays, and meaningful everyday moments."
                     className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
                   />
+                  <p className="mt-1 text-right text-xs text-slate-500">
+                    {form.seoDescription.length}/170
+                  </p>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <p className="text-sm font-bold text-slate-200">Suggested occasions</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {PRODUCT_OCCASIONS.map((option) => {
-                      const selected = form.suggestedOccasions.includes(option);
-
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() =>
-                            setForm((current) => ({
-                              ...current,
-                              suggestedOccasions: selected
-                                ? current.suggestedOccasions.filter(
-                                    (occasion) => occasion !== option,
-                                  )
-                                : [...current.suggestedOccasions, option],
-                            }))
-                          }
-                          className={`rounded-full border px-3 py-2 text-xs font-black transition ${
-                            selected
-                              ? "border-violet-400 bg-violet-500/20 text-violet-200"
-                              : "border-white/10 bg-slate-950 text-slate-400 hover:border-violet-400/50"
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
+                <div>
                   <Field
-                    label="Suggested tags (comma separated)"
-                    value={form.suggestedTags}
+                    label="Social sharing title"
+                    value={form.socialTitle}
                     onChange={(value) =>
-                      setForm((current) => ({ ...current, suggestedTags: value }))
+                      setForm((current) => ({ ...current, socialTitle: value }))
                     }
-                    placeholder="red roses, romantic, classic, elegant"
+                    placeholder="Classic Red Roses"
+                    maxLength={100}
                   />
+                  <p className="mt-1 text-right text-xs text-slate-500">
+                    {form.socialTitle.length}/100
+                  </p>
+                </div>
+
+                <div>
+                  <Field
+                    label="Social sharing description"
+                    value={form.socialDescription}
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, socialDescription: value }))
+                    }
+                    placeholder="A timeless red rose arrangement for love, anniversaries, birthdays, and just-because moments."
+                    maxLength={250}
+                  />
+                  <p className="mt-1 text-right text-xs text-slate-500">
+                    {form.socialDescription.length}/250
+                  </p>
                 </div>
               </div>
             </div>
@@ -1006,21 +1071,29 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
                       {item.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  {(item.suggestedProduct.name ||
-                    item.suggestedProduct.shortDescription ||
-                    item.suggestedProduct.description ||
-                    item.suggestedProduct.category ||
-                    item.suggestedProduct.occasions.length > 0 ||
-                    item.suggestedProduct.tags.length > 0) && (
-                    <div className="mt-3 inline-flex rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-black text-violet-300">
-                      Starter product details configured
+                  {(item.shortDescription ||
+                    item.description ||
+                    item.category ||
+                    item.occasions.length > 0 ||
+                    item.tags.length > 0) && (
+                    <div className="mt-3 inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-300">
+                      Starter product details ready
+                    </div>
+                  )}
+                  {(item.suggestedSeo.title ||
+                    item.suggestedSeo.description ||
+                    item.suggestedSeo.imageAltText ||
+                    item.suggestedSeo.socialTitle ||
+                    item.suggestedSeo.socialDescription) && (
+                    <div className="ml-2 mt-3 inline-flex rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-black text-violet-300">
+                      SEO recommendations ready
                     </div>
                   )}
                   <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-400">
-                    {item.description || "No description added."}
+                    {item.shortDescription || item.description || "No description added."}
                   </p>
                   <div className="mt-4 flex flex-wrap gap-1.5">
-                    {[...item.colors, ...item.flowers, ...item.occasions].slice(0, 5).map((tag) => (
+                    {[item.category, ...item.colors, ...item.flowers, ...item.occasions].filter(Boolean).slice(0, 5).map((tag) => (
                       <span key={tag} className="rounded-full bg-white/5 px-2 py-1 text-xs text-slate-400">
                         {tag}
                       </span>
@@ -1050,6 +1123,7 @@ function Field({
   placeholder,
   required = false,
   type = "text",
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -1057,6 +1131,7 @@ function Field({
   placeholder?: string;
   required?: boolean;
   type?: "text" | "number";
+  maxLength?: number;
 }) {
   return (
     <div>
@@ -1067,6 +1142,7 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
+        maxLength={maxLength}
         className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
       />
     </div>

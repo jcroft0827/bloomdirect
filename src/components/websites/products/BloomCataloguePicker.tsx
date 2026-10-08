@@ -16,6 +16,11 @@ export type BloomCatalogueSuggestedProduct = {
   category: string;
   occasions: string[];
   tags: string[];
+  seoTitle: string;
+  seoDescription: string;
+  imageAltText: string;
+  socialTitle: string;
+  socialDescription: string;
 };
 
 export type BloomCatalogueSuggestedField = keyof BloomCatalogueSuggestedProduct;
@@ -23,6 +28,7 @@ export type BloomCatalogueSuggestedField = keyof BloomCatalogueSuggestedProduct;
 export type BloomCataloguePickerItem = {
   id: string;
   title: string;
+  shortDescription?: string;
   description: string;
   flowers: string[];
   colors: string[];
@@ -51,16 +57,28 @@ type Props = {
 
 type SuggestedFieldSelection = Record<BloomCatalogueSuggestedField, boolean>;
 
-const SUGGESTED_FIELDS: Array<{
+type SuggestedFieldDefinition = {
   key: BloomCatalogueSuggestedField;
   label: string;
-}> = [
-  { key: "name", label: "Product name" },
-  { key: "shortDescription", label: "Short description" },
-  { key: "description", label: "Description" },
-  { key: "category", label: "Category" },
-  { key: "occasions", label: "Occasions" },
-  { key: "tags", label: "Tags" },
+  group: "Product details" | "SEO recommendations";
+};
+
+const SUGGESTED_FIELDS: SuggestedFieldDefinition[] = [
+  { key: "name", label: "Product name", group: "Product details" },
+  { key: "shortDescription", label: "Short description", group: "Product details" },
+  { key: "description", label: "Description", group: "Product details" },
+  { key: "category", label: "Category", group: "Product details" },
+  { key: "occasions", label: "Occasions", group: "Product details" },
+  { key: "tags", label: "Tags", group: "Product details" },
+  { key: "seoTitle", label: "SEO title", group: "SEO recommendations" },
+  { key: "seoDescription", label: "Meta description", group: "SEO recommendations" },
+  { key: "imageAltText", label: "Image alt text", group: "SEO recommendations" },
+  { key: "socialTitle", label: "Social sharing title", group: "SEO recommendations" },
+  {
+    key: "socialDescription",
+    label: "Social sharing description",
+    group: "SEO recommendations",
+  },
 ];
 
 function hasValue(
@@ -101,6 +119,11 @@ function emptySelections(): SuggestedFieldSelection {
     category: false,
     occasions: false,
     tags: false,
+    seoTitle: false,
+    seoDescription: false,
+    imageAltText: false,
+    socialTitle: false,
+    socialDescription: false,
   };
 }
 
@@ -205,6 +228,7 @@ export default function BloomCataloguePicker({
 
       return [
         item.title,
+        item.shortDescription || "",
         item.description,
         ...item.flowers,
         ...item.colors,
@@ -391,7 +415,7 @@ export default function BloomCataloguePicker({
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredItems.map((item) => {
                     const alreadyUsed = currentImages.includes(item.imageUrl);
-                    const hasStarterCopy = SUGGESTED_FIELDS.some(({ key }) =>
+                    const hasStarterDetails = SUGGESTED_FIELDS.some(({ key }) =>
                       hasValue(item.suggestedProduct[key]),
                     );
 
@@ -412,18 +436,18 @@ export default function BloomCataloguePicker({
                                 Designer&apos;s Choice
                               </span>
                             )}
-                            {hasStarterCopy && (
+                            {hasStarterDetails && (
                               <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-purple-700 shadow-sm ring-1 ring-purple-100">
-                                Starter details
+                                Starter details + SEO
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="border-t border-gray-100 p-4">
                           <h3 className="font-black text-gray-950">{item.title}</h3>
-                          {item.description && (
+                          {(item.shortDescription || item.description) && (
                             <p className="mt-1 line-clamp-2 text-sm leading-5 text-gray-500">
-                              {item.description}
+                              {item.shortDescription || item.description}
                             </p>
                           )}
                           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -474,7 +498,7 @@ export default function BloomCataloguePicker({
         <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/75 p-0 sm:items-center sm:p-5">
           <button
             type="button"
-            aria-label="Close suggested product details"
+            aria-label="Close suggested product details and SEO"
             onClick={() => setPendingItem(null)}
             className="absolute inset-0 cursor-default"
           />
@@ -491,14 +515,14 @@ export default function BloomCataloguePicker({
                   <div className="flex items-center gap-2 text-purple-700">
                     <Sparkles size={17} />
                     <span className="text-xs font-black uppercase tracking-[0.14em]">
-                      Optional starter details
+                      Optional starter details + SEO
                     </span>
                   </div>
                   <h3 className="mt-1 text-xl font-black text-gray-950">
-                    Use suggested product details?
+                    Use Bloom starter details?
                   </h3>
                   <p className="mt-1 text-sm leading-5 text-gray-600">
-                    Bloom has starter copy for {pendingItem.title}. Choose what you want to use, or keep your product details and use the image only.
+                    Bloom has curated product copy and SEO recommendations for {pendingItem.title}. Choose exactly what you want to use, or keep your existing details and use the image only.
                   </p>
                 </div>
               </div>
@@ -512,54 +536,75 @@ export default function BloomCataloguePicker({
               </button>
             </div>
 
-            <div className="mt-5 space-y-2">
-              {availableSuggestedFields.map(({ key, label }) => {
-                const selected = suggestedSelections[key];
-                const currentFilled = hasValue(currentProductDetails[key]);
+            <div className="mt-5 space-y-5">
+              {(["Product details", "SEO recommendations"] as const).map((group) => {
+                const fields = availableSuggestedFields.filter(
+                  (field) => field.group === group,
+                );
+
+                if (fields.length === 0) return null;
 
                 return (
-                  <label
-                    key={key}
-                    className={`block cursor-pointer rounded-2xl border p-4 transition ${
-                      selected
-                        ? "border-purple-300 bg-purple-50"
-                        : "border-gray-200 bg-white hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={(event) =>
-                          setSuggestedSelections((current) => ({
-                            ...current,
-                            [key]: event.target.checked,
-                          }))
-                        }
-                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-700"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-black text-gray-950">{label}</span>
-                          {currentFilled && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
-                              Currently filled
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 line-clamp-3 text-sm leading-5 text-gray-600">
-                          {formatSuggestedValue(pendingItem.suggestedProduct[key])}
-                        </p>
-                      </div>
+                  <section key={group}>
+                    <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-gray-400">
+                      {group}
+                    </p>
+                    <div className="space-y-2">
+                      {fields.map(({ key, label }) => {
+                        const selected = suggestedSelections[key];
+                        const currentFilled = hasValue(currentProductDetails[key]);
+
+                        return (
+                          <label
+                            key={key}
+                            className={`block cursor-pointer rounded-2xl border p-4 transition ${
+                              selected
+                                ? "border-purple-300 bg-purple-50"
+                                : "border-gray-200 bg-white hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={(event) =>
+                                  setSuggestedSelections((current) => ({
+                                    ...current,
+                                    [key]: event.target.checked,
+                                  }))
+                                }
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-700"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-black text-gray-950">
+                                    {label}
+                                  </span>
+                                  {currentFilled && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                                      Currently filled
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-1 line-clamp-3 text-sm leading-5 text-gray-600">
+                                  {formatSuggestedValue(
+                                    pendingItem.suggestedProduct[key],
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
-                  </label>
+                  </section>
                 );
               })}
             </div>
 
             {overwriteCount > 0 && (
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-                {overwriteCount} selected field{overwriteCount === 1 ? "" : "s"} already {overwriteCount === 1 ? "has" : "have"} content and will be replaced. Pricing, recipes, images beyond the selected primary, inventory, taxes, and other settings will not change.
+                {overwriteCount} selected field{overwriteCount === 1 ? "" : "s"} already {overwriteCount === 1 ? "has" : "have"} content and will be replaced. Pricing, recipes, images beyond the selected primary, inventory, taxes, canonical URLs, indexing controls, and other settings will not change.
               </div>
             )}
 
@@ -577,7 +622,7 @@ export default function BloomCataloguePicker({
                 onClick={applySuggestedDetails}
                 className="rounded-xl bg-purple-700 px-4 py-3 text-sm font-black text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Use Selected Details
+                Use Selected Details + SEO
               </button>
             </div>
           </div>
