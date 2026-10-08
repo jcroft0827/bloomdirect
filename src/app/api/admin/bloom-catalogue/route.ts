@@ -25,6 +25,23 @@ function cleanStringArray(value: unknown, maxItemLength = 100) {
   ].slice(0, MAX_ARRAY_ITEMS);
 }
 
+
+function parseSuggestedProduct(value: unknown) {
+  const suggested =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    name: cleanString(suggested.name, 160),
+    shortDescription: cleanString(suggested.shortDescription, 240),
+    description: cleanString(suggested.description, 3000),
+    category: cleanString(suggested.category, 100),
+    occasions: cleanStringArray(suggested.occasions),
+    tags: cleanStringArray(suggested.tags),
+  };
+}
+
 function parseImage(value: unknown) {
   if (!value || typeof value !== "object") return null;
 
@@ -114,6 +131,7 @@ export async function POST(request: Request) {
       occasions: cleanStringArray(body?.occasions),
       categories: cleanStringArray(body?.categories),
       tags: cleanStringArray(body?.tags),
+      suggestedProduct: parseSuggestedProduct(body?.suggestedProduct),
       image,
       isDesignerChoice: body?.isDesignerChoice === true,
       isActive: body?.isActive !== false,

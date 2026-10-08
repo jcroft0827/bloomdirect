@@ -30,6 +30,23 @@ function cleanStringArray(value: unknown, maxItemLength = 100) {
   ].slice(0, MAX_ARRAY_ITEMS);
 }
 
+
+function parseSuggestedProduct(value: unknown) {
+  const suggested =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    name: cleanString(suggested.name, 160),
+    shortDescription: cleanString(suggested.shortDescription, 240),
+    description: cleanString(suggested.description, 3000),
+    category: cleanString(suggested.category, 100),
+    occasions: cleanStringArray(suggested.occasions),
+    tags: cleanStringArray(suggested.tags),
+  };
+}
+
 function parseImage(value: unknown) {
   if (!value || typeof value !== "object") return null;
 
@@ -100,6 +117,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     item.occasions = cleanStringArray(body?.occasions);
     item.categories = cleanStringArray(body?.categories);
     item.tags = cleanStringArray(body?.tags);
+    item.suggestedProduct = parseSuggestedProduct(body?.suggestedProduct);
     item.isDesignerChoice = body?.isDesignerChoice === true;
     item.isActive = body?.isActive !== false;
     item.sortOrder = Number.isFinite(Number(body?.sortOrder)) ? Number(body.sortOrder) : 0;

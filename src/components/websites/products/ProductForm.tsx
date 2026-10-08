@@ -12,7 +12,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
-import BloomCataloguePicker from "@/components/websites/products/BloomCataloguePicker";
+import BloomCataloguePicker, {
+  type BloomCatalogueSuggestedField,
+  type BloomCatalogueSuggestedProduct,
+} from "@/components/websites/products/BloomCataloguePicker";
 import ProductRecipeEditor from "@/components/websites/products/ProductRecipeEditor";
 import ProductFormQuickNavigation from "@/components/websites/products/ProductFormQuickNavigation";
 import {
@@ -768,6 +771,52 @@ export default function ProductForm({
     }
   }
 
+  function applyCatalogueSuggestedDetails(
+    suggestedProduct: BloomCatalogueSuggestedProduct,
+    fields: BloomCatalogueSuggestedField[],
+  ) {
+    const selected = new Set(fields);
+
+    if (selected.has("name") && suggestedProduct.name.trim()) {
+      setName(suggestedProduct.name.trim());
+    }
+
+    if (
+      selected.has("shortDescription") &&
+      suggestedProduct.shortDescription.trim()
+    ) {
+      setShortDescription(suggestedProduct.shortDescription.trim());
+    }
+
+    if (selected.has("description") && suggestedProduct.description.trim()) {
+      setDescription(suggestedProduct.description.trim());
+    }
+
+    if (selected.has("category") && suggestedProduct.category.trim()) {
+      const suggestedCategory = suggestedProduct.category.trim();
+
+      if (
+        PRODUCT_CATEGORIES.includes(
+          suggestedCategory as (typeof PRODUCT_CATEGORIES)[number],
+        )
+      ) {
+        setCategory(suggestedCategory);
+      }
+    }
+
+    if (selected.has("occasions") && suggestedProduct.occasions.length > 0) {
+      const supportedOccasions = suggestedProduct.occasions.filter((occasion) =>
+        PRODUCT_OCCASIONS.includes(occasion as (typeof PRODUCT_OCCASIONS)[number]),
+      );
+
+      setOccasions([...new Set(supportedOccasions)]);
+    }
+
+    if (selected.has("tags") && suggestedProduct.tags.length > 0) {
+      setTagsInput([...new Set(suggestedProduct.tags)].join(", "));
+    }
+  }
+
   // ===============================
   // SUBMIT
   // ===============================
@@ -1106,12 +1155,25 @@ export default function ProductForm({
               <BloomCataloguePicker
                 currentImages={productImages}
                 canAddGalleryImage={productImages.length < 8}
+                isEditing={isEditing}
+                currentProductDetails={{
+                  name,
+                  shortDescription,
+                  description,
+                  category,
+                  occasions,
+                  tags: tagsInput
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean),
+                }}
                 onUsePrimary={useCatalogueAsPrimary}
                 onAddGallery={addCatalogueToGallery}
+                onApplySuggestedDetails={applyCatalogueSuggestedDetails}
               />
 
               <p className="max-w-xl text-xs leading-5 text-gray-500 sm:text-right">
-                Bloom catalogue images are shared illustrative examples. Choosing one only changes this product&apos;s image selection; it does not replace your title, description, pricing, recipes, or other settings.
+                Bloom catalogue images are shared illustrative examples. Choosing one never changes product details automatically; when starter copy is available, you can review exactly which fields to use.
               </p>
             </div>
 

@@ -58,6 +58,45 @@ const catalogueAssetSchema = new Schema(
   { _id: false },
 );
 
+
+const suggestedProductSchema = new Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: "",
+    },
+    shortDescription: {
+      type: String,
+      trim: true,
+      maxlength: 240,
+      default: "",
+    },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+      default: "",
+    },
+    category: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: "",
+    },
+    occasions: {
+      type: [String],
+      default: [],
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
 const bloomCatalogueItemSchema = new Schema(
   {
     title: {
@@ -91,6 +130,10 @@ const bloomCatalogueItemSchema = new Schema(
     tags: {
       type: [String],
       default: [],
+    },
+    suggestedProduct: {
+      type: suggestedProductSchema,
+      default: () => ({}),
     },
     image: {
       type: catalogueAssetSchema,

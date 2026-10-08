@@ -22,6 +22,14 @@ export default async function AdminBloomCataloguePage() {
     occasions: item.occasions || [],
     categories: item.categories || [],
     tags: item.tags || [],
+    suggestedProduct: {
+      name: item.suggestedProduct?.name || "",
+      shortDescription: item.suggestedProduct?.shortDescription || "",
+      description: item.suggestedProduct?.description || "",
+      category: item.suggestedProduct?.category || "",
+      occasions: item.suggestedProduct?.occasions || [],
+      tags: item.suggestedProduct?.tags || [],
+    },
     image: {
       originalKey: item.image?.originalKey || "",
       originalUrl: item.image?.originalUrl || "",

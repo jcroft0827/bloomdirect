@@ -43,7 +43,7 @@ export async function GET() {
 
     const items = await BloomCatalogueItem.find({ isActive: true })
       .select(
-        "title description flowers colors occasions categories tags image.optimizedUrl image.width image.height isDesignerChoice sortOrder",
+        "title description flowers colors occasions categories tags suggestedProduct image.optimizedUrl image.width image.height isDesignerChoice sortOrder",
       )
       .sort({ sortOrder: 1, title: 1 })
       .lean();
@@ -59,6 +59,14 @@ export async function GET() {
         occasions: item.occasions || [],
         categories: item.categories || [],
         tags: item.tags || [],
+        suggestedProduct: {
+          name: item.suggestedProduct?.name || "",
+          shortDescription: item.suggestedProduct?.shortDescription || "",
+          description: item.suggestedProduct?.description || "",
+          category: item.suggestedProduct?.category || "",
+          occasions: item.suggestedProduct?.occasions || [],
+          tags: item.suggestedProduct?.tags || [],
+        },
         imageUrl: item.image?.optimizedUrl || "",
         width: item.image?.width || null,
         height: item.image?.height || null,

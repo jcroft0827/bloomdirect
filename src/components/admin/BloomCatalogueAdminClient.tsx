@@ -17,6 +17,40 @@ import {
   type BloomCatalogueImageUpload,
 } from "@/lib/bloom-websites/uploadBloomCatalogueImage";
 
+const PRODUCT_CATEGORIES = [
+  "Flowers",
+  "Plants",
+  "Gift Baskets",
+  "Sympathy",
+  "Funeral",
+  "Gifts",
+  "Seasonal",
+  "Other",
+] as const;
+
+const PRODUCT_OCCASIONS = [
+  "Birthday",
+  "Anniversary",
+  "Love & Romance",
+  "Get Well",
+  "New Baby",
+  "Congratulations",
+  "Thank You",
+  "Thinking of You",
+  "Sympathy",
+  "Funeral",
+  "Just Because",
+] as const;
+
+export type CatalogueSuggestedProduct = {
+  name: string;
+  shortDescription: string;
+  description: string;
+  category: string;
+  occasions: string[];
+  tags: string[];
+};
+
 export type AdminBloomCatalogueItem = {
   id: string;
   title: string;
@@ -26,6 +60,7 @@ export type AdminBloomCatalogueItem = {
   occasions: string[];
   categories: string[];
   tags: string[];
+  suggestedProduct: CatalogueSuggestedProduct;
   image: BloomCatalogueImageUpload;
   isDesignerChoice: boolean;
   isActive: boolean;
@@ -44,6 +79,12 @@ type FormState = {
   occasions: string;
   categories: string;
   tags: string;
+  suggestedName: string;
+  suggestedShortDescription: string;
+  suggestedDescription: string;
+  suggestedCategory: string;
+  suggestedOccasions: string[];
+  suggestedTags: string;
   isDesignerChoice: boolean;
   isActive: boolean;
   sortOrder: string;
@@ -71,6 +112,12 @@ const EMPTY_FORM: FormState = {
   occasions: "",
   categories: "",
   tags: "",
+  suggestedName: "",
+  suggestedShortDescription: "",
+  suggestedDescription: "",
+  suggestedCategory: "",
+  suggestedOccasions: [],
+  suggestedTags: "",
   isDesignerChoice: false,
   isActive: true,
   sortOrder: "0",
@@ -119,6 +166,33 @@ function normalizeItem(item: Record<string, unknown>): AdminBloomCatalogueItem {
     occasions: Array.isArray(item.occasions) ? item.occasions.map(String) : [],
     categories: Array.isArray(item.categories) ? item.categories.map(String) : [],
     tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+    suggestedProduct: {
+      name: String(
+        (item.suggestedProduct as Record<string, unknown> | undefined)?.name || "",
+      ),
+      shortDescription: String(
+        (item.suggestedProduct as Record<string, unknown> | undefined)
+          ?.shortDescription || "",
+      ),
+      description: String(
+        (item.suggestedProduct as Record<string, unknown> | undefined)?.description || "",
+      ),
+      category: String(
+        (item.suggestedProduct as Record<string, unknown> | undefined)?.category || "",
+      ),
+      occasions: Array.isArray(
+        (item.suggestedProduct as Record<string, unknown> | undefined)?.occasions,
+      )
+        ? ((item.suggestedProduct as Record<string, unknown>).occasions as unknown[]).map(
+            String,
+          )
+        : [],
+      tags: Array.isArray(
+        (item.suggestedProduct as Record<string, unknown> | undefined)?.tags,
+      )
+        ? ((item.suggestedProduct as Record<string, unknown>).tags as unknown[]).map(String)
+        : [],
+    },
     image: (item.image || {}) as BloomCatalogueImageUpload,
     isDesignerChoice: item.isDesignerChoice === true,
     isActive: item.isActive !== false,
@@ -153,6 +227,12 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
         ...item.occasions,
         ...item.categories,
         ...item.tags,
+        item.suggestedProduct.name,
+        item.suggestedProduct.shortDescription,
+        item.suggestedProduct.description,
+        item.suggestedProduct.category,
+        ...item.suggestedProduct.occasions,
+        ...item.suggestedProduct.tags,
       ]
         .join(" ")
         .toLowerCase()
@@ -178,6 +258,12 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
       occasions: join(item.occasions),
       categories: join(item.categories),
       tags: join(item.tags),
+      suggestedName: item.suggestedProduct.name,
+      suggestedShortDescription: item.suggestedProduct.shortDescription,
+      suggestedDescription: item.suggestedProduct.description,
+      suggestedCategory: item.suggestedProduct.category,
+      suggestedOccasions: item.suggestedProduct.occasions,
+      suggestedTags: join(item.suggestedProduct.tags),
       isDesignerChoice: item.isDesignerChoice,
       isActive: item.isActive,
       sortOrder: String(item.sortOrder),
@@ -279,6 +365,14 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
             occasions: [],
             categories: [],
             tags: [],
+            suggestedProduct: {
+              name: "",
+              shortDescription: "",
+              description: "",
+              category: "",
+              occasions: [],
+              tags: [],
+            },
             image: uploaded,
             isDesignerChoice: pendingRow.isDesignerChoice,
             isActive: false,
@@ -379,6 +473,14 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
             occasions: csv(form.occasions),
             categories: csv(form.categories),
             tags: csv(form.tags),
+            suggestedProduct: {
+              name: form.suggestedName,
+              shortDescription: form.suggestedShortDescription,
+              description: form.suggestedDescription,
+              category: form.suggestedCategory,
+              occasions: form.suggestedOccasions,
+              tags: csv(form.suggestedTags),
+            },
             image,
             isDesignerChoice: form.isDesignerChoice,
             isActive: form.isActive,
@@ -592,7 +694,7 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
               {editingId ? "Edit catalogue item" : "Add catalogue item"}
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Metadata helps florists search without changing their product copy or pricing.
+              Search metadata helps florists find an image. Optional starter copy can be offered separately when they choose it.
             </p>
           </div>
           {editingId && (
@@ -690,6 +792,132 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
               </div>
             ))}
 
+            <div className="sm:col-span-2 rounded-2xl border border-violet-400/20 bg-violet-500/[0.06] p-4 sm:p-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-300">
+                  Suggested starter product details
+                </p>
+                <h3 className="mt-2 text-lg font-black text-white">
+                  Optional copy florists can choose to auto-fill
+                </h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                  These fields are never applied automatically. When a florist chooses this image as the primary product image, Bloom can offer these details as an editable starting point. Pricing, recipes, inventory, tax settings, and product sizes are never filled from the catalogue.
+                </p>
+              </div>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Suggested product name"
+                  value={form.suggestedName}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, suggestedName: value }))
+                  }
+                  placeholder="Classic Red Roses"
+                />
+
+                <div>
+                  <label className="text-sm font-bold text-slate-200">Suggested category</label>
+                  <select
+                    value={form.suggestedCategory}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        suggestedCategory: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
+                  >
+                    <option value="">No suggested category</option>
+                    {PRODUCT_CATEGORIES.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Suggested short description"
+                    value={form.suggestedShortDescription}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        suggestedShortDescription: value,
+                      }))
+                    }
+                    placeholder="Rich red roses arranged with fresh greenery in a clear glass vase."
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Keep this concise for product cards and quick previews.
+                  </p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-bold text-slate-200">
+                    Suggested full description
+                  </label>
+                  <textarea
+                    value={form.suggestedDescription}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        suggestedDescription: event.target.value,
+                      }))
+                    }
+                    maxLength={3000}
+                    rows={4}
+                    placeholder="A timeless arrangement of rich red roses accented with fresh greenery in a clear glass vase..."
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none focus:border-violet-400"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <p className="text-sm font-bold text-slate-200">Suggested occasions</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {PRODUCT_OCCASIONS.map((option) => {
+                      const selected = form.suggestedOccasions.includes(option);
+
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              suggestedOccasions: selected
+                                ? current.suggestedOccasions.filter(
+                                    (occasion) => occasion !== option,
+                                  )
+                                : [...current.suggestedOccasions, option],
+                            }))
+                          }
+                          className={`rounded-full border px-3 py-2 text-xs font-black transition ${
+                            selected
+                              ? "border-violet-400 bg-violet-500/20 text-violet-200"
+                              : "border-white/10 bg-slate-950 text-slate-400 hover:border-violet-400/50"
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Field
+                    label="Suggested tags (comma separated)"
+                    value={form.suggestedTags}
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, suggestedTags: value }))
+                    }
+                    placeholder="red roses, romantic, classic, elegant"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-5 sm:col-span-2">
               <Checkbox
                 label="Designer’s Choice example"
@@ -778,6 +1006,16 @@ export default function BloomCatalogueAdminClient({ initialItems }: Props) {
                       {item.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
+                  {(item.suggestedProduct.name ||
+                    item.suggestedProduct.shortDescription ||
+                    item.suggestedProduct.description ||
+                    item.suggestedProduct.category ||
+                    item.suggestedProduct.occasions.length > 0 ||
+                    item.suggestedProduct.tags.length > 0) && (
+                    <div className="mt-3 inline-flex rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-black text-violet-300">
+                      Starter product details configured
+                    </div>
+                  )}
                   <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-400">
                     {item.description || "No description added."}
                   </p>
