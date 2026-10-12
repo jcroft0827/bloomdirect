@@ -4,6 +4,11 @@ import Link from "next/link";
 import ProductConfigurator from "@/components/websites/storefront/ProductConfigurator";
 import StorefrontCartButton from "@/components/websites/storefront/StorefrontCartButton";
 import WebsitePreviewBar from "@/components/websites/WebsitePreviewBar";
+import {
+  BloomElegantFooter,
+  BloomElegantHeader,
+} from "@/components/websites/themes/BloomElegantChrome";
+import { getBloomWebsiteHeaderLogoClassName } from "@/lib/bloom-websites/storefront-theme";
 import type { BloomWebsiteStorefrontProductPage } from "@/types/bloom-website";
 
 type BloomWebsiteProductStorefrontProps = {
@@ -23,6 +28,114 @@ export default function BloomWebsiteProductStorefront({
 
   const homeHref = basePath || "/";
   const shopHref = `${basePath}/shop`;
+  const elegant = website.theme === "bloom-elegant";
+  const cityState = [shop.address.city, shop.address.state].filter(Boolean).join(", ");
+  const fullAddress = [shop.address.street, cityState, shop.address.zip]
+    .filter(Boolean)
+    .join(" ");
+
+  if (elegant) {
+    return (
+      <div className="min-h-screen bg-[#fffdf9] pb-28 text-stone-950 sm:pb-20">
+        <BloomElegantHeader
+          siteName={website.siteName}
+          logo={website.storefrontTheme.logo}
+          logoSize={website.storefrontTheme.logoSize}
+          basePath={basePath}
+          primaryColor={primaryColor}
+          primaryForeground={primaryForeground}
+          aboutEnabled={website.aboutPage?.enabled !== false}
+          announcement={{
+            isActive: website.announcement.isActive,
+            message: website.announcement.message,
+          }}
+        />
+
+        <main>
+          <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 sm:py-12 lg:px-10 lg:py-14">
+            <nav
+              aria-label="Breadcrumb"
+              className="mb-8 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500"
+            >
+              <Link href={homeHref} className="transition hover:text-stone-900">
+                Home
+              </Link>
+              <span aria-hidden="true">/</span>
+              <Link href={shopHref} className="transition hover:text-stone-900">
+                Shop
+              </Link>
+              <span aria-hidden="true">/</span>
+              <span className="text-stone-800">{product.name}</span>
+            </nav>
+
+            <ProductConfigurator
+              product={product}
+              primaryColor={primaryColor}
+              accentColor={accentColor}
+              variant="elegant"
+            />
+
+            {product.description ? (
+              <section className="mt-16 border-t border-stone-200 py-14 sm:mt-20 sm:py-16">
+                <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:gap-16">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500">
+                      The details
+                    </p>
+                    <h2 className="mt-3 font-serif text-3xl font-medium tracking-tight text-stone-950 sm:text-4xl">
+                      Designed for the moment.
+                    </h2>
+                  </div>
+                  <p className="max-w-3xl whitespace-pre-line text-base leading-8 text-stone-600">
+                    {product.description}
+                  </p>
+                </div>
+              </section>
+            ) : null}
+
+            <section className="grid border-y border-stone-200 py-8 sm:grid-cols-2 sm:divide-x sm:divide-stone-200 sm:py-10">
+              <div className="flex gap-4 pb-6 sm:pb-0 sm:pr-10">
+                <Flower2 size={19} className="mt-0.5 shrink-0 text-stone-500" />
+                <div>
+                  <p className="font-serif text-xl text-stone-950">Designed locally</p>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-stone-500">
+                    Hand-designed by {shop.businessName}, not shipped from a warehouse.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-4 border-t border-stone-200 pt-6 sm:border-t-0 sm:pl-10 sm:pt-0">
+                <ShieldCheck size={19} className="mt-0.5 shrink-0 text-stone-500" />
+                <div>
+                  <p className="font-serif text-xl text-stone-950">Local florist delivery</p>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-stone-500">
+                    Prepared and delivered by a real local flower shop.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+
+        <BloomElegantFooter
+          siteName={website.siteName}
+          businessName={shop.businessName}
+          tagline={website.storefrontTheme.tagline}
+          basePath={basePath}
+          aboutEnabled={website.aboutPage?.enabled !== false}
+          cityState={cityState}
+          fullAddress={fullAddress}
+          phone={shop.phone}
+          email={shop.email}
+          showPhone={website.settings.showPhone}
+          showAddress={website.settings.showAddress}
+          showSocialLinks={website.settings.showSocialLinks}
+          socialLinks={shop.socialLinks}
+        />
+
+        {showPreviewBar && <WebsitePreviewBar websiteId={website.id} />}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white pb-28 text-gray-950 sm:pb-20">
@@ -33,7 +146,7 @@ export default function BloomWebsiteProductStorefront({
               <img
                 src={website.branding.logo}
                 alt={website.siteName}
-                className="h-14 w-auto max-w-[220px] object-contain object-left sm:h-16 sm:max-w-[260px] lg:h-20 lg:max-w-[320px]"
+                className={getBloomWebsiteHeaderLogoClassName(website.branding.logoSize, "classic")}
               />
             ) : (
               <>

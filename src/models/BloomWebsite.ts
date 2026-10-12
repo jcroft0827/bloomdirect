@@ -40,6 +40,53 @@ const bloomWebsiteBusinessHourSchema = new Schema(
   },
 );
 
+const bloomWebsiteHeroSlideSchema = new Schema(
+  {
+    id: { type: String, trim: true, maxlength: 120, required: true },
+    headline: { type: String, trim: true, maxlength: 160, required: true },
+    subheadline: { type: String, trim: true, maxlength: 300, default: "" },
+    imageUrl: { type: String, trim: true, default: "" },
+    textStyle: { type: String, enum: ["light", "dark"], default: "dark" },
+    overlay: {
+      type: String,
+      enum: ["none", "soft", "medium", "strong"],
+      default: "soft",
+    },
+    alignment: { type: String, enum: ["left", "center"], default: "left" },
+    imagePosition: {
+      type: String,
+      enum: ["top", "center", "bottom"],
+      default: "center",
+    },
+    ctaLabel: { type: String, trim: true, maxlength: 80, default: "Shop Flowers" },
+    ctaDestination: {
+      type: String,
+      enum: ["shop", "about", "custom", "none"],
+      default: "shop",
+    },
+    ctaHref: { type: String, trim: true, maxlength: 2000, default: "" },
+  },
+  { _id: false },
+);
+
+const bloomWebsiteHomepageMerchandisingSectionSchema = new Schema(
+  {
+    id: { type: String, trim: true, maxlength: 120, required: true },
+    enabled: { type: Boolean, default: true },
+    eyebrow: { type: String, trim: true, maxlength: 80, default: "" },
+    heading: { type: String, trim: true, maxlength: 140, default: "Shop the Collection" },
+    description: { type: String, trim: true, maxlength: 420, default: "" },
+    sourceType: {
+      type: String,
+      enum: ["featured", "occasion", "category", "all"],
+      default: "featured",
+    },
+    sourceValue: { type: String, trim: true, maxlength: 140, default: "" },
+    productLimit: { type: Number, min: 3, max: 12, default: 6 },
+  },
+  { _id: false },
+);
+
 const bloomWebsiteSchema = new Schema(
   {
     // ===============================
@@ -167,18 +214,12 @@ const bloomWebsiteSchema = new Schema(
     // ===============================
 
     /**
-     * V1 intentionally starts with one structural theme.
-     *
-     * Florists customize the visual identity through the
-     * branding settings below rather than selecting an
-     * entirely different component/layout system.
-     *
-     * Additional full themes can be added later without
-     * changing the website ownership architecture.
+     * Storefront layout family. Brand identity remains independent so florists
+     * can change presentation without rebuilding their shop data.
      */
     theme: {
       type: String,
-      enum: ["bloom-classic"],
+      enum: ["bloom-classic", "bloom-elegant"],
       default: "bloom-classic",
     },
 
@@ -203,6 +244,12 @@ const bloomWebsiteSchema = new Schema(
       logo: {
         type: String,
         default: "",
+      },
+
+      logoSize: {
+        type: String,
+        enum: ["small", "standard", "large", "xlarge"],
+        default: "standard",
       },
 
       primaryColor: {
@@ -276,6 +323,17 @@ const bloomWebsiteSchema = new Schema(
         default: "",
       },
 
+      heroSlides: {
+        type: [bloomWebsiteHeroSlideSchema],
+        default: [],
+        validate: {
+          validator(value: unknown[]) {
+            return value.length <= 5;
+          },
+          message: "BloomWebsites supports up to 5 hero slides.",
+        },
+      },
+
       heroInfoCard: {
         eyebrow: {
           type: String,
@@ -322,6 +380,61 @@ const bloomWebsiteSchema = new Schema(
         trim: true,
         maxlength: 3000,
         default: "",
+      },
+
+      aboutImage: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      sectionOrder: {
+        type: [String],
+        default: [
+          "occasions",
+          "featured",
+          "merchandising",
+          "about",
+          "trust",
+          "delivery",
+          "contact",
+        ],
+        validate: {
+          validator(value: string[]) {
+            const allowed = new Set([
+              "occasions",
+              "featured",
+              "merchandising",
+              "about",
+              "trust",
+              "delivery",
+              "contact",
+            ]);
+            return value.every((item) => allowed.has(item));
+          },
+          message: "Homepage section order contains an unsupported section.",
+        },
+      },
+
+      sectionVisibility: {
+        occasions: { type: Boolean, default: true },
+        featured: { type: Boolean, default: true },
+        merchandising: { type: Boolean, default: true },
+        about: { type: Boolean, default: true },
+        trust: { type: Boolean, default: true },
+        delivery: { type: Boolean, default: true },
+        contact: { type: Boolean, default: true },
+      },
+
+      merchandisingSections: {
+        type: [bloomWebsiteHomepageMerchandisingSectionSchema],
+        default: [],
+        validate: {
+          validator(value: unknown[]) {
+            return value.length <= 8;
+          },
+          message: "BloomWebsites supports up to 8 homepage product sections.",
+        },
       },
 
       sectionContent: {

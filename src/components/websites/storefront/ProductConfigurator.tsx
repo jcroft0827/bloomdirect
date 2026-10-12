@@ -24,6 +24,7 @@ type ProductConfiguratorProps = {
 
   primaryColor: string;
   accentColor: string;
+  variant?: "classic" | "elegant";
 };
 
 function formatTierLabel(value: "standard" | "deluxe" | "premium") {
@@ -46,7 +47,9 @@ export default function ProductConfigurator({
   product,
   primaryColor,
   accentColor,
+  variant = "classic",
 }: ProductConfiguratorProps) {
+  const elegant = variant === "elegant";
   const { addItem } = useBloomWebsiteCart();
 
   const availableTiers = useMemo(
@@ -173,10 +176,10 @@ export default function ProductConfigurator({
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+    <div className={elegant ? "grid gap-12 lg:grid-cols-[1.08fr_0.92fr] lg:gap-20" : "grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16"}>
       {/* PRODUCT MEDIA */}
       <section className="min-w-0">
-        <div className="relative overflow-hidden rounded-[2rem] border border-gray-100 bg-white">
+        <div className={elegant ? "relative overflow-hidden bg-[#f6f3ee]" : "relative overflow-hidden rounded-[2rem] border border-gray-100 bg-white"}>
           <div className="aspect-square">
             {selectedImage ? (
               <img
@@ -221,7 +224,7 @@ export default function ProductConfigurator({
                   onClick={() => setSelectedImage(image)}
                   aria-label={`View ${product.name} photo ${index + 1}`}
                   aria-pressed={isSelected}
-                  className={`aspect-square overflow-hidden rounded-2xl border bg-white p-2 transition ${
+                  className={`aspect-square overflow-hidden border bg-white p-2 transition ${elegant ? "rounded-none" : "rounded-2xl"} ${
                     isSelected
                       ? "border-gray-950 ring-1 ring-gray-950"
                       : "border-gray-200 hover:border-gray-400"
@@ -242,7 +245,7 @@ export default function ProductConfigurator({
       {/* PRODUCT CONFIGURATION */}
       <section className="min-w-0 lg:pt-4">
         <p
-          className="text-sm font-black uppercase tracking-[0.18em]"
+          className={elegant ? "text-[10px] font-semibold uppercase tracking-[0.22em]" : "text-sm font-black uppercase tracking-[0.18em]"}
           style={{
             color: primaryColor,
           }}
@@ -250,7 +253,7 @@ export default function ProductConfigurator({
           {product.category}
         </p>
 
-        <h1 className="mt-3 text-4xl font-black tracking-tight text-gray-950 sm:text-5xl">
+        <h1 className={elegant ? "mt-4 font-serif text-4xl font-medium leading-tight tracking-[-0.03em] text-gray-950 sm:text-5xl lg:text-6xl" : "mt-3 text-4xl font-black tracking-tight text-gray-950 sm:text-5xl"}>
           {product.name}
         </h1>
 
@@ -262,8 +265,18 @@ export default function ProductConfigurator({
 
         {/* AVAILABILITY */}
         {product.availabilityState === "available" ? (
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-black text-green-700">
-            <Check size={16} />
+          <div
+            className={
+              elegant
+                ? "mt-6 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-600"
+                : "mt-6 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-black text-green-700"
+            }
+          >
+            {elegant ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
+            ) : (
+              <Check size={16} />
+            )}
             Available to order
           </div>
         ) : product.availabilityState === "sold_out" ? (
@@ -293,7 +306,7 @@ export default function ProductConfigurator({
         {availableTiers.length > 0 && (
           <div className="mt-8">
             <div>
-              <h2 className="text-lg font-black text-gray-950">
+              <h2 className={elegant ? "font-serif text-2xl font-medium text-gray-950" : "text-lg font-black text-gray-950"}>
                 Choose your arrangement
               </h2>
 
@@ -321,7 +334,7 @@ export default function ProductConfigurator({
                     aria-checked={isSelected}
                     disabled={!canPurchase}
                     onClick={() => handleTierSelect(tier)}
-                    className={`relative w-full rounded-2xl border p-5 text-left transition ${
+                    className={`relative w-full border p-5 text-left transition ${elegant ? "rounded-none" : "rounded-2xl"} ${
                       isSelected
                         ? "border-gray-950 bg-gray-50 shadow-sm"
                         : "border-gray-200 bg-white hover:border-gray-400"
@@ -340,17 +353,25 @@ export default function ProductConfigurator({
 
                           {isPopular && (
                             <span
-                              className="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white"
-                              style={{
-                                backgroundColor: accentColor,
-                              }}
+                              className={
+                                elegant
+                                  ? "text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-500"
+                                  : "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white"
+                              }
+                              style={elegant ? undefined : { backgroundColor: accentColor }}
                             >
                               Popular
                             </span>
                           )}
 
                           {isSelected && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-950 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">
+                            <span
+                              className={
+                                elegant
+                                  ? "inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-700"
+                                  : "inline-flex items-center gap-1 rounded-full bg-gray-950 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white"
+                              }
+                            >
                               <Check size={11} />
                               Selected
                             </span>
@@ -378,7 +399,7 @@ export default function ProductConfigurator({
         {/* ADD-ONS */}
         {availableAddons.length > 0 && (
           <div className="mt-9 border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-black text-gray-950">
+            <h2 className={elegant ? "font-serif text-2xl font-medium text-gray-950" : "text-lg font-black text-gray-950"}>
               Make it a little more special
             </h2>
 
@@ -397,7 +418,7 @@ export default function ProductConfigurator({
                     disabled={!canPurchase}
                     onClick={() => toggleAddon(addon)}
                     aria-pressed={isSelected}
-                    className={`relative flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition ${
+                    className={`relative flex min-w-0 items-center gap-3 border p-3 text-left transition ${elegant ? "rounded-none" : "rounded-2xl"} ${
                       isSelected
                         ? "border-gray-950 bg-gray-50 shadow-sm"
                         : "border-gray-200 bg-white hover:border-gray-400"
@@ -458,13 +479,13 @@ export default function ProductConfigurator({
                 </p>
               </div>
 
-              <div className="flex items-center rounded-full border border-gray-200 bg-white p-1">
+              <div className={`flex items-center border border-gray-200 bg-white p-1 ${elegant ? "rounded-none" : "rounded-full"}`}>
                 <button
                   type="button"
                   onClick={decreaseQuantity}
                   disabled={quantity <= 1}
                   aria-label="Decrease quantity"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
+                  className={`flex h-10 w-10 items-center justify-center text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30 ${elegant ? "rounded-none" : "rounded-full"}`}
                 >
                   <Minus size={17} />
                 </button>
@@ -480,7 +501,7 @@ export default function ProductConfigurator({
                   type="button"
                   onClick={increaseQuantity}
                   aria-label="Increase quantity"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-gray-700 transition hover:bg-gray-100"
+                  className={`flex h-10 w-10 items-center justify-center text-gray-700 transition hover:bg-gray-100 ${elegant ? "rounded-none" : "rounded-full"}`}
                 >
                   <Plus size={17} />
                 </button>
@@ -490,7 +511,7 @@ export default function ProductConfigurator({
         )}
 
         {/* TOTAL / PURCHASE */}
-        <div className="mt-9 rounded-[1.75rem] border border-gray-200 bg-gray-50 p-5 sm:p-6">
+        <div className={elegant ? "mt-10 border-y border-stone-300 bg-transparent py-6" : "mt-9 rounded-[1.75rem] border border-gray-200 bg-gray-50 p-5 sm:p-6"}>
           {canPurchase ? (
             <>
               <div className="flex items-end justify-between gap-5">
@@ -528,7 +549,7 @@ export default function ProductConfigurator({
               </div>
 
               {product.arrangementContainerNote && (
-                <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4">
+                <div className={elegant ? "mt-5 border-l-2 border-stone-300 pl-4" : "mt-5 rounded-2xl border border-gray-200 bg-white p-4"}>
                   <p className="text-xs font-black uppercase tracking-wide text-gray-500">
                     Arrangement &amp; container note
                   </p>
@@ -541,7 +562,7 @@ export default function ProductConfigurator({
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-black text-white shadow-sm transition hover:opacity-95"
+                className={elegant ? "mt-6 flex w-full items-center justify-center gap-2 border px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90" : "mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-black text-white shadow-sm transition hover:opacity-95"}
                 style={{
                   backgroundColor: primaryColor,
                 }}

@@ -9,10 +9,14 @@ import Shop from "@/models/Shop";
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
 import {
   normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageMerchandisingSections,
   normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteHomepageSectionOrder,
+  normalizeBloomWebsiteHomepageSectionVisibility,
   normalizeBloomWebsiteTrustPoints,
 } from "@/lib/bloom-websites/storefront-content";
 import { DEFAULT_BLOOM_WEBSITE_HERO_SUBHEADLINE } from "@/lib/bloom-websites/branding-copy";
+import { normalizeBloomWebsiteHeroSlides } from "@/lib/bloom-websites/storefront-editor";
 import {
   getBloomWebsiteConfiguredDeliveryZipCodes,
   normalizeBloomWebsiteBusinessHours,
@@ -22,6 +26,7 @@ import {
 import type {
   BloomWebsiteAvailabilityType,
   BloomWebsitePurchasabilityState,
+  BloomWebsiteThemeName,
   BloomWebsiteStorefrontAddon,
   BloomWebsiteStorefrontProductPage,
 } from "@/types/bloom-website";
@@ -40,10 +45,11 @@ type WebsiteLean = {
 
   status: "preview" | "live" | "paused";
 
-  theme: "bloom-classic";
+  theme: BloomWebsiteThemeName;
 
   branding?: {
     logo?: string;
+    logoSize?: string;
 
     tagline?: string;
 
@@ -57,10 +63,15 @@ type WebsiteLean = {
     heroHeadline?: string;
     heroSubheadline?: string;
     heroImage?: string;
+    heroSlides?: unknown;
     heroInfoCard?: unknown;
     trustPoints?: unknown;
     aboutText?: string;
+    aboutImage?: string;
     sectionContent?: unknown;
+    sectionOrder?: unknown;
+    sectionVisibility?: unknown;
+    merchandisingSections?: unknown;
   };
 
   seo?: {
@@ -599,6 +610,7 @@ export async function getBloomWebsiteStorefrontProduct(
     themeName: website.theme,
 
     logo: website.branding?.logo,
+    logoSize: website.branding?.logoSize,
 
     tagline: website.branding?.tagline,
 
@@ -623,6 +635,7 @@ export async function getBloomWebsiteStorefrontProduct(
 
       branding: {
         logo: storefrontTheme.logo,
+        logoSize: storefrontTheme.logoSize,
 
         tagline: storefrontTheme.tagline,
 
@@ -644,6 +657,19 @@ export async function getBloomWebsiteStorefrontProduct(
 
         heroImage: website.homepage?.heroImage || "",
 
+        heroSlides: normalizeBloomWebsiteHeroSlides(
+          website.homepage?.heroSlides,
+          {
+            headline:
+              website.homepage?.heroHeadline ||
+              `Beautiful flowers from ${website.siteName}.`,
+            subheadline:
+              website.homepage?.heroSubheadline ||
+              DEFAULT_BLOOM_WEBSITE_HERO_SUBHEADLINE,
+            imageUrl: website.homepage?.heroImage || "",
+          },
+        ),
+
         heroInfoCard: normalizeBloomWebsiteHeroInfoCardContent(
           website.homepage?.heroInfoCard,
         ),
@@ -653,6 +679,20 @@ export async function getBloomWebsiteStorefrontProduct(
         ),
 
         aboutText: website.homepage?.aboutText || "",
+
+        aboutImage: website.homepage?.aboutImage || "",
+
+        sectionOrder: normalizeBloomWebsiteHomepageSectionOrder(
+          website.homepage?.sectionOrder,
+        ),
+
+        sectionVisibility: normalizeBloomWebsiteHomepageSectionVisibility(
+          website.homepage?.sectionVisibility,
+        ),
+
+        merchandisingSections: normalizeBloomWebsiteHomepageMerchandisingSections(
+          website.homepage?.merchandisingSections,
+        ),
 
         sectionContent: normalizeBloomWebsiteHomepageSectionContent(
           website.homepage?.sectionContent,

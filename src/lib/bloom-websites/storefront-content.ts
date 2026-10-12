@@ -1,6 +1,9 @@
 import type {
   BloomWebsiteHeroInfoCardContent,
+  BloomWebsiteHomepageMerchandisingSection,
   BloomWebsiteHomepageSectionContent,
+  BloomWebsiteHomepageSectionKey,
+  BloomWebsiteHomepageSectionVisibility,
   BloomWebsiteTrustPoint,
 } from "@/types/bloom-website";
 
@@ -196,4 +199,82 @@ export function resolveBloomWebsiteTrustPoints(
     title: custom[index]?.title || fallback.title,
     description: custom[index]?.description || fallback.description,
   }));
+}
+
+
+export const BLOOM_WEBSITE_HOMEPAGE_SECTION_ORDER: BloomWebsiteHomepageSectionKey[] = [
+  "occasions",
+  "featured",
+  "merchandising",
+  "about",
+  "trust",
+  "delivery",
+  "contact",
+];
+
+export function normalizeBloomWebsiteHomepageSectionOrder(
+  input: unknown,
+): BloomWebsiteHomepageSectionKey[] {
+  const source = Array.isArray(input) ? input : [];
+  const allowed = new Set(BLOOM_WEBSITE_HOMEPAGE_SECTION_ORDER);
+  const seen = new Set<string>();
+  const normalized = source
+    .filter((value): value is BloomWebsiteHomepageSectionKey =>
+      typeof value === "string" && allowed.has(value as BloomWebsiteHomepageSectionKey),
+    )
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+
+  for (const key of BLOOM_WEBSITE_HOMEPAGE_SECTION_ORDER) {
+    if (!seen.has(key)) normalized.push(key);
+  }
+
+  return normalized;
+}
+
+export function normalizeBloomWebsiteHomepageSectionVisibility(
+  input: unknown,
+): BloomWebsiteHomepageSectionVisibility {
+  const source =
+    typeof input === "object" && input !== null
+      ? (input as Record<string, unknown>)
+      : {};
+
+  return Object.fromEntries(
+    BLOOM_WEBSITE_HOMEPAGE_SECTION_ORDER.map((key) => [
+      key,
+      source[key] !== false,
+    ]),
+  ) as BloomWebsiteHomepageSectionVisibility;
+}
+
+export function normalizeBloomWebsiteHomepageMerchandisingSections(
+  input: unknown,
+): BloomWebsiteHomepageMerchandisingSection[] {
+  const source = Array.isArray(input) ? input.slice(0, 8) : [];
+  const allowedSources = new Set(["featured", "occasion", "category", "all"]);
+
+  return source.flatMap((raw, index) => {
+    if (typeof raw !== "object" || raw === null) return [];
+    const value = raw as Record<string, unknown>;
+    const rawLimit = typeof value.productLimit === "number" ? value.productLimit : Number(value.productLimit);
+    const productLimit = Number.isFinite(rawLimit)
+      ? Math.max(3, Math.min(12, Math.round(rawLimit)))
+      : 6;
+    const rawSource = typeof value.sourceType === "string" ? value.sourceType : "featured";
+
+    return [{
+      id: clean(value.id, 120) || `collection-${index + 1}`,
+      enabled: value.enabled !== false,
+      eyebrow: clean(value.eyebrow, BLOOM_WEBSITE_SECTION_EYEBROW_MAX),
+      heading: clean(value.heading, BLOOM_WEBSITE_SECTION_HEADING_MAX) || "Shop the Collection",
+      description: clean(value.description, BLOOM_WEBSITE_SECTION_DESCRIPTION_MAX),
+      sourceType: (allowedSources.has(rawSource) ? rawSource : "featured") as BloomWebsiteHomepageMerchandisingSection["sourceType"],
+      sourceValue: clean(value.sourceValue, 140),
+      productLimit,
+    }];
+  });
 }

@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { NavLinks } from "@/components/NavLinks";
-import { Bell, Menu, X } from "lucide-react";
+import { Bell, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { SettingsDirtyStateProvider } from "./settings/SettingsDirtyState";
 import SettingsNavigationGuard from "./settings/SettingsNavigationGuard";
 
@@ -39,6 +39,7 @@ export default function DashboardLayout({
   }).format(new Date());
 
   const [showNav, setShowNav] = useState(false);
+  const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -133,6 +134,27 @@ export default function DashboardLayout({
     loadNotifications();
   }, []);
 
+  useEffect(() => {
+    const storedValue = window.localStorage.getItem(
+      "bloom-dashboard-nav-collapsed",
+    );
+
+    if (storedValue === "true") {
+      setDesktopNavCollapsed(true);
+    }
+  }, []);
+
+  function toggleDesktopNav() {
+    setDesktopNavCollapsed((current) => {
+      const nextValue = !current;
+      window.localStorage.setItem(
+        "bloom-dashboard-nav-collapsed",
+        String(nextValue),
+      );
+      return nextValue;
+    });
+  }
+
   if (shop?.isSuspended) {
     return (
       <div className="min-h-screen bg-emerald-50 px-4 py-8 sm:px-6 lg:px-8">
@@ -199,29 +221,69 @@ export default function DashboardLayout({
     <SettingsDirtyStateProvider>
       <SettingsNavigationGuard />
 
-      <div className="flex h-screen overflow-hidden bg-emerald-50 md:p-4 lg:gap-4 xl:gap-6 xl:p-6 2xl:gap-8 2xl:p-8 print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
+      <div className="flex h-dvh overflow-hidden bg-emerald-50 md:p-4 lg:gap-4 xl:gap-6 xl:p-6 2xl:gap-8 2xl:p-8 print:block print:h-auto print:overflow-visible print:bg-white print:p-0">
         {/* Desktop Sidebar */}
         {shop && (
-          <aside className="hidden h-full min-h-0 w-56 shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-lg lg:flex xl:w-64 print:!hidden">
-            <div className="mb-5 flex shrink-0 items-center gap-3 border-b border-slate-100 pb-5">
-              <img src="/logo.svg" alt="" className="h-9 w-9" />
+          <aside
+            className={`hidden h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg transition-[width,padding] duration-200 lg:flex print:!hidden ${
+              desktopNavCollapsed
+                ? "w-20 p-3"
+                : "w-56 p-5 xl:w-64"
+            }`}
+          >
+            <div
+              className={`mb-3 flex shrink-0 items-center border-b border-slate-100 pb-4 ${
+                desktopNavCollapsed ? "justify-center" : "gap-3"
+              }`}
+            >
+              <img src="/logo.svg" alt="" className="h-9 w-9 shrink-0" />
 
-              <div className="min-w-0">
-                <h2 className="truncate text-lg font-black text-slate-900">
-                  GetBloomDirect
-                </h2>
+              {!desktopNavCollapsed ? (
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-black text-slate-900">
+                    GetBloomDirect
+                  </h2>
 
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-purple-600">
-                  Florist technology
-                </p>
-              </div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-purple-600">
+                    Florist technology
+                  </p>
+                </div>
+              ) : null}
             </div>
+
+            <button
+              type="button"
+              onClick={toggleDesktopNav}
+              className={`mb-3 flex shrink-0 items-center rounded-xl border border-slate-200 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 ${
+                desktopNavCollapsed
+                  ? "justify-center px-2"
+                  : "gap-2 px-3"
+              }`}
+              aria-label={
+                desktopNavCollapsed
+                  ? "Expand dashboard navigation"
+                  : "Collapse dashboard navigation"
+              }
+              title={
+                desktopNavCollapsed
+                  ? "Expand navigation"
+                  : "Collapse navigation"
+              }
+            >
+              {desktopNavCollapsed ? (
+                <PanelLeftOpen size={17} aria-hidden="true" />
+              ) : (
+                <PanelLeftClose size={17} aria-hidden="true" />
+              )}
+              {!desktopNavCollapsed ? <span>Collapse navigation</span> : null}
+            </button>
 
             <NavLinks
               slug={shop.slug}
               pro={shop.isPro}
               pathname={pathname}
               role={shop.role}
+              collapsed={desktopNavCollapsed}
             />
           </aside>
         )}
@@ -268,7 +330,7 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main Dashboard Workspace */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col print:block print:w-full">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden print:block print:h-auto print:w-full print:overflow-visible">
           <header className="mb-5 flex w-full shrink-0 bg-white px-4 py-2 md:rounded-2xl print:hidden">
             <div className="flex w-full items-center justify-between">
               {/* Greeting */}
@@ -470,7 +532,7 @@ export default function DashboardLayout({
             </button>
           </header>
 
-          <main className="min-h-0 flex-1 overflow-auto overscroll-contain print:block print:overflow-visible">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain print:block print:overflow-visible">
             {children}
           </main>
         </div>

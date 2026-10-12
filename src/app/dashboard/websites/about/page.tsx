@@ -52,8 +52,14 @@ export default async function BloomWebsiteAboutPage() {
   const fallbackSections = getDefaultBloomWebsiteAboutSections(
     website.homepage?.aboutText || "",
   );
-  const storedSections = Array.isArray(website.aboutPage?.sections)
-    ? website.aboutPage.sections
+  const storedSections: BloomWebsiteAboutSection[] = Array.isArray(website.aboutPage?.sections)
+    ? website.aboutPage.sections.map((section) => ({
+        key: section.key,
+        enabled: section.enabled !== false,
+        title: section.title || "",
+        body: section.body || "",
+        sortOrder: Number(section.sortOrder || 0),
+      }))
     : [];
   const sectionMap = new Map<BloomWebsiteAboutSectionKey, BloomWebsiteAboutSection>(
     storedSections.map((section) => [section.key, section]),

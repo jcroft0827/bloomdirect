@@ -8,12 +8,16 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import {
   normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageMerchandisingSections,
   normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteHomepageSectionOrder,
+  normalizeBloomWebsiteHomepageSectionVisibility,
   normalizeBloomWebsiteTrustPoints,
 } from "@/lib/bloom-websites/storefront-content";
 import {
   DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
+  normalizeBloomWebsiteLogoSize,
   normalizeStorefrontHexColor,
 } from "@/lib/bloom-websites/storefront-theme";
 import {
@@ -21,6 +25,7 @@ import {
   buildBloomWebsiteHeroSubheadline,
   isBloomWebsiteGeneratedHeroHeadline,
 } from "@/lib/bloom-websites/branding-copy";
+import { normalizeBloomWebsiteHeroSlides } from "@/lib/bloom-websites/storefront-editor";
 
 type BloomWebsiteLean = {
   _id: {
@@ -212,9 +217,11 @@ export async function POST() {
 
 type UpdateBloomWebsiteBrandingBody = {
   siteName?: unknown;
+  theme?: unknown;
 
   branding?: {
     logo?: unknown;
+    logoSize?: unknown;
     tagline?: unknown;
     primaryColor?: unknown;
     accentColor?: unknown;
@@ -224,9 +231,14 @@ type UpdateBloomWebsiteBrandingBody = {
     heroHeadline?: unknown;
     heroSubheadline?: unknown;
     heroImage?: unknown;
+    heroSlides?: unknown;
     heroInfoCard?: unknown;
     trustPoints?: unknown;
+    aboutImage?: unknown;
     sectionContent?: unknown;
+    sectionOrder?: unknown;
+    sectionVisibility?: unknown;
+    merchandisingSections?: unknown;
   };
 };
 
@@ -268,9 +280,16 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const logo = cleanBrandingString(body.branding?.logo, 2000);
+    const themeWasProvided = typeof body.theme === "string";
+    const theme =
+      body.theme === "bloom-elegant" ? "bloom-elegant" : "bloom-classic";
 
+    const brandingWasProvided = body.branding !== undefined;
+    const logo = cleanBrandingString(body.branding?.logo, 2000);
     const tagline = cleanBrandingString(body.branding?.tagline, 180);
+    const logoSize = normalizeBloomWebsiteLogoSize(
+      typeof body.branding?.logoSize === "string" ? body.branding.logoSize : undefined,
+    );
 
     const primaryColor = normalizeStorefrontHexColor(
       typeof body.branding?.primaryColor === "string"
@@ -298,7 +317,14 @@ export async function PATCH(request: Request) {
       body.homepage?.heroSubheadline,
       300,
     );
+    const heroImageWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "heroImage");
     const heroImage = cleanBrandingString(body.homepage?.heroImage, 2000);
+    const heroSlidesWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "heroSlides");
+    const heroSlides = normalizeBloomWebsiteHeroSlides(body.homepage?.heroSlides);
     const heroInfoCardWasProvided =
       body.homepage !== undefined &&
       Object.prototype.hasOwnProperty.call(body.homepage, "heroInfoCard");
@@ -314,6 +340,29 @@ export async function PATCH(request: Request) {
     const sectionContentWasProvided =
       body.homepage !== undefined &&
       Object.prototype.hasOwnProperty.call(body.homepage, "sectionContent");
+    const aboutImageWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "aboutImage");
+    const aboutImage = cleanBrandingString(body.homepage?.aboutImage, 2000);
+    const sectionOrderWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "sectionOrder");
+    const sectionOrder = normalizeBloomWebsiteHomepageSectionOrder(
+      body.homepage?.sectionOrder,
+    );
+    const sectionVisibilityWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "sectionVisibility");
+    const sectionVisibility = normalizeBloomWebsiteHomepageSectionVisibility(
+      body.homepage?.sectionVisibility,
+    );
+    const merchandisingSectionsWasProvided =
+      body.homepage !== undefined &&
+      Object.prototype.hasOwnProperty.call(body.homepage, "merchandisingSections");
+    const merchandisingSections = normalizeBloomWebsiteHomepageMerchandisingSections(
+      body.homepage?.merchandisingSections,
+    );
+
     const sectionContent = normalizeBloomWebsiteHomepageSectionContent(
       body.homepage?.sectionContent,
     );
@@ -361,17 +410,20 @@ export async function PATCH(request: Request) {
       shop: session.user.id,
     })
       .select(
-        "_id siteName branding.tagline homepage.heroHeadline homepage.heroSubheadline",
+        "_id siteName theme branding.tagline homepage.heroHeadline homepage.heroSubheadline homepage.heroImage homepage.heroSlides",
       )
       .lean<{
         _id: unknown;
         siteName: string;
+        theme?: "bloom-classic" | "bloom-elegant";
         branding?: {
           tagline?: string;
         };
         homepage?: {
           heroHeadline?: string;
           heroSubheadline?: string;
+          heroImage?: string;
+          heroSlides?: unknown;
         };
       } | null>();
 
@@ -386,14 +438,40 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const updateSet: Record<string, unknown> = {
-      siteName,
-      "branding.logo": logo,
-      "branding.tagline": tagline,
-      "branding.primaryColor": primaryColor,
-      "branding.accentColor": accentColor,
-      "homepage.heroImage": heroImage,
-    };
+    const updateSet: Record<string, unknown> = { siteName };
+
+    if (themeWasProvided) {
+      updateSet.theme = theme;
+    }
+
+    if (brandingWasProvided) {
+      updateSet["branding.logo"] = logo;
+      updateSet["branding.logoSize"] = logoSize;
+      updateSet["branding.tagline"] = tagline;
+      updateSet["branding.primaryColor"] = primaryColor;
+      updateSet["branding.accentColor"] = accentColor;
+    }
+
+    if (heroImageWasProvided) {
+      updateSet["homepage.heroImage"] = heroImage;
+    }
+
+    if (heroSlidesWasProvided) {
+      if (heroSlides.length === 0) {
+        return NextResponse.json(
+          { error: "Add at least one hero before saving your storefront." },
+          { status: 400 },
+        );
+      }
+
+      const primaryHero = heroSlides[0];
+      updateSet["homepage.heroSlides"] = heroSlides;
+
+      // Keep legacy single-hero fields synchronized for metadata and older surfaces.
+      updateSet["homepage.heroHeadline"] = primaryHero.headline;
+      updateSet["homepage.heroSubheadline"] = primaryHero.subheadline;
+      updateSet["homepage.heroImage"] = primaryHero.imageUrl;
+    }
 
     /*
      * Keep Bloom's generated hero copy in sync with Site Name, but never
@@ -412,9 +490,24 @@ export async function PATCH(request: Request) {
 
     if (heroHeadlineWasProvided) {
       updateSet["homepage.heroHeadline"] = heroHeadline;
-    } else if (heroHeadlineIsGenerated) {
-      updateSet["homepage.heroHeadline"] =
-        buildBloomWebsiteHeroHeadline(siteName);
+    } else if (!heroSlidesWasProvided && heroHeadlineIsGenerated) {
+      const generatedHeadline = buildBloomWebsiteHeroHeadline(siteName);
+      updateSet["homepage.heroHeadline"] = generatedHeadline;
+
+      const storedSlides = Array.isArray(existingWebsite.homepage?.heroSlides)
+        ? existingWebsite.homepage.heroSlides
+        : [];
+      const firstStoredSlide =
+        storedSlides[0] && typeof storedSlides[0] === "object"
+          ? (storedSlides[0] as Record<string, unknown>)
+          : null;
+
+      if (
+        firstStoredSlide &&
+        firstStoredSlide.headline === existingWebsite.homepage?.heroHeadline
+      ) {
+        updateSet["homepage.heroSlides.0.headline"] = generatedHeadline;
+      }
     }
 
     if (heroSubheadlineWasProvided) {
@@ -427,6 +520,22 @@ export async function PATCH(request: Request) {
 
     if (trustPointsWasProvided) {
       updateSet["homepage.trustPoints"] = trustPoints;
+    }
+
+    if (aboutImageWasProvided) {
+      updateSet["homepage.aboutImage"] = aboutImage;
+    }
+
+    if (sectionOrderWasProvided) {
+      updateSet["homepage.sectionOrder"] = sectionOrder;
+    }
+
+    if (sectionVisibilityWasProvided) {
+      updateSet["homepage.sectionVisibility"] = sectionVisibility;
+    }
+
+    if (merchandisingSectionsWasProvided) {
+      updateSet["homepage.merchandisingSections"] = merchandisingSections;
     }
 
     if (sectionContentWasProvided) {
@@ -451,15 +560,22 @@ export async function PATCH(request: Request) {
           "_id",
           "previewSlug",
           "siteName",
+          "theme",
           "branding.logo",
+          "branding.logoSize",
           "branding.tagline",
           "branding.primaryColor",
           "branding.accentColor",
           "homepage.heroHeadline",
           "homepage.heroSubheadline",
           "homepage.heroImage",
+          "homepage.heroSlides",
           "homepage.heroInfoCard",
           "homepage.trustPoints",
+          "homepage.aboutImage",
+          "homepage.sectionOrder",
+          "homepage.sectionVisibility",
+          "homepage.merchandisingSections",
           "homepage.sectionContent",
         ].join(" "),
       )
@@ -470,9 +586,11 @@ export async function PATCH(request: Request) {
 
         previewSlug: string;
         siteName: string;
+        theme?: "bloom-classic" | "bloom-elegant";
 
         branding?: {
           logo?: string;
+          logoSize?: string;
           tagline?: string;
           primaryColor?: string;
           accentColor?: string;
@@ -482,8 +600,13 @@ export async function PATCH(request: Request) {
           heroHeadline?: string;
           heroSubheadline?: string;
           heroImage?: string;
+          heroSlides?: unknown;
           heroInfoCard?: unknown;
           trustPoints?: unknown;
+          aboutImage?: string;
+          sectionOrder?: unknown;
+          sectionVisibility?: unknown;
+          merchandisingSections?: unknown;
           sectionContent?: unknown;
         };
       } | null>();
@@ -508,9 +631,11 @@ export async function PATCH(request: Request) {
         previewSlug: website.previewSlug,
 
         siteName: website.siteName,
+        theme: website.theme || "bloom-classic",
 
         branding: {
           logo: website.branding?.logo || "",
+          logoSize: normalizeBloomWebsiteLogoSize(website.branding?.logoSize),
 
           tagline: website.branding?.tagline || "",
 
@@ -526,11 +651,29 @@ export async function PATCH(request: Request) {
           heroHeadline: website.homepage?.heroHeadline || "",
           heroSubheadline: website.homepage?.heroSubheadline || "",
           heroImage: website.homepage?.heroImage || "",
+          heroSlides: normalizeBloomWebsiteHeroSlides(
+            website.homepage?.heroSlides,
+            {
+              headline: website.homepage?.heroHeadline || "",
+              subheadline: website.homepage?.heroSubheadline || "",
+              imageUrl: website.homepage?.heroImage || "",
+            },
+          ),
           heroInfoCard: normalizeBloomWebsiteHeroInfoCardContent(
             website.homepage?.heroInfoCard,
           ),
           trustPoints: normalizeBloomWebsiteTrustPoints(
             website.homepage?.trustPoints,
+          ),
+          aboutImage: website.homepage?.aboutImage || "",
+          sectionOrder: normalizeBloomWebsiteHomepageSectionOrder(
+            website.homepage?.sectionOrder,
+          ),
+          sectionVisibility: normalizeBloomWebsiteHomepageSectionVisibility(
+            website.homepage?.sectionVisibility,
+          ),
+          merchandisingSections: normalizeBloomWebsiteHomepageMerchandisingSections(
+            website.homepage?.merchandisingSections,
           ),
           sectionContent: normalizeBloomWebsiteHomepageSectionContent(
             website.homepage?.sectionContent,
@@ -539,11 +682,11 @@ export async function PATCH(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Failed to update BloomWebsite branding:", error);
+    console.error("Failed to update BloomWebsite settings:", error);
 
     return NextResponse.json(
       {
-        error: "Failed to save your BloomWebsite branding.",
+        error: "Failed to save your BloomWebsite settings.",
       },
       {
         status: 500,

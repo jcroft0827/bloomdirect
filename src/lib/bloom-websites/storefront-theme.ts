@@ -1,5 +1,6 @@
 import type {
   BloomWebsiteBackgroundStyle,
+  BloomWebsiteLogoSize,
   BloomWebsiteStorefrontTheme,
   BloomWebsiteThemeName,
 } from "@/types/bloom-website";
@@ -11,6 +12,11 @@ export const DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR = "#37a156";
 export const DEFAULT_BLOOM_WEBSITE_THEME_NAME: BloomWebsiteThemeName =
   "bloom-classic";
 
+export const DEFAULT_BLOOM_WEBSITE_LOGO_SIZE: BloomWebsiteLogoSize = "standard";
+
+export const BLOOM_WEBSITE_LOGO_SIZES: readonly BloomWebsiteLogoSize[] =
+  ["small", "standard", "large", "xlarge"] as const;
+
 export const DEFAULT_BLOOM_WEBSITE_BACKGROUND_STYLE: BloomWebsiteBackgroundStyle =
   "clean";
 
@@ -21,6 +27,7 @@ type NormalizeBloomWebsiteStorefrontThemeInput = {
   themeName?: string | null;
 
   logo?: string | null;
+  logoSize?: string | null;
 
   primaryColor?: string | null;
   accentColor?: string | null;
@@ -29,6 +36,40 @@ type NormalizeBloomWebsiteStorefrontThemeInput = {
 
   backgroundStyle?: string | null;
 };
+
+
+export function normalizeBloomWebsiteLogoSize(
+  value: string | null | undefined,
+): BloomWebsiteLogoSize {
+  return BLOOM_WEBSITE_LOGO_SIZES.includes(value as BloomWebsiteLogoSize)
+    ? (value as BloomWebsiteLogoSize)
+    : DEFAULT_BLOOM_WEBSITE_LOGO_SIZE;
+}
+
+const HEADER_LOGO_CLASS_NAMES: Record<
+  "classic" | "elegant",
+  Record<BloomWebsiteLogoSize, string>
+> = {
+  classic: {
+    small: "h-12 w-auto max-w-[200px] object-contain object-left sm:h-14 sm:max-w-[240px] lg:h-16 lg:max-w-[280px]",
+    standard: "h-16 w-auto max-w-[240px] object-contain object-left sm:h-[4.5rem] sm:max-w-[300px] lg:h-20 lg:max-w-[360px]",
+    large: "h-[4.5rem] w-auto max-w-[280px] object-contain object-left sm:h-20 sm:max-w-[360px] lg:h-24 lg:max-w-[440px]",
+    xlarge: "h-20 w-auto max-w-[320px] object-contain object-left sm:h-24 sm:max-w-[420px] lg:h-28 lg:max-w-[520px]",
+  },
+  elegant: {
+    small: "h-10 w-auto max-w-[180px] object-contain sm:h-12 sm:max-w-[220px] lg:h-14 lg:max-w-[280px]",
+    standard: "h-12 w-auto max-w-[210px] object-contain sm:h-14 sm:max-w-[260px] lg:h-16 lg:max-w-[340px]",
+    large: "h-14 w-auto max-w-[240px] object-contain sm:h-16 sm:max-w-[320px] lg:h-20 lg:max-w-[420px]",
+    xlarge: "h-16 w-auto max-w-[280px] object-contain sm:h-20 sm:max-w-[380px] lg:h-24 lg:max-w-[500px]",
+  },
+};
+
+export function getBloomWebsiteHeaderLogoClassName(
+  value: string | null | undefined,
+  variant: "classic" | "elegant",
+) {
+  return HEADER_LOGO_CLASS_NAMES[variant][normalizeBloomWebsiteLogoSize(value)];
+}
 
 /**
  * Expands valid shorthand hex colors.
@@ -163,6 +204,7 @@ function normalizeThemeName(
 ): BloomWebsiteThemeName {
   switch (value) {
     case "bloom-classic":
+    case "bloom-elegant":
       return value;
 
     default:
@@ -206,6 +248,7 @@ export function normalizeBloomWebsiteStorefrontTheme(
     themeName: normalizeThemeName(input.themeName),
 
     logo: input.logo?.trim() || "",
+    logoSize: normalizeBloomWebsiteLogoSize(input.logoSize),
 
     primaryColor,
     accentColor,

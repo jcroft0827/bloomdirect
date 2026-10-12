@@ -1,10 +1,12 @@
 // src/lib/bloom-websites/getBloomWebsiteStorefrontCatalog.ts
 
+import { normalizeBloomWebsiteLogoSize } from "@/lib/bloom-websites/storefront-theme";
 import { connectToDB } from "@/lib/mongoose";
 
 import BloomWebsite from "@/models/BloomWebsite";
 import BloomWebsiteProduct from "@/models/BloomWebsiteProduct";
 import Shop from "@/models/Shop";
+import type { BloomWebsiteLogoSize, BloomWebsiteThemeName } from "@/types/bloom-website";
 
 export type BloomWebsiteCatalogAvailabilityState =
   | "available"
@@ -41,9 +43,11 @@ export type BloomWebsiteStorefrontCatalog = {
     previewSlug: string;
 
     siteName: string;
+    theme: BloomWebsiteThemeName;
 
     branding: {
       logo: string;
+      logoSize: BloomWebsiteLogoSize;
       primaryColor: string;
       accentColor: string;
     };
@@ -67,9 +71,11 @@ type WebsiteLean = {
 
   previewSlug: string;
   siteName: string;
+  theme?: BloomWebsiteThemeName;
 
   branding?: {
     logo?: string;
+    logoSize?: string;
     primaryColor?: string;
     accentColor?: string;
   };
@@ -187,7 +193,7 @@ export async function getBloomWebsiteStorefrontCatalog(
   }
 
   const website = (await BloomWebsite.findOne(websiteQuery)
-    .select(["_id", "shop", "previewSlug", "siteName", "branding"].join(" "))
+    .select(["_id", "shop", "previewSlug", "siteName", "theme", "branding"].join(" "))
     .lean()) as WebsiteLean | null;
 
   if (!website) {
@@ -249,9 +255,11 @@ export async function getBloomWebsiteStorefrontCatalog(
       previewSlug: website.previewSlug,
 
       siteName: website.siteName,
+      theme: website.theme === "bloom-elegant" ? "bloom-elegant" : "bloom-classic",
 
       branding: {
         logo: website.branding?.logo || "",
+        logoSize: normalizeBloomWebsiteLogoSize(website.branding?.logoSize),
 
         primaryColor: website.branding?.primaryColor || "#654783",
 

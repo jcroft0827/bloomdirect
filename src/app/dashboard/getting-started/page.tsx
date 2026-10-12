@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   PackageCheck,
   Palette,
+  PanelsTopLeft,
   PlayCircle,
   Rocket,
   Search,
@@ -171,13 +172,22 @@ const bloomWebsiteWalkthroughs: Walkthrough[] = [
     actionLabel: "Open website overview",
   },
   {
-    title: "Branding and Storefront Content",
+    title: "Branding",
     description:
-      "Set your logo, colors, hero content, footer details, social links, and the customer-facing copy used throughout your storefront.",
-    topics: ["Logo and colors", "Hero content", "Storefront section copy"],
+      "Set the identity customers recognize across your website: shop name, logo, colors, brand statement, and social links.",
+    topics: ["Shop identity", "Logo and colors", "Social links"],
     icon: Palette,
     href: "/dashboard/websites/branding",
     actionLabel: "Open Branding",
+  },
+  {
+    title: "Storefront Editor",
+    description:
+      "Choose your storefront style, build hero slides, and shape the customer-facing copy on your homepage with a live preview.",
+    topics: ["Storefront style", "Hero slideshow", "Homepage copy"],
+    icon: PanelsTopLeft,
+    href: "/dashboard/websites/storefront",
+    actionLabel: "Open Storefront Editor",
   },
   {
     title: "Products and Add-Ons",

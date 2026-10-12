@@ -169,12 +169,9 @@ export default function BloomWebsiteAboutEditor({
 
       {values.contentMode === "guided" && (
       <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-black text-gray-950">Let Bloom help write it</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">Add only facts you are comfortable publishing. Empty fields are simply ignored.</p>
-          </div>
-          <button type="button" onClick={generateCopy} className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-3 text-sm font-black text-white"><Sparkles size={17} />Build my About copy</button>
+        <div>
+          <h2 className="text-xl font-black text-gray-950">Let Bloom help write it</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">Add only facts you are comfortable publishing. Empty fields are simply ignored.</p>
         </div>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -196,6 +193,17 @@ export default function BloomWebsiteAboutEditor({
               )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-7 flex flex-col gap-3 rounded-2xl border border-purple-100 bg-purple-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-black text-gray-950">Ready to turn those details into your About copy?</p>
+            <p className="mt-1 text-sm leading-5 text-gray-600">Bloom will fill the editable About sections directly below. You can review and change every word before saving.</p>
+          </div>
+          <button type="button" onClick={generateCopy} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-3 text-sm font-black text-white">
+            <Sparkles size={17} />
+            Build my About copy
+          </button>
         </div>
       </section>
       )}

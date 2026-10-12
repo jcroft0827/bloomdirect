@@ -3,10 +3,14 @@
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
 import {
   normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageMerchandisingSections,
   normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteHomepageSectionOrder,
+  normalizeBloomWebsiteHomepageSectionVisibility,
   normalizeBloomWebsiteTrustPoints,
 } from "@/lib/bloom-websites/storefront-content";
 import { DEFAULT_BLOOM_WEBSITE_HERO_SUBHEADLINE } from "@/lib/bloom-websites/branding-copy";
+import { normalizeBloomWebsiteHeroSlides } from "@/lib/bloom-websites/storefront-editor";
 import {
   getBloomWebsiteConfiguredDeliveryZipCodes,
   normalizeBloomWebsiteBusinessHours,
@@ -41,6 +45,7 @@ type BloomWebsiteLean = {
 
   branding?: {
     logo?: string;
+    logoSize?: string;
 
     tagline?: string;
 
@@ -54,10 +59,15 @@ type BloomWebsiteLean = {
     heroHeadline?: string;
     heroSubheadline?: string;
     heroImage?: string;
+    heroSlides?: unknown;
     heroInfoCard?: unknown;
     trustPoints?: unknown;
     aboutText?: string;
+    aboutImage?: string;
     sectionContent?: unknown;
+    sectionOrder?: unknown;
+    sectionVisibility?: unknown;
+    merchandisingSections?: unknown;
   };
 
   aboutPage?: {
@@ -360,6 +370,7 @@ export async function getBloomWebsiteStorefront(
     themeName: website.theme,
 
     logo: website.branding?.logo,
+    logoSize: website.branding?.logoSize,
 
     tagline: website.branding?.tagline,
 
@@ -407,6 +418,7 @@ export async function getBloomWebsiteStorefront(
 
       branding: {
         logo: storefrontTheme.logo,
+        logoSize: storefrontTheme.logoSize,
 
         tagline: storefrontTheme.tagline,
 
@@ -428,6 +440,19 @@ export async function getBloomWebsiteStorefront(
 
         heroImage: website.homepage?.heroImage || "",
 
+        heroSlides: normalizeBloomWebsiteHeroSlides(
+          website.homepage?.heroSlides,
+          {
+            headline:
+              website.homepage?.heroHeadline ||
+              `Beautiful flowers from ${website.siteName}.`,
+            subheadline:
+              website.homepage?.heroSubheadline ||
+              DEFAULT_BLOOM_WEBSITE_HERO_SUBHEADLINE,
+            imageUrl: website.homepage?.heroImage || "",
+          },
+        ),
+
         heroInfoCard: normalizeBloomWebsiteHeroInfoCardContent(
           website.homepage?.heroInfoCard,
         ),
@@ -437,6 +462,20 @@ export async function getBloomWebsiteStorefront(
         ),
 
         aboutText: website.homepage?.aboutText || "",
+
+        aboutImage: website.homepage?.aboutImage || "",
+
+        sectionOrder: normalizeBloomWebsiteHomepageSectionOrder(
+          website.homepage?.sectionOrder,
+        ),
+
+        sectionVisibility: normalizeBloomWebsiteHomepageSectionVisibility(
+          website.homepage?.sectionVisibility,
+        ),
+
+        merchandisingSections: normalizeBloomWebsiteHomepageMerchandisingSections(
+          website.homepage?.merchandisingSections,
+        ),
 
         sectionContent: normalizeBloomWebsiteHomepageSectionContent(
           website.homepage?.sectionContent,

@@ -4,17 +4,25 @@ import { ExternalLink, Loader2, Monitor, Smartphone } from "lucide-react";
 import Link from "next/link";
 import type {
   BloomWebsiteHeroInfoCardContent,
+  BloomWebsiteHeroSlide,
+  BloomWebsiteHomepageMerchandisingSection,
   BloomWebsiteHomepageSectionContent,
+  BloomWebsiteHomepageSectionKey,
+  BloomWebsiteHomepageSectionVisibility,
+  BloomWebsiteLogoSize,
+  BloomWebsiteThemeName,
   BloomWebsiteTrustPoint,
 } from "@/types/bloom-website";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PreviewMode = "desktop" | "mobile";
 
 type Props = {
   previewSlug: string;
+  theme: BloomWebsiteThemeName;
   siteName: string;
   logo: string;
+  logoSize?: BloomWebsiteLogoSize;
   tagline: string;
   heroHeadline: string;
   heroSubheadline: string;
@@ -27,9 +35,14 @@ type Props = {
     tiktok: string;
   };
   sectionContent: BloomWebsiteHomepageSectionContent;
+  sectionOrder?: BloomWebsiteHomepageSectionKey[];
+  sectionVisibility?: BloomWebsiteHomepageSectionVisibility;
+  merchandisingSections?: BloomWebsiteHomepageMerchandisingSection[];
+  aboutImage?: string;
   primaryColor: string;
   accentColor: string;
   heroImage: string;
+  heroSlides?: BloomWebsiteHeroSlide[];
 };
 
 const VIEWPORTS: Record<
@@ -51,8 +64,10 @@ const VIEWPORTS: Record<
 
 function buildPreviewUrl({
   previewSlug,
+  theme,
   siteName,
   logo,
+  logoSize,
   tagline,
   heroHeadline,
   heroSubheadline,
@@ -60,16 +75,25 @@ function buildPreviewUrl({
   trustPoints,
   socialLinks,
   sectionContent,
+  sectionOrder,
+  sectionVisibility,
+  merchandisingSections,
+  aboutImage,
   primaryColor,
   accentColor,
   heroImage,
+  heroSlides,
 }: Props) {
   const params = new URLSearchParams();
 
   params.set("builder", "1");
   params.set("embedded", "1");
+  params.set("theme", theme);
   params.set("siteName", siteName);
   params.set("logo", logo);
+  if (logoSize !== undefined) {
+    params.set("logoSize", logoSize);
+  }
   params.set("tagline", tagline);
   params.set("heroHeadline", heroHeadline);
   params.set("heroSubheadline", heroSubheadline);
@@ -77,9 +101,27 @@ function buildPreviewUrl({
   params.set("trustPoints", JSON.stringify(trustPoints));
   params.set("socialLinks", JSON.stringify(socialLinks));
   params.set("sectionContent", JSON.stringify(sectionContent));
+  if (sectionOrder !== undefined) {
+    params.set("sectionOrder", JSON.stringify(sectionOrder));
+  }
+  if (sectionVisibility !== undefined) {
+    params.set("sectionVisibility", JSON.stringify(sectionVisibility));
+  }
+  if (merchandisingSections !== undefined) {
+    params.set(
+      "merchandisingSections",
+      JSON.stringify(merchandisingSections),
+    );
+  }
+  if (aboutImage !== undefined) {
+    params.set("aboutImage", aboutImage);
+  }
   params.set("primaryColor", primaryColor);
   params.set("accentColor", accentColor);
   params.set("heroImage", heroImage);
+  if (heroSlides) {
+    params.set("heroSlides", JSON.stringify(heroSlides));
+  }
 
   return `/websites/preview/${encodeURIComponent(previewSlug)}?${params.toString()}`;
 }
@@ -91,24 +133,7 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
   const [availableWidth, setAvailableWidth] = useState(0);
   const measureRef = useRef<HTMLDivElement | null>(null);
 
-  const nextPreviewUrl = useMemo(
-    () => buildPreviewUrl(props),
-    [
-      props.previewSlug,
-      props.siteName,
-      props.logo,
-      props.tagline,
-      props.heroHeadline,
-      props.heroSubheadline,
-      props.heroInfoCard,
-      props.trustPoints,
-      props.socialLinks,
-      props.sectionContent,
-      props.primaryColor,
-      props.accentColor,
-      props.heroImage,
-    ],
-  );
+  const nextPreviewUrl = buildPreviewUrl(props);
 
   useEffect(() => {
     if (nextPreviewUrl === previewUrl) {

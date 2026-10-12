@@ -10,6 +10,7 @@ type StorefrontCartButtonProps = {
   primaryForeground?: "#000000" | "#ffffff";
 
   compact?: boolean;
+  variant?: "classic" | "elegant";
 };
 
 export default function StorefrontCartButton({
@@ -18,8 +19,24 @@ export default function StorefrontCartButton({
   primaryForeground = "#ffffff",
 
   compact = false,
+  variant = "classic",
 }: StorefrontCartButtonProps) {
   const { itemCount, openCart } = useBloomWebsiteCart();
+
+  if (variant === "elegant") {
+    return (
+      <button
+        type="button"
+        onClick={openCart}
+        aria-label={`Open cart with ${itemCount} ${itemCount === 1 ? "item" : "items"}`}
+        className="group relative inline-flex min-h-10 shrink-0 items-center gap-2 border-b border-stone-400 px-1 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-700 transition hover:border-stone-900 hover:text-stone-950"
+      >
+        <ShoppingBag size={16} strokeWidth={1.6} />
+        <span className={compact ? "hidden sm:inline" : ""}>Bag</span>
+        {itemCount > 0 ? <span className="font-medium tracking-normal">({itemCount > 99 ? "99+" : itemCount})</span> : null}
+      </button>
+    );
+  }
 
   return (
     <button

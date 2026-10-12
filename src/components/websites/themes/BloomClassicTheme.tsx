@@ -21,7 +21,10 @@ import BloomWebsiteStorefrontProductCard, {
 
 import Link from "next/link";
 import StorefrontCartButton from "@/components/websites/storefront/StorefrontCartButton";
-import type { BloomWebsiteStorefront } from "@/types/bloom-website";
+import StorefrontReveal from "@/components/websites/storefront/StorefrontReveal";
+import StorefrontRevealObserver from "@/components/websites/storefront/StorefrontRevealObserver";
+import { getBloomWebsiteHeaderLogoClassName } from "@/lib/bloom-websites/storefront-theme";
+import type { BloomWebsiteHomepageMerchandisingSection, BloomWebsiteHomepageSectionKey, BloomWebsiteStorefront, BloomWebsiteStorefrontProduct } from "@/types/bloom-website";
 import {
   getBloomWebsiteHeroInfoCardDefaults,
   getBloomWebsiteHomepageSectionDefaults,
@@ -68,6 +71,39 @@ function formatLocalList(values: string[], limit = 6) {
 
   const text = visible.join(", ");
   return remaining > 0 ? `${text}, and ${remaining} more` : text;
+}
+
+function toProductCard(product: BloomWebsiteStorefrontProduct): BloomWebsiteStorefrontProductCardProduct {
+  const enabledPrices = product.pricingTiers.filter((tier) => tier.enabled).map((tier) => tier.price);
+  const startingPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : null;
+
+  return {
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    shortDescription: product.shortDescription,
+    category: product.category,
+    imageUrl: product.imageUrl,
+    startingPrice,
+    isFeatured: product.isFeatured,
+    availabilityState: product.soldOut ? "sold_out" : startingPrice === null ? "unavailable" : "available",
+  };
+}
+
+function selectMerchandisingProducts(
+  products: BloomWebsiteStorefrontProduct[],
+  section: BloomWebsiteHomepageMerchandisingSection,
+) {
+  let selected = products;
+  if ((section.sourceType === "occasion" || section.sourceType === "category") && !section.sourceValue.trim()) return [];
+  if (section.sourceType === "featured") selected = products.filter((product) => product.isFeatured);
+  if (section.sourceType === "occasion" && section.sourceValue) {
+    selected = products.filter((product) => product.occasions.some((occasion) => occasion.toLowerCase() === section.sourceValue.toLowerCase()));
+  }
+  if (section.sourceType === "category" && section.sourceValue) {
+    selected = products.filter((product) => product.category.toLowerCase() === section.sourceValue.toLowerCase());
+  }
+  return selected.slice(0, section.productLimit).map(toProductCard);
 }
 
 export default function BloomClassicTheme({
@@ -240,37 +276,27 @@ export default function BloomClassicTheme({
    * preview truthful and gives us the correct foundation for
    * the upcoming homepage redesign.
    */
-  const storefrontProducts = products.slice(0, 6);
+  const homepageProductCards: BloomWebsiteStorefrontProductCardProduct[] = products
+    .slice(0, 6)
+    .map(toProductCard);
 
-  const homepageProductCards: BloomWebsiteStorefrontProductCardProduct[] =
-    storefrontProducts.map((product) => {
-      const enabledPrices = product.pricingTiers
-        .filter((tier) => tier.enabled)
-        .map((tier) => tier.price);
+  const sectionOrderIndex = (key: BloomWebsiteHomepageSectionKey) => {
+    const index = website.homepage.sectionOrder.indexOf(key);
+    return index < 0 ? 99 : index;
+  };
 
-      const startingPrice =
-        enabledPrices.length > 0 ? Math.min(...enabledPrices) : null;
+  const merchandisingCollections = website.homepage.merchandisingSections
+    .filter((section) => section.enabled)
+    .map((section) => ({ ...section, products: selectMerchandisingProducts(products, section) }))
+    .filter((section) => section.products.length > 0);
 
-      return {
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        shortDescription: product.shortDescription,
-        category: product.category,
-        imageUrl: product.imageUrl,
-        startingPrice,
-        isFeatured: product.isFeatured,
-
-        availabilityState: product.soldOut
-          ? "sold_out"
-          : startingPrice === null
-            ? "unavailable"
-            : "available",
-      };
-    });
+  const mapSrc = showAddress && fullAddress
+    ? `https://www.google.com/maps?q=${encodeURIComponent(fullAddress)}&output=embed`
+    : "";
 
   return (
     <div className="min-h-screen bg-white text-gray-950">
+      <StorefrontRevealObserver />
       {/* ANNOUNCEMENT */}
       {website.announcement.isActive && (
         <div
@@ -300,7 +326,7 @@ export default function BloomClassicTheme({
               <img
                 src={website.storefrontTheme.logo}
                 alt={`${website.siteName} logo`}
-                className="h-16 w-auto max-w-[240px] object-contain object-left sm:h-[4.5rem] sm:max-w-[300px] lg:h-20 lg:max-w-[360px]"
+                className={getBloomWebsiteHeaderLogoClassName(website.storefrontTheme.logoSize, "classic")}
               />
             ) : (
               <>
@@ -334,26 +360,30 @@ export default function BloomClassicTheme({
             <nav className="hidden items-center gap-7 text-sm font-bold text-gray-700 lg:flex">
               <Link
                 href={`${storefrontBasePath}/shop`}
-                className="transition hover:opacity-60"
+                className="group relative py-1"
               >
                 Shop
+                <span className="absolute inset-x-0 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full transition-transform duration-300 group-hover:scale-x-100" style={{ backgroundColor: primaryColor }} />
               </Link>
 
               {website.aboutPage?.enabled !== false && (
                 <Link
                   href={`${storefrontBasePath}/about`}
-                  className="transition hover:opacity-60"
+                  className="group relative py-1"
                 >
                   About
+                  <span className="absolute inset-x-0 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full transition-transform duration-300 group-hover:scale-x-100" style={{ backgroundColor: primaryColor }} />
                 </Link>
               )}
 
-              <a href="#delivery" className="transition hover:opacity-60">
+              <a href="#delivery" className="group relative py-1">
                 Delivery
+                <span className="absolute inset-x-0 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full transition-transform duration-300 group-hover:scale-x-100" style={{ backgroundColor: primaryColor }} />
               </a>
 
-              <a href="#contact" className="transition hover:opacity-60">
+              <a href="#contact" className="group relative py-1">
                 Contact
+                <span className="absolute inset-x-0 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full transition-transform duration-300 group-hover:scale-x-100" style={{ backgroundColor: primaryColor }} />
               </a>
             </nav>
 
@@ -602,9 +632,10 @@ export default function BloomClassicTheme({
           </div>
         </section>
 
+        <div className="flex flex-col">
         {/* SHOP BY OCCASION */}
-        {homepageOccasions.length > 0 && (
-          <section className="bg-[#faf9f7] px-5 py-16 sm:px-8 sm:py-20">
+        {website.homepage.sectionVisibility.occasions && homepageOccasions.length > 0 && (
+          <section data-bloom-reveal className="bg-[#faf9f7] px-5 py-16 sm:px-8 sm:py-20" style={{ order: sectionOrderIndex("occasions") }}>
             <div className="mx-auto max-w-7xl">
               <div className="mx-auto max-w-2xl text-center">
                 <p
@@ -695,7 +726,8 @@ export default function BloomClassicTheme({
         )}
 
         {/* FEATURED FLOWERS */}
-        <section id="shop" className="bg-white px-5 py-16 sm:px-8 sm:py-20">
+        {website.homepage.sectionVisibility.featured ? (
+        <section data-bloom-reveal id="shop" className="bg-white px-5 py-16 sm:px-8 sm:py-20" style={{ order: sectionOrderIndex("featured") }}>
           <div className="mx-auto max-w-7xl">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="max-w-2xl">
@@ -776,166 +808,131 @@ export default function BloomClassicTheme({
             )}
           </div>
         </section>
+        ) : null}
 
-        {/* ABOUT + LOCAL TRUST */}
-        <section
-          id="about"
-          className="overflow-hidden bg-[#f8f6f3] px-5 py-16 sm:px-8 sm:py-20 lg:py-24"
-        >
-          <div className="mx-auto max-w-7xl">
-            <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
-              {/* STORY */}
-              <div>
-                <p
-                  className="text-xs font-black uppercase tracking-[0.2em] sm:text-sm"
-                  style={{
-                    color: accentColor,
-                  }}
-                >
-                  {aboutContent.eyebrow}
-                </p>
+        {/* EXTRA PRODUCT COLLECTIONS */}
+        {website.homepage.sectionVisibility.merchandising && merchandisingCollections.length > 0 ? (
+          <section data-bloom-reveal className="bg-[#faf9f7] px-5 py-16 sm:px-8 sm:py-20" style={{ order: sectionOrderIndex("merchandising") }}>
+            <div className="mx-auto max-w-7xl space-y-16">
+              {merchandisingCollections.map((collection) => (
+                <StorefrontReveal key={collection.id}>
+                  <div>
+                    <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="max-w-2xl">
+                        {collection.eyebrow ? <p className="text-xs font-black uppercase tracking-[0.2em] sm:text-sm" style={{ color: accentColor }}>{collection.eyebrow}</p> : null}
+                        <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">{collection.heading}</h2>
+                        {collection.description ? <p className="mt-4 max-w-xl text-sm leading-7 text-gray-600 sm:text-base">{collection.description}</p> : null}
+                      </div>
+                      <Link href={`${storefrontBasePath}/shop`} className="hidden shrink-0 rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-black text-gray-800 transition hover:bg-gray-50 sm:inline-flex">View All Flowers</Link>
+                    </div>
+                    <div className="mt-10 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
+                      {collection.products.map((product) => (
+                        <BloomWebsiteStorefrontProductCard key={`${collection.id}-${product.slug}`} product={product} basePath={storefrontBasePath} primaryColor={primaryColor} accentColor={accentColor} primaryForeground={primaryForeground} />
+                      ))}
+                    </div>
+                  </div>
+                </StorefrontReveal>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-                <h2 className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
-                  {aboutContent.heading}
-                </h2>
-
-                <p className="mt-6 max-w-2xl whitespace-pre-line text-base leading-8 text-gray-600">
-                  {aboutContent.description}
-                </p>
-
-                <div className="mt-8 flex flex-wrap gap-3">
-                  {showAddress && cityState && (
+        {/* ABOUT */}
+        {website.homepage.sectionVisibility.about ? (
+          <section
+            data-bloom-reveal
+            id="about"
+            className="overflow-hidden bg-[#f8f6f3] px-5 py-16 sm:px-8 sm:py-20 lg:py-24"
+            style={{ order: sectionOrderIndex("about") }}
+          >
+            <StorefrontReveal className="mx-auto max-w-7xl">
+              <div className="grid gap-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-16">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] sm:text-sm" style={{ color: accentColor }}>
+                    {aboutContent.eyebrow}
+                  </p>
+                  <h2 className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-gray-950 sm:text-4xl lg:text-5xl">
+                    {aboutContent.heading}
+                  </h2>
+                  <p className="mt-6 max-w-2xl whitespace-pre-line text-base leading-8 text-gray-600">
+                    {aboutContent.description}
+                  </p>
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    {showAddress && cityState ? (
+                      <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm">
+                        <MapPin size={16} style={{ color: accentColor }} />
+                        Local to {cityState}
+                      </div>
+                    ) : null}
                     <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm">
-                      <MapPin
-                        size={16}
-                        style={{
-                          color: accentColor,
-                        }}
-                      />
-                      Local to {cityState}
+                      <Flower2 size={16} style={{ color: accentColor }} />
+                      Florist designed
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm">
+                      <Truck size={16} style={{ color: accentColor }} />
+                      Hand delivered
+                    </div>
+                  </div>
+                  <div className="mt-9 flex flex-wrap gap-3">
+                    {website.aboutPage?.enabled !== false ? (
+                      <Link href={`${storefrontBasePath}/about`} className="inline-flex min-h-12 items-center justify-center rounded-full px-6 py-3.5 text-sm font-black shadow-sm transition hover:-translate-y-0.5 hover:opacity-95" style={{ backgroundColor: primaryColor, color: primaryForeground }}>
+                        Meet Your Florist
+                      </Link>
+                    ) : null}
+                    <Link href={`${storefrontBasePath}/shop`} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-6 py-3.5 text-sm font-black text-gray-800 transition hover:bg-gray-50">
+                      Shop Flowers <ShoppingBag size={17} />
+                    </Link>
+                  </div>
+                </div>
+
+                <div>
+                  {website.homepage.aboutImage ? (
+                    <div className="relative aspect-[5/4] overflow-hidden rounded-[2rem] bg-white shadow-xl shadow-gray-900/5">
+                      <img src={website.homepage.aboutImage} alt={`${website.siteName} florist story`} className="h-full w-full object-cover transition duration-700 hover:scale-[1.025]" />
+                    </div>
+                  ) : (
+                    <div className="flex aspect-[5/4] items-center justify-center rounded-[2rem] border border-gray-200 bg-white px-8 text-center shadow-sm">
+                      <div><Flower2 size={32} className="mx-auto text-gray-300" /><p className="mt-4 text-xl font-black text-gray-800">Your florist story belongs here.</p><p className="mt-2 text-sm leading-6 text-gray-500">Add a team, storefront, or behind-the-scenes photo in the Storefront Editor.</p></div>
                     </div>
                   )}
-
-                  <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm">
-                    <Flower2
-                      size={16}
-                      style={{
-                        color: accentColor,
-                      }}
-                    />
-                    Florist designed
-                  </div>
-
-                  <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm">
-                    <Truck
-                      size={16}
-                      style={{
-                        color: accentColor,
-                      }}
-                    />
-                    Hand delivered
-                  </div>
-                </div>
-
-                <div className="mt-9">
-                  <Link
-                    href={`${storefrontBasePath}/shop`}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-black shadow-sm transition hover:-translate-y-0.5 hover:opacity-95"
-                    style={{
-                      backgroundColor: primaryColor,
-                      color: primaryForeground,
-                    }}
-                  >
-                    Shop Our Flowers
-                    <ShoppingBag size={17} />
-                  </Link>
                 </div>
               </div>
+            </StorefrontReveal>
+          </section>
+        ) : null}
 
-              {/* TRUST CARD */}
-              <div className="relative">
-                <div
-                  className="absolute -right-20 -top-20 h-64 w-64 rounded-full opacity-[0.08] blur-3xl"
-                  style={{
-                    backgroundColor: accentColor,
-                  }}
-                />
-
-                <div className="relative overflow-hidden rounded-[2rem] border border-gray-200 bg-white p-6 shadow-xl shadow-gray-900/5 sm:p-8">
-                  <div className="flex items-start justify-between gap-5">
-                    <div>
-                      <p
-                        className="text-xs font-black uppercase tracking-[0.18em]"
-                        style={{
-                          color: accentColor,
-                        }}
-                      >
-                        {trustContent.eyebrow}
-                      </p>
-
-                      <h3 className="mt-2 text-2xl font-black tracking-tight text-gray-950 sm:text-3xl">
-                        {trustContent.heading}
-                      </h3>
-
-                      {trustContent.description ? (
-                        <p className="mt-3 max-w-md text-sm leading-6 text-gray-500">
-                          {trustContent.description}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-                      style={{
-                        backgroundColor: primaryColor,
-                        color: primaryForeground,
-                      }}
-                    >
-                      <Heart size={23} />
-                    </div>
-                  </div>
-
-                  <div className="mt-8 divide-y divide-gray-100">
-                    {trustPoints.map((point, index) => {
-                      const Icon = trustPointIcons[index] || ShieldCheck;
-
-                      return (
-                        <div
-                          key={`${point.title}-${index}`}
-                          className="flex gap-4 py-5 first:pt-0 last:pb-0"
-                        >
-                          <div
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                            style={{
-                              backgroundColor: `${accentColor}14`,
-                              color: accentColor,
-                            }}
-                          >
-                            <Icon size={19} />
-                          </div>
-
-                          <div>
-                            <p className="font-black text-gray-950">
-                              {point.title}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-gray-500">
-                              {point.description}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+        {/* WHY SHOP LOCAL */}
+        {website.homepage.sectionVisibility.trust ? (
+          <section data-bloom-reveal className="bg-white px-5 py-16 sm:px-8 sm:py-20" style={{ order: sectionOrderIndex("trust") }}>
+            <StorefrontReveal className="mx-auto max-w-7xl">
+              <div className="mx-auto max-w-2xl text-center">
+                <p className="text-xs font-black uppercase tracking-[0.2em] sm:text-sm" style={{ color: accentColor }}>{trustContent.eyebrow}</p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">{trustContent.heading}</h2>
+                {trustContent.description ? <p className="mt-4 text-sm leading-7 text-gray-600 sm:text-base">{trustContent.description}</p> : null}
               </div>
-            </div>
-          </div>
-        </section>
+              <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {trustPoints.map((point, index) => {
+                  const Icon = trustPointIcons[index] || ShieldCheck;
+                  return (
+                    <div key={`${point.title}-${index}`} className="rounded-3xl border border-gray-200 bg-[#faf9f7] p-6">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${accentColor}14`, color: accentColor }}><Icon size={20} /></div>
+                      <p className="mt-5 font-black text-gray-950">{point.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-gray-500">{point.description}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </StorefrontReveal>
+          </section>
+        ) : null}
 
         {/* LOCAL DELIVERY */}
+        {website.homepage.sectionVisibility.delivery ? (
         <section
+          data-bloom-reveal
           id="delivery"
           className="bg-white px-5 py-16 sm:px-8 sm:py-20 lg:py-24"
+          style={{ order: sectionOrderIndex("delivery") }}
         >
           <div className="mx-auto max-w-7xl">
             <div className="grid overflow-hidden rounded-[2rem] border border-gray-200 bg-gray-950 shadow-xl shadow-gray-900/5 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1135,11 +1132,15 @@ export default function BloomClassicTheme({
             </div>
           </div>
         </section>
+        ) : null}
 
         {/* CONTACT */}
+        {website.homepage.sectionVisibility.contact ? (
         <section
+          data-bloom-reveal
           id="contact"
           className="border-t border-gray-100 bg-[#faf9f7] px-5 py-16 sm:px-8 sm:py-20"
+          style={{ order: sectionOrderIndex("contact") }}
         >
           <div className="mx-auto max-w-7xl">
             <div className="mx-auto max-w-2xl text-center">
@@ -1161,75 +1162,43 @@ export default function BloomClassicTheme({
               </p>
             </div>
 
-            <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3">
-              {showAddress && hasAddress && (
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                    style={{
-                      backgroundColor: `${accentColor}14`,
-                      color: accentColor,
-                    }}
-                  >
-                    <MapPin size={21} />
+            <div className="mx-auto mt-10 grid max-w-6xl gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                {showAddress && hasAddress ? (
+                  <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${accentColor}14`, color: accentColor }}><MapPin size={21} /></div>
+                    <p className="mt-5 font-black text-gray-950">Visit Our Shop</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{fullAddress}</p>
                   </div>
-
-                  <p className="mt-5 font-black text-gray-950">
-                    Visit Our Shop
-                  </p>
-
-                  <p className="mt-2 text-sm leading-6 text-gray-600">
-                    {fullAddress}
-                  </p>
-                </div>
-              )}
-
-              {showPhone && shop.phone && (
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                    style={{
-                      backgroundColor: `${accentColor}14`,
-                      color: accentColor,
-                    }}
-                  >
-                    <Phone size={21} />
+                ) : null}
+                {showPhone && shop.phone ? (
+                  <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${accentColor}14`, color: accentColor }}><Phone size={21} /></div>
+                    <p className="mt-5 font-black text-gray-950">Call Us</p>
+                    <a href={`tel:${shop.phone}`} className="mt-2 block text-sm font-semibold text-gray-600 transition hover:text-gray-950">{shop.phone}</a>
                   </div>
-
-                  <p className="mt-5 font-black text-gray-950">Call Us</p>
-
-                  <a
-                    href={`tel:${shop.phone}`}
-                    className="mt-2 block text-sm font-semibold text-gray-600 transition hover:text-gray-950"
-                  >
-                    {shop.phone}
-                  </a>
-                </div>
-              )}
-
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                  style={{
-                    backgroundColor: `${accentColor}14`,
-                    color: accentColor,
-                  }}
-                >
-                  <Mail size={21} />
-                </div>
-
-                <p className="mt-5 font-black text-gray-950">Email Us</p>
-
-                <a
-                  href={`mailto:${shop.email}`}
-                  className="mt-2 block break-all text-sm font-semibold text-gray-600 transition hover:text-gray-950"
-                >
-                  {shop.email}
-                </a>
+                ) : null}
+                {shop.email ? (
+                  <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm sm:p-7">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${accentColor}14`, color: accentColor }}><Mail size={21} /></div>
+                    <p className="mt-5 font-black text-gray-950">Email Us</p>
+                    <a href={`mailto:${shop.email}`} className="mt-2 block break-all text-sm font-semibold text-gray-600 transition hover:text-gray-950">{shop.email}</a>
+                  </div>
+                ) : null}
               </div>
+
+              {mapSrc ? (
+                <div className="overflow-hidden rounded-3xl border border-gray-200 bg-gray-100 shadow-sm">
+                  <iframe title={`Map to ${website.siteName}`} src={mapSrc} className="h-[420px] w-full border-0 lg:h-full lg:min-h-[500px]" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                </div>
+              ) : (
+                <div className="flex min-h-[360px] items-center justify-center rounded-3xl border border-gray-200 bg-white px-8 text-center"><div><MapPin size={30} className="mx-auto text-gray-300" /><p className="mt-4 text-xl font-black text-gray-800">Add your shop address to show a map.</p></div></div>
+              )}
             </div>
           </div>
         </section>
+        ) : null}
+        </div>
       </main>
 
       {/* FOOTER */}

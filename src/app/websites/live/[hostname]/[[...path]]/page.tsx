@@ -9,6 +9,7 @@ import BloomWebsiteProductStorefront from "@/components/websites/storefront/Bloo
 import BloomWebsiteShopStorefront from "@/components/websites/storefront/BloomWebsiteShopStorefront";
 import BloomWebsiteThemeSurface from "@/components/websites/storefront/BloomWebsiteThemeSurface";
 import BloomClassicTheme from "@/components/websites/themes/BloomClassicTheme";
+import BloomElegantTheme from "@/components/websites/themes/BloomElegantTheme";
 
 import { getBloomWebsiteLiveTenant } from "@/lib/bloom-websites/getBloomWebsiteLiveTenant";
 import { getBloomWebsiteStorefront } from "@/lib/bloom-websites/getBloomWebsiteStorefront";
@@ -274,10 +275,11 @@ export default async function BloomWebsiteLiveRouteBoundary({
       <>
         <BloomWebsiteJsonLd data={structuredData} />
 
-        <BloomClassicTheme
-          storefront={storefront}
-          basePath=""
-        />
+        {storefront.website.theme === "bloom-elegant" ? (
+          <BloomElegantTheme storefront={storefront} basePath="" />
+        ) : (
+          <BloomClassicTheme storefront={storefront} basePath="" />
+        )}
       </>
     );
   } else if (path.length === 1 && path[0] === "about") {

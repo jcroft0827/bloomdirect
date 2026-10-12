@@ -9,7 +9,10 @@ import { getBloomWebsiteStorefront } from "@/lib/bloom-websites/getBloomWebsiteS
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
 import {
   normalizeBloomWebsiteHeroInfoCardContent,
+  normalizeBloomWebsiteHomepageMerchandisingSections,
   normalizeBloomWebsiteHomepageSectionContent,
+  normalizeBloomWebsiteHomepageSectionOrder,
+  normalizeBloomWebsiteHomepageSectionVisibility,
   normalizeBloomWebsiteTrustPoints,
 } from "@/lib/bloom-websites/storefront-content";
 import {
@@ -17,7 +20,9 @@ import {
   buildBloomWebsiteHeroSubheadline,
   isBloomWebsiteGeneratedHeroHeadline,
 } from "@/lib/bloom-websites/branding-copy";
+import { normalizeBloomWebsiteHeroSlides } from "@/lib/bloom-websites/storefront-editor";
 import BloomClassicTheme from "@/components/websites/themes/BloomClassicTheme";
+import BloomElegantTheme from "@/components/websites/themes/BloomElegantTheme";
 import WebsitePreviewBar from "@/components/websites/WebsitePreviewBar";
 import {
   getBloomWebsiteHomepageMetadata,
@@ -32,8 +37,10 @@ import type { BloomWebsiteStorefront } from "@/types/bloom-website";
 type BuilderPreviewSearchParams = {
   builder?: string | string[];
   embedded?: string | string[];
+  theme?: string | string[];
   siteName?: string | string[];
   logo?: string | string[];
+  logoSize?: string | string[];
   tagline?: string | string[];
   heroHeadline?: string | string[];
   heroSubheadline?: string | string[];
@@ -41,9 +48,14 @@ type BuilderPreviewSearchParams = {
   trustPoints?: string | string[];
   socialLinks?: string | string[];
   sectionContent?: string | string[];
+  sectionOrder?: string | string[];
+  sectionVisibility?: string | string[];
+  merchandisingSections?: string | string[];
+  aboutImage?: string | string[];
   primaryColor?: string | string[];
   accentColor?: string | string[];
   heroImage?: string | string[];
+  heroSlides?: string | string[];
 };
 
 type PreviewPageProps = {
@@ -77,8 +89,10 @@ function applyBuilderPreviewOverrides(
     return storefront;
   }
 
+  const themeOverride = getParam(searchParams.theme);
   const siteNameOverride = clamp(getParam(searchParams.siteName), 120);
   const logoOverride = clamp(getParam(searchParams.logo), 4096);
+  const logoSizeOverride = clamp(getParam(searchParams.logoSize), 32);
   const taglineOverride = clamp(getParam(searchParams.tagline), 180);
   const heroHeadlineOverride = clamp(getParam(searchParams.heroHeadline), 160);
   const heroSubheadlineOverride = clamp(
@@ -101,9 +115,14 @@ function applyBuilderPreviewOverrides(
     getParam(searchParams.sectionContent),
     6000,
   );
+  const sectionOrderOverride = clamp(getParam(searchParams.sectionOrder), 3000);
+  const sectionVisibilityOverride = clamp(getParam(searchParams.sectionVisibility), 3000);
+  const merchandisingSectionsOverride = clamp(getParam(searchParams.merchandisingSections), 24000);
+  const aboutImageOverride = clamp(getParam(searchParams.aboutImage), 4096);
   const primaryColorOverride = clamp(getParam(searchParams.primaryColor), 32);
   const accentColorOverride = clamp(getParam(searchParams.accentColor), 32);
   const heroImageOverride = clamp(getParam(searchParams.heroImage), 4096);
+  const heroSlidesOverride = clamp(getParam(searchParams.heroSlides), 24000);
 
   const previousSiteName = storefront.website.siteName;
   const previousHeadlineWasGenerated =
@@ -139,8 +158,15 @@ function applyBuilderPreviewOverrides(
       : accentColorOverride;
 
   const storefrontTheme = normalizeBloomWebsiteStorefrontTheme({
-    themeName: storefront.website.theme,
+    themeName:
+      themeOverride === "bloom-elegant" || themeOverride === "bloom-classic"
+        ? themeOverride
+        : storefront.website.theme,
     logo,
+    logoSize:
+      logoSizeOverride === undefined
+        ? storefront.website.storefrontTheme.logoSize
+        : logoSizeOverride,
     tagline,
     primaryColor,
     accentColor,
@@ -156,6 +182,33 @@ function applyBuilderPreviewOverrides(
       );
     } catch {
       sectionContent = storefront.website.homepage.sectionContent;
+    }
+  }
+
+  let sectionOrder = storefront.website.homepage.sectionOrder;
+  if (sectionOrderOverride !== undefined) {
+    try {
+      sectionOrder = normalizeBloomWebsiteHomepageSectionOrder(JSON.parse(sectionOrderOverride));
+    } catch {
+      sectionOrder = storefront.website.homepage.sectionOrder;
+    }
+  }
+
+  let sectionVisibility = storefront.website.homepage.sectionVisibility;
+  if (sectionVisibilityOverride !== undefined) {
+    try {
+      sectionVisibility = normalizeBloomWebsiteHomepageSectionVisibility(JSON.parse(sectionVisibilityOverride));
+    } catch {
+      sectionVisibility = storefront.website.homepage.sectionVisibility;
+    }
+  }
+
+  let merchandisingSections = storefront.website.homepage.merchandisingSections;
+  if (merchandisingSectionsOverride !== undefined) {
+    try {
+      merchandisingSections = normalizeBloomWebsiteHomepageMerchandisingSections(JSON.parse(merchandisingSectionsOverride));
+    } catch {
+      merchandisingSections = storefront.website.homepage.merchandisingSections;
     }
   }
 
@@ -181,6 +234,22 @@ function applyBuilderPreviewOverrides(
     }
   }
 
+  let heroSlides = storefront.website.homepage.heroSlides;
+  if (heroSlidesOverride !== undefined) {
+    try {
+      heroSlides = normalizeBloomWebsiteHeroSlides(
+        JSON.parse(heroSlidesOverride),
+        {
+          headline: storefront.website.homepage.heroHeadline,
+          subheadline: storefront.website.homepage.heroSubheadline,
+          imageUrl: storefront.website.homepage.heroImage,
+        },
+      );
+    } catch {
+      heroSlides = storefront.website.homepage.heroSlides;
+    }
+  }
+
   let socialLinks = storefront.shop.socialLinks;
   if (socialLinksOverride !== undefined) {
     try {
@@ -201,9 +270,11 @@ function applyBuilderPreviewOverrides(
     website: {
       ...storefront.website,
       siteName,
+      theme: storefrontTheme.themeName,
       branding: {
         ...storefront.website.branding,
         logo: storefrontTheme.logo,
+        logoSize: storefrontTheme.logoSize,
         tagline: storefrontTheme.tagline,
         primaryColor: storefrontTheme.primaryColor,
         accentColor: storefrontTheme.accentColor,
@@ -226,9 +297,14 @@ function applyBuilderPreviewOverrides(
           heroImageOverride === undefined
             ? storefront.website.homepage.heroImage
             : heroImageOverride.trim(),
+        heroSlides,
         heroInfoCard,
         trustPoints,
+        aboutImage: aboutImageOverride === undefined ? storefront.website.homepage.aboutImage : aboutImageOverride.trim(),
         sectionContent,
+        sectionOrder,
+        sectionVisibility,
+        merchandisingSections,
       },
     },
     shop: {
@@ -295,10 +371,17 @@ export default async function BloomWebsitePreviewPage({
     <div className={embedded ? "" : "pb-28 sm:pb-20"}>
       {!embedded ? <BloomWebsiteJsonLd data={structuredData} /> : null}
 
-      <BloomClassicTheme
-        storefront={storefront}
-        basePath={`/websites/preview/${storefront.website.previewSlug}`}
-      />
+      {storefront.website.theme === "bloom-elegant" ? (
+        <BloomElegantTheme
+          storefront={storefront}
+          basePath={`/websites/preview/${storefront.website.previewSlug}`}
+        />
+      ) : (
+        <BloomClassicTheme
+          storefront={storefront}
+          basePath={`/websites/preview/${storefront.website.previewSlug}`}
+        />
+      )}
 
       {!embedded ? <WebsitePreviewBar websiteId={storefront.website.id} /> : null}
     </div>

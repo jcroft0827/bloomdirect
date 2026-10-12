@@ -20,7 +20,7 @@ import {
   Network,
   Package2,
   Palette,
-  PlugZap,
+  PanelsTopLeft,
   PlusCircle,
   Rocket,
   Search,
@@ -45,9 +45,20 @@ interface NavLinksProps {
   pathname: string;
   onClose?: () => void;
   role: string;
+  collapsed?: boolean;
 }
 
-function SectionLabel({ children }: { children: ReactNode }) {
+function SectionLabel({
+  children,
+  collapsed = false,
+}: {
+  children: ReactNode;
+  collapsed?: boolean;
+}) {
+  if (collapsed) {
+    return <div className="mx-2 my-3 border-t border-slate-200" aria-hidden="true" />;
+  }
+
   return (
     <p className="px-3 pb-1 pt-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 first:pt-0">
       {children}
@@ -61,6 +72,7 @@ export const NavLinks = ({
   pathname,
   role,
   onClose,
+  collapsed = false,
 }: NavLinksProps) => {
   const [sendUsage, setSendUsage] = useState<MonthlySendUsage | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
@@ -109,7 +121,9 @@ export const NavLinks = ({
   }, []);
 
   const navItemClass = (active: boolean) =>
-    `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
+    `flex w-full items-center rounded-xl py-2.5 text-sm font-semibold transition-all ${
+      collapsed ? "justify-center gap-0 px-2" : "gap-3 px-3"
+    } ${
       active
         ? "bg-emerald-100 text-emerald-800"
         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -137,8 +151,14 @@ export const NavLinks = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
+    <div
+      className={`flex min-h-0 flex-1 flex-col ${
+        collapsed
+          ? "[&_span]:max-w-0 [&_span]:overflow-hidden [&_span]:whitespace-nowrap [&_span]:opacity-0"
+          : ""
+      }`}
+    >
+      <nav className={`min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain ${collapsed ? "pr-0" : "pr-1"}`}>
         <Link
           href="/dashboard"
           onClick={onClose}
@@ -148,13 +168,18 @@ export const NavLinks = ({
           <span>Dashboard</span>
         </Link>
 
-        <SectionLabel>GetBloomDirect</SectionLabel>
+        <SectionLabel collapsed={collapsed}>GetBloomDirect</SectionLabel>
 
         {usageLoading ? (
-          <span className="flex cursor-wait items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400">
+          <div
+            className={`flex cursor-wait items-center rounded-xl py-2.5 text-sm font-semibold text-slate-400 ${
+              collapsed ? "justify-center px-2" : "gap-3 px-3"
+            }`}
+            aria-label="Loading create order availability"
+          >
             <PlusCircle className={iconClass} aria-hidden="true" />
-            Create Order
-          </span>
+            <span>Create Order</span>
+          </div>
         ) : sendUsage?.allowed !== false ? (
           <Link
             href="/dashboard/new-order"
@@ -213,7 +238,7 @@ export const NavLinks = ({
           </span>
         </Link>
 
-        <SectionLabel>BloomWebsites</SectionLabel>
+        <SectionLabel collapsed={collapsed}>BloomWebsites</SectionLabel>
 
         <Link
           href="/dashboard/websites"
@@ -249,6 +274,15 @@ export const NavLinks = ({
         >
           <BarChart3 className={iconClass} aria-hidden="true" />
           <span>Reports</span>
+        </Link>
+
+        <Link
+          href="/dashboard/websites/storefront"
+          onClick={onClose}
+          className={navItemClass(pathname === "/dashboard/websites/storefront")}
+        >
+          <PanelsTopLeft className={iconClass} aria-hidden="true" />
+          <span>Storefront</span>
         </Link>
 
         <Link
@@ -307,7 +341,7 @@ export const NavLinks = ({
           <span>TFPOS Integration</span>
         </Link>
 
-        <SectionLabel>My Shop</SectionLabel>
+        <SectionLabel collapsed={collapsed}>My Shop</SectionLabel>
 
         <Link
           href={`/dashboard/shops/${slug}`}
@@ -329,7 +363,7 @@ export const NavLinks = ({
 
         {role === "admin" && (
           <>
-            <SectionLabel>Administration</SectionLabel>
+            <SectionLabel collapsed={collapsed}>Administration</SectionLabel>
             <Link
               href="/admin"
               onClick={onClose}
@@ -364,7 +398,9 @@ export const NavLinks = ({
         <button
           type="button"
           onClick={logOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50"
+          className={`flex w-full items-center rounded-xl py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50 ${
+            collapsed ? "justify-center px-2" : "gap-3 px-3"
+          }`}
         >
           <LogOut className={iconClass} aria-hidden="true" />
           <span>Logout</span>

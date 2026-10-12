@@ -28,6 +28,7 @@ type BloomWebsiteCatalogBrowserProps = {
   accentForeground: "#000000" | "#ffffff";
 
   initialFilters?: InitialCatalogFilters;
+  variant?: "classic" | "elegant";
 };
 
 function normalizeText(value: string) {
@@ -110,7 +111,9 @@ export default function BloomWebsiteCatalogBrowser({
   primaryForeground,
   accentForeground,
   initialFilters,
+  variant = "classic",
 }: BloomWebsiteCatalogBrowserProps) {
+  const elegant = variant === "elegant";
   const [query, setQuery] = useState(initialFilters?.query?.trim() || "");
 
   const [occasion, setOccasion] = useState(
@@ -287,7 +290,13 @@ export default function BloomWebsiteCatalogBrowser({
   return (
     <div>
       {/* SEARCH + SORT */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:rounded-3xl sm:p-5">
+      <div
+        className={
+          elegant
+            ? "border-y border-stone-200 bg-[#fbfaf7] py-4 sm:py-5"
+            : "rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:rounded-3xl sm:p-5"
+        }
+      >
         <div className="flex flex-col gap-3 sm:flex-row">
           <label className="relative block min-w-0 flex-1">
             <span className="sr-only">Search flowers</span>
@@ -302,7 +311,11 @@ export default function BloomWebsiteCatalogBrowser({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search flowers..."
-              className="h-12 w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-10 text-sm font-semibold text-gray-950 outline-none transition placeholder:font-medium placeholder:text-gray-400 focus:border-gray-400 focus:bg-white sm:h-13 sm:rounded-2xl"
+              className={
+                elegant
+                  ? "h-12 w-full border-b border-stone-300 bg-transparent pl-11 pr-10 text-sm text-gray-950 outline-none transition placeholder:text-gray-400 focus:border-gray-950"
+                  : "h-12 w-full rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-10 text-sm font-semibold text-gray-950 outline-none transition placeholder:font-medium placeholder:text-gray-400 focus:border-gray-400 focus:bg-white sm:h-13 sm:rounded-2xl"
+              }
             />
 
             {query && (
@@ -328,7 +341,11 @@ export default function BloomWebsiteCatalogBrowser({
             <select
               value={sort}
               onChange={(event) => setSort(event.target.value as CatalogSort)}
-              className="h-12 w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-9 text-sm font-black text-gray-700 outline-none transition focus:border-gray-400 focus:bg-white sm:h-13 sm:rounded-2xl"
+              className={
+                elegant
+                  ? "h-12 w-full appearance-none border-b border-stone-300 bg-transparent pl-11 pr-9 text-sm font-semibold text-gray-700 outline-none transition focus:border-gray-950"
+                  : "h-12 w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 pl-11 pr-9 text-sm font-black text-gray-700 outline-none transition focus:border-gray-400 focus:bg-white sm:h-13 sm:rounded-2xl"
+              }
             >
               <option value="featured">Featured</option>
 
@@ -356,7 +373,7 @@ export default function BloomWebsiteCatalogBrowser({
               <button
                 type="button"
                 onClick={() => setOccasion("")}
-                className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${
+                className={`shrink-0 border px-4 py-2.5 text-xs transition sm:text-sm ${elegant ? "rounded-none font-semibold uppercase tracking-[0.12em]" : "rounded-full font-black"} ${
                   !occasion
                     ? "border-transparent"
                     : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
@@ -383,7 +400,7 @@ export default function BloomWebsiteCatalogBrowser({
                     key={value}
                     type="button"
                     onClick={() => setOccasion(isSelected ? "" : slug)}
-                    className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${
+                    className={`shrink-0 border px-4 py-2.5 text-xs transition sm:text-sm ${elegant ? "rounded-none font-semibold uppercase tracking-[0.12em]" : "rounded-full font-black"} ${
                       isSelected
                         ? "border-transparent"
                         : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
@@ -416,7 +433,7 @@ export default function BloomWebsiteCatalogBrowser({
               <button
                 type="button"
                 onClick={() => setCategory("")}
-                className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${
+                className={`shrink-0 border px-4 py-2.5 text-xs transition sm:text-sm ${elegant ? "rounded-none font-semibold uppercase tracking-[0.12em]" : "rounded-full font-black"} ${
                   !category
                     ? "border-transparent"
                     : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
@@ -443,7 +460,7 @@ export default function BloomWebsiteCatalogBrowser({
                     key={value}
                     type="button"
                     onClick={() => setCategory(isSelected ? "" : slug)}
-                    className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${
+                    className={`shrink-0 border px-4 py-2.5 text-xs transition sm:text-sm ${elegant ? "rounded-none font-semibold uppercase tracking-[0.12em]" : "rounded-full font-black"} ${
                       isSelected
                         ? "border-transparent"
                         : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
@@ -473,7 +490,13 @@ export default function BloomWebsiteCatalogBrowser({
             Our Collection
           </p>
 
-          <h2 className="mt-1 text-xl font-black tracking-tight text-gray-950 sm:text-2xl">
+          <h2
+            className={
+              elegant
+                ? "mt-2 font-serif text-2xl font-medium tracking-tight text-gray-950 sm:text-3xl"
+                : "mt-1 text-xl font-black tracking-tight text-gray-950 sm:text-2xl"
+            }
+          >
             {filteredProducts.length === 1
               ? "1 arrangement"
               : `${filteredProducts.length} arrangements`}
@@ -515,7 +538,13 @@ export default function BloomWebsiteCatalogBrowser({
 
       {/* RESULTS */}
       {filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:gap-6">
+        <div
+          className={
+            elegant
+              ? "grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-7 sm:gap-y-12 lg:grid-cols-3"
+              : "grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:gap-6"
+          }
+        >
           {filteredProducts.map((product) => (
             <BloomWebsiteStorefrontProductCard
               key={product.id}
@@ -524,6 +553,7 @@ export default function BloomWebsiteCatalogBrowser({
               primaryColor={primaryColor}
               accentColor={accentColor}
               primaryForeground={primaryForeground}
+              variant={variant}
             />
           ))}
         </div>

@@ -2,7 +2,38 @@
 
 export type BloomWebsiteStatus = "preview" | "live" | "paused";
 
-export type BloomWebsiteThemeName = "bloom-classic";
+export type BloomWebsiteThemeName = "bloom-classic" | "bloom-elegant";
+
+export type BloomWebsiteLogoSize = "small" | "standard" | "large" | "xlarge";
+
+
+export type BloomWebsiteHeroTextStyle = "light" | "dark";
+
+export type BloomWebsiteHeroOverlay = "none" | "soft" | "medium" | "strong";
+
+export type BloomWebsiteHeroAlignment = "left" | "center";
+
+export type BloomWebsiteHeroImagePosition = "top" | "center" | "bottom";
+
+export type BloomWebsiteHeroCtaDestination =
+  | "shop"
+  | "about"
+  | "custom"
+  | "none";
+
+export type BloomWebsiteHeroSlide = {
+  id: string;
+  headline: string;
+  subheadline: string;
+  imageUrl: string;
+  textStyle: BloomWebsiteHeroTextStyle;
+  overlay: BloomWebsiteHeroOverlay;
+  alignment: BloomWebsiteHeroAlignment;
+  imagePosition: BloomWebsiteHeroImagePosition;
+  ctaLabel: string;
+  ctaDestination: BloomWebsiteHeroCtaDestination;
+  ctaHref: string;
+};
 
 export type BloomWebsiteBackgroundStyle =
   | "clean"
@@ -15,6 +46,7 @@ export type BloomWebsiteStorefrontTheme = {
   themeName: BloomWebsiteThemeName;
 
   logo: string;
+  logoSize: BloomWebsiteLogoSize;
 
   primaryColor: string;
   accentColor: string;
@@ -52,6 +84,38 @@ export type BloomWebsiteBusinessHour = {
   closes: string;
 };
 
+
+
+export type BloomWebsiteHomepageSectionKey =
+  | "occasions"
+  | "featured"
+  | "merchandising"
+  | "about"
+  | "trust"
+  | "delivery"
+  | "contact";
+
+export type BloomWebsiteHomepageSectionVisibility = Record<
+  BloomWebsiteHomepageSectionKey,
+  boolean
+>;
+
+export type BloomWebsiteHomepageMerchandisingSource =
+  | "featured"
+  | "occasion"
+  | "category"
+  | "all";
+
+export type BloomWebsiteHomepageMerchandisingSection = {
+  id: string;
+  enabled: boolean;
+  eyebrow: string;
+  heading: string;
+  description: string;
+  sourceType: BloomWebsiteHomepageMerchandisingSource;
+  sourceValue: string;
+  productLimit: number;
+};
 
 export type BloomWebsiteHomepageSectionText = {
   eyebrow: string;
@@ -161,6 +225,7 @@ export type BloomWebsiteStorefrontWebsite = {
    */
   branding: {
     logo: string;
+    logoSize: BloomWebsiteLogoSize;
 
     tagline: string;
 
@@ -180,10 +245,15 @@ export type BloomWebsiteStorefrontWebsite = {
     heroHeadline: string;
     heroSubheadline: string;
     heroImage: string;
+    heroSlides: BloomWebsiteHeroSlide[];
     heroInfoCard: BloomWebsiteHeroInfoCardContent;
     trustPoints: BloomWebsiteTrustPoint[];
     aboutText: string;
+    aboutImage: string;
     sectionContent: BloomWebsiteHomepageSectionContent;
+    sectionOrder: BloomWebsiteHomepageSectionKey[];
+    sectionVisibility: BloomWebsiteHomepageSectionVisibility;
+    merchandisingSections: BloomWebsiteHomepageMerchandisingSection[];
   };
 
   aboutPage?: {

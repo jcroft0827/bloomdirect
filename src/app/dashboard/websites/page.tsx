@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Globe2,
   Palette,
+  PanelsTopLeft,
   PlugZap,
   Search,
   ShoppingBag,
@@ -160,10 +161,10 @@ export default async function WebsitesPage() {
                 </Link>
 
                 <Link
-                  href="/dashboard/websites/branding"
+                  href="/dashboard/websites/storefront"
                   className="inline-flex items-center justify-between gap-3 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15"
                 >
-                  Edit Branding
+                  Edit Storefront
                   <ArrowRight size={16} />
                 </Link>
               </div>
@@ -171,6 +172,25 @@ export default async function WebsitesPage() {
           </div>
 
           <div className="grid gap-px bg-gray-200 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/dashboard/websites/storefront"
+              className="group bg-white p-6 transition hover:bg-purple-50/50"
+            >
+              <PanelsTopLeft className="text-purple-700" size={23} />
+
+              <div className="mt-3 flex items-center gap-2">
+                <p className="font-bold text-gray-950">Storefront Editor</p>
+                <ArrowRight
+                  size={15}
+                  className="text-gray-400 transition group-hover:translate-x-1 group-hover:text-purple-700"
+                />
+              </div>
+
+              <p className="mt-1 text-sm leading-6 text-gray-500">
+                Choose your storefront style, hero slides, and homepage presentation.
+              </p>
+            </Link>
+
             <Link
               href="/dashboard/websites/branding"
               className="group bg-white p-6 transition hover:bg-purple-50/50"
@@ -187,7 +207,7 @@ export default async function WebsitesPage() {
               </div>
 
               <p className="mt-1 text-sm leading-6 text-gray-500">
-                Customize your logo, colors, tagline and hero image.
+                Manage your shop name, logo, colors, and brand statement.
               </p>
             </Link>
 
