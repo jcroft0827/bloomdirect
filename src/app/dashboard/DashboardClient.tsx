@@ -1,45 +1,45 @@
-// /app/dashboard/DashboardClient.tsx
-
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import BloomSpinner from "@/components/BloomSpinner";
-import { sendInvite as sendInviteRequest } from "@/lib/client/sendInvite";
-import VerificationProgressBar from "@/components/verification/ProgressBar";
-import DashboardWelcome from "@/components/dashboard/DashboardWelcome";
 import {
   ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  CircleAlert,
+  FileText,
   Globe2,
   Network,
   Package2,
+  Palette,
+  PanelsTopLeft,
   PlusCircle,
+  Rocket,
+  Settings2,
   ShoppingBag,
+  Sparkles,
 } from "lucide-react";
 
-type DashboardReportPeriod = "month" | "year" | "all";
+import BloomSpinner from "@/components/BloomSpinner";
 
-// #region Shop
-interface DashboardReportSummary {
-  period: DashboardReportPeriod;
-  ordersReceived: number;
-  fulfillmentValueCents: number;
-  averageFulfillmentOrderCents: number;
-}
-
-interface MonthlySendUsage {
+type MonthlySendUsage = {
   isPro: boolean;
   sentThisMonth: number;
   limit: number | null;
   remaining: number | null;
   allowed: boolean;
-  monthStart: string;
-  nextMonthStart: string;
-}
+};
 
-interface ShopReadiness {
+type ReadinessKey =
+  | "emailVerification"
+  | "businessInformation"
+  | "paymentMethods"
+  | "deliverySettings"
+  | "financialSettings";
+
+type ShopReadiness = {
   requirements: {
     accountCreated: boolean;
     emailVerified: boolean;
@@ -48,286 +48,88 @@ interface ShopReadiness {
     deliveryConfigured: boolean;
     financialsConfigured: boolean;
   };
-
-  capabilities: {
-    canAccessDashboard: boolean;
-    canAppearInSearch: boolean;
-    canSendOrders: boolean;
-    canReceiveOrders: boolean;
-    canAcceptOrders: boolean;
-  };
-
-  incompleteRequirements: Array<
-    | "emailVerification"
-    | "businessInformation"
-    | "paymentMethods"
-    | "deliverySettings"
-    | "financialSettings"
-  >;
-
+  incompleteRequirements: ReadinessKey[];
   completedCount: number;
   totalCount: number;
   completionPercentage: number;
-}
+};
 
-interface Stripe {
-  status?: string;
-  planId?: string;
-  cancelAtPeriodEnd?: boolean;
-  trialEndsAt?: Date;
-}
-
-interface ZipZone {
-  name: string;
-  zip: string;
-  fee: number;
-}
-
-interface DistanceZone {
-  min: number;
-  max: number;
-  fee: number;
-}
-
-interface BlackoutDate {
-  date: Date;
-}
-
-interface BlackoutTime {
-  start: string;
-  end: string;
-}
-
-interface Reviews {
-  customerName?: string;
-  rating?: number;
-  comment?: string;
-  date?: Date;
-}
-
-interface Delivery {
-  deliveryMethod: string;
-  zipZones?: ZipZone[];
-  distanceZones?: DistanceZone[];
-  fallbackFee: number;
-  maxRadius: number;
-  minProductTotal: number;
-  sameDayCutoff: string;
-  holidaySurcharge: number;
-  blackoutDates?: BlackoutDate[];
-  blackoutTimes?: BlackoutTime[];
-  noMoreOrdersToday: boolean;
-  allowSameDay: boolean;
-}
-
-interface Stats {
-  ordersSent: number;
-  ordersCompleted: number;
-  ordersDeclined: number;
-  ordersReceived: number;
-  responseRate?: number;
-  avgResponseTimeMinutes?: number;
-}
-
-interface Contact {
-  phone?: string;
-  whatsapp?: string;
-  emailSecondary?: string;
-  website?: string;
-}
-
-interface Geo {
-  type: string;
-  coordinates: number[];
-}
-
-interface PaymentMethods {
-  venmoHandle?: string;
-  cashAppTag?: string;
-  zellePhoneOrEmail?: string;
-  paypalEmail?: string;
-  defaultPaymentMethod?: string;
-}
-
-interface Address {
-  street?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  country?: string;
-  timezone: string;
-  geoLocation: Geo;
-}
-
-interface Verification {
-  emailVerified: boolean;
-  phoneVerified: boolean;
-  websiteVerified: boolean;
-}
-
-interface PricingTier {
-  label: string;
-  price: number;
-  description?: string;
-}
-
-interface FeaturedArrangement {
-  name?: string;
-  description?: string;
-  image?: string;
-  pricingTiers?: PricingTier[];
-}
-
-interface Shop {
-  id: string;
+type Shop = {
   businessName: string;
-  email: string;
-  role: string;
-  isVerified: boolean;
-  verifiedFlorist: boolean;
-  verification: Verification;
-  isSuspended: boolean;
-  suspensionReason?: string;
-  isPublic: boolean;
-  reviews: Reviews[];
-  networkJoinDate: Date;
   isPro: boolean;
-  proSince: Date;
-  lastLogin: Date;
-  lastActivity: Date;
-  dismissedDashboardWelcome?: boolean;
-  contact: Contact;
-  address: Address;
-  paymentMethods: PaymentMethods;
-  stripe: Stripe;
-  delivery: Delivery;
-  stats: Stats;
-  featuredArrangement?: FeaturedArrangement;
-}
+};
 
-// #endregion
-
-function ReadinessItem({
-  label,
-  description,
-  completed,
-  href,
-}: {
-  label: string;
+type ShortcutProps = {
+  href: string;
+  title: string;
   description: string;
-  completed: boolean;
-  href?: string;
-}) {
-  const content = (
-    <div
-      className={`flex h-full gap-4 rounded-2xl border p-4 transition ${
-        completed
-          ? "border-emerald-200 bg-emerald-50"
-          : "border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-purple-50"
-      }`}
+  icon: ReactNode;
+  tone?: "purple" | "emerald";
+};
+
+function WebsiteShortcut({
+  href,
+  title,
+  description,
+  icon,
+  tone = "purple",
+}: ShortcutProps) {
+  const toneClasses =
+    tone === "emerald"
+      ? "bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100"
+      : "bg-purple-50 text-purple-700 group-hover:bg-purple-100";
+
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-[138px] flex-col rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-purple-200 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-purple-100"
     >
-      <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-          completed
-            ? "bg-emerald-600 text-white"
-            : "border-2 border-slate-300 bg-white text-slate-400"
-        }`}
-      >
-        {completed ? "✓" : ""}
+      <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${toneClasses}`}>
+        {icon}
       </div>
 
-      <div className="flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <p
-            className={`font-bold ${
-              completed ? "text-emerald-900" : "text-slate-800"
-            }`}
-          >
-            {label}
-          </p>
-
-          {!completed && href && (
-            <span className="shrink-0 text-sm font-bold text-purple-700">
-              Complete →
-            </span>
-          )}
-        </div>
-
-        <p
-          className={`mt-1 text-sm ${
-            completed ? "text-emerald-700" : "text-slate-500"
-          }`}
-        >
-          {description}
-        </p>
+      <div className="mt-4 flex items-center gap-2">
+        <h3 className="font-black text-slate-900">{title}</h3>
+        <ArrowRight
+          className="h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-purple-600"
+          aria-hidden="true"
+        />
       </div>
-    </div>
+
+      <p className="mt-1 text-sm leading-5 text-slate-500">{description}</p>
+    </Link>
   );
-
-  if (!completed && href) {
-    return (
-      <Link
-        href={href}
-        className="block rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-200"
-      >
-        {content}
-      </Link>
-    );
-  }
-
-  return content;
 }
+
+const readinessLabels: Record<ReadinessKey, string> = {
+  emailVerification: "Verify email",
+  businessInformation: "Business information",
+  paymentMethods: "Payment method",
+  deliverySettings: "Delivery settings",
+  financialSettings: "Taxes & fees",
+};
 
 export default function DashboardClient() {
-  const { data: session, status } = useSession();
-
-  // ------------------------------
-  // Local state (your preferred style)
-  // ------------------------------
+  const { status } = useSession();
   const [shop, setShop] = useState<Shop | null>(null);
-  const [shopId, setShopId] = useState("");
   const [readiness, setReadiness] = useState<ShopReadiness | null>(null);
-  const [profit, setProfit] = useState(0);
-  const [ordersSent, setOrdersSent] = useState(0);
-  const [ordersReceived, setOrdersReceived] = useState(0);
-
-  const [isPro, setIsPro] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
   const [monthlySendUsage, setMonthlySendUsage] =
     useState<MonthlySendUsage | null>(null);
-  const [usageLoading, setUsageLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [reportPeriod, setReportPeriod] =
-    useState<DashboardReportPeriod>("month");
-
-  const [reportSummary, setReportSummary] =
-    useState<DashboardReportSummary | null>(null);
-
-  const [reportLoading, setReportLoading] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [dismissingWelcome, setDismissingWelcome] = useState(false);
-
-  // Invite Florists
-  const [inviteFriendsVisible, setInviteFriendsVisible] = useState(false);
-  const [personalMessageVisible, setPersonalMessageVisible] = useState(false);
-  const [personalMessage, setPersonalMessage] = useState("");
-  const [toEmail, setToEmail] = useState("");
-  const [inviteLink, setInviteLink] = useState(
-    process.env.NEXT_PUBLIC_URL + "/register",
-  );
-  const [sendingInvite, setSendingInvite] = useState(false);
-
-  // ------------------------------
-  // Fetch dashboard data
-  // ------------------------------
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      if (status === "unauthenticated") {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    let mounted = true;
 
     async function loadDashboard() {
       try {
         setIsLoading(true);
-        setUsageLoading(true);
 
         const [shopRes, usageRes] = await Promise.all([
           fetch("/api/shops/me"),
@@ -347,862 +149,341 @@ export default function DashboardClient() {
           );
         }
 
+        if (!mounted) return;
+
         if (shopData?.shop) {
-          setShop(shopData.shop);
-          setShopId(shopData.shop._id || shopData.id || "");
-          setIsPro(Boolean(shopData.shop.isPro));
-          setShowWelcome(!Boolean(shopData.shop.dismissedDashboardWelcome));
+          setShop({
+            businessName: shopData.shop.businessName || "Your flower shop",
+            isPro: Boolean(shopData.shop.isPro),
+          });
         }
 
-        if (shopData?.readiness) {
-          setReadiness(shopData.readiness);
-        }
-
-        setMonthlySendUsage(usageData.usage);
-      } catch (err) {
-        console.error("Failed to load dashboard:", err);
-
+        setReadiness(shopData?.readiness ?? null);
+        setMonthlySendUsage(usageData?.usage ?? null);
+      } catch (error) {
+        console.error("Failed to load home dashboard:", error);
         toast.error(
-          "Failed to load dashboard data. Please refresh the page. If the problem persists, contact GetBloomDirect support.",
+          "We couldn't load your Bloom home page. Refresh and try again.",
         );
       } finally {
-        setIsLoading(false);
-        setUsageLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
   }, [status]);
-
-  useEffect(() => {
-    if (!shop?.isPro) {
-      setReportSummary(null);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function loadReportSummary() {
-      try {
-        setReportLoading(true);
-
-        const res = await fetch(
-          `/api/reports/dashboard-summary?period=${reportPeriod}`,
-          {
-            signal: controller.signal,
-          },
-        );
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || "Unable to load performance summary.");
-        }
-
-        setReportSummary(data.summary);
-      } catch (error: any) {
-        if (error?.name === "AbortError") {
-          return;
-        }
-
-        console.error("Failed to load dashboard report:", error);
-
-        toast.error("Unable to load Bloom Pro performance data.");
-      } finally {
-        if (!controller.signal.aborted) {
-          setReportLoading(false);
-        }
-      }
-    }
-
-    loadReportSummary();
-
-    return () => controller.abort();
-  }, [shop?.isPro, reportPeriod]);
 
   if (status === "unauthenticated") {
     return (
-      <div className="p-6 text-xl text-red-500">You must be logged in.</div>
-    );
-  }
-
-  // ------------------------------
-  // CLEAR INVITE FIELDS
-  // ------------------------------
-  const clearInviteFields = () => {
-    setToEmail("");
-    setPersonalMessage("");
-    setPersonalMessageVisible(false);
-    setInviteFriendsVisible(false);
-  };
-
-  // ------------------------------
-  // SEND INVITE HANDLER
-  // ------------------------------
-  const handleSendInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!toEmail) {
-      toast.error("Please enter an email address");
-      return;
-    }
-
-    try {
-      await sendInviteRequest({
-        to: toEmail,
-        businessName: shop?.businessName || "",
-        inviteLink,
-        personalMessage,
-      });
-
-      toast.success("Invite sent successfully!");
-      clearInviteFields();
-    } catch (error) {
-      console.error("INVITE ERROR:", error);
-      toast.error(
-        "Failed to send invite. Please try again. If the issue persists, contact GetBloomDirect support.",
-      );
-    }
-  };
-
-  // ------------------------------
-  // HIDE WELCOME MESSAGE HANDLER
-  // ------------------------------
-  const handleDismissWelcome = async () => {
-    if (dismissingWelcome) {
-      return;
-    }
-
-    try {
-      setDismissingWelcome(true);
-
-      const response = await fetch("/api/shops/me/dashboard-welcome", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          dismissed: true,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Unable to hide the welcome guide.");
-      }
-
-      setShowWelcome(false);
-
-      setShop((currentShop) =>
-        currentShop
-          ? {
-              ...currentShop,
-              dismissedDashboardWelcome: true,
-            }
-          : currentShop,
-      );
-    } catch (error) {
-      console.error("DISMISS DASHBOARD WELCOME ERROR:", error);
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to hide the welcome guide.",
-      );
-    } finally {
-      setDismissingWelcome(false);
-    }
-  };
-
-  // ------------------------------
-  // SHOW/HIDE PERSONAL MESSAGE
-  // ------------------------------
-  const handleVisibilityPersonalMessage = async () => {
-    if (personalMessageVisible) {
-      setPersonalMessageVisible(false);
-      setPersonalMessage("");
-    } else {
-      setPersonalMessageVisible(true);
-    }
-  };
-
-  // ------------------------------
-  // VERIFICATION PROGRESS
-  // ------------------------------
-  const verificationSteps = [
-    {
-      label: "Verified Email",
-      completed: !!shop?.verification?.emailVerified,
-    },
-    {
-      label: "Website Verified",
-      completed: !!shop?.verification?.websiteVerified,
-    },
-    {
-      label: "Profile Public",
-      completed: !!shop?.isPublic,
-    },
-    {
-      label: "Completed 2 Successful Orders",
-      completed: (shop?.stats?.ordersCompleted ?? 0) >= 2,
-    },
-    {
-      label: "Received 2 Reviews",
-      completed: (shop?.reviews?.length ?? 0) >= 2,
-    },
-  ];
-
-  // ------------------------------
-  // CURRENCY FORMATTER
-  // ------------------------------
-  function formatCurrencyFromCents(cents: number) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format((cents || 0) / 100);
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[70vh] items-center gap-8 justify-center">
-        <p>Loading, Please be patient...</p>
-        <BloomSpinner size={72} />
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+        You must be logged in to view Bloom.
       </div>
     );
   }
+
+  if (isLoading || status === "loading") {
+    return (
+      <div className="flex h-[65vh] items-center justify-center gap-5 text-slate-600">
+        <BloomSpinner size={58} />
+        <p className="font-semibold">Opening your Bloom workspace…</p>
+      </div>
+    );
+  }
+
+  const incompleteItems = readiness?.incompleteRequirements ?? [];
+  const setupComplete = Boolean(readiness && readiness.completionPercentage >= 100);
+  const usagePercent =
+    monthlySendUsage && !monthlySendUsage.isPro && monthlySendUsage.limit
+      ? Math.min(
+          100,
+          Math.round(
+            (monthlySendUsage.sentThisMonth / monthlySendUsage.limit) * 100,
+          ),
+        )
+      : 0;
 
   return (
-    <div className="w-full rounded-2xl shadow-xl bg-gradient-to-br from-blue-50 via-white to-teal-50">
-      <div className="mx-auto p-6">
-        {showWelcome && readiness && (
-          <DashboardWelcome
-            businessName={shop?.businessName}
-            readinessPercentage={readiness.completionPercentage}
-            readinessCompleted={readiness.completedCount}
-            readinessTotal={readiness.totalCount}
-            onDismiss={handleDismissWelcome}
-          />
-        )}
+    <div className="mx-auto w-full max-w-7xl space-y-8 pb-10">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-600">
+            Bloom home
+          </p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            Welcome back{shop?.businessName ? `, ${shop.businessName}` : ""}.
+          </h1>
+          <p className="mt-2 max-w-2xl text-base leading-7 text-slate-600">
+            Your website is front and center. Everything else is one click away when you need it.
+          </p>
+        </div>
 
-        <section className="mb-10 grid gap-5 xl:grid-cols-2">
-          <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-white shadow-lg">
-            <div className="bg-gradient-to-br from-emerald-700 to-teal-700 p-6 text-white sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
-                    GetBloomDirect
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black">
-                    Florist-to-florist network
-                  </h2>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-emerald-50">
-                    Send, receive, and manage network orders from one place.
-                  </p>
+        <Link
+          href="/dashboard/getting-started"
+          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700"
+        >
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          Getting Started
+        </Link>
+      </header>
+
+      {!setupComplete && readiness ? (
+        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70">
+          <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <CircleAlert className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-black text-slate-900">
+                  A few account details still need your attention.
+                </p>
+                <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-slate-600">
+                  <span>{readiness.completionPercentage}% complete</span>
+                  {incompleteItems.slice(0, 3).map((item) => (
+                    <span key={item} className="before:mr-2 before:text-slate-300 before:content-['•']">
+                      {readinessLabels[item]}
+                    </span>
+                  ))}
+                  {incompleteItems.length > 3 ? (
+                    <span className="before:mr-2 before:text-slate-300 before:content-['•']">
+                      +{incompleteItems.length - 3} more
+                    </span>
+                  ) : null}
                 </div>
-                <Network className="h-8 w-8 shrink-0 text-emerald-100" aria-hidden="true" />
               </div>
             </div>
 
-            <div className="grid gap-2 p-4 sm:grid-cols-3 sm:p-5">
-              <Link
-                href="/dashboard/new-order"
-                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
-              >
-                <PlusCircle size={17} aria-hidden="true" />
-                Create Order
-              </Link>
-              <Link
-                href="/dashboard/incoming"
-                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
-              >
-                <ShoppingBag size={17} aria-hidden="true" />
-                View Orders
-              </Link>
-              <Link
-                href="/dashboard/network"
-                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
-              >
-                <Network size={17} aria-hidden="true" />
-                Network
-              </Link>
-            </div>
+            <Link
+              href="/dashboard/settings"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white transition hover:bg-slate-800"
+            >
+              Finish setup
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
+        </section>
+      ) : setupComplete ? (
+        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          Your Bloom account setup is complete.
+        </div>
+      ) : null}
 
-          <div className="overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-lg">
-            <div className="bg-gradient-to-br from-purple-800 to-violet-700 p-6 text-white sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-purple-100">
-                    BloomWebsites
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black">
-                    Your website workspace
-                  </h2>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-purple-50">
-                    Build your storefront, manage the catalog, and run website orders.
-                  </p>
-                </div>
-                <Globe2 className="h-8 w-8 shrink-0 text-purple-100" aria-hidden="true" />
+      <section className="overflow-hidden rounded-[28px] border border-purple-200 bg-white shadow-sm">
+        <div className="relative overflow-hidden bg-gradient-to-br from-purple-950 via-purple-800 to-violet-700 px-6 py-8 text-white sm:px-8 lg:px-10 lg:py-10">
+          <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-28 right-32 h-64 w-64 rounded-full bg-fuchsia-300/10 blur-3xl" />
+
+          <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="max-w-3xl">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
+                  <Globe2 className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-100">
+                  BloomWebsites · Start here
+                </p>
               </div>
+
+              <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">
+                Your website is your storefront.
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-purple-100 sm:text-lg">
+                Build your site, manage products, handle website orders, and keep your storefront looking its best.
+              </p>
             </div>
 
-            <div className="grid gap-2 p-4 sm:grid-cols-3 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
               <Link
                 href="/dashboard/websites"
-                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-800"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-black text-purple-800 transition hover:bg-purple-50"
               >
-                <Globe2 size={17} aria-hidden="true" />
-                Overview
+                Open BloomWebsites
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link
-                href="/dashboard/websites/orders"
-                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-800"
+                href="/dashboard/websites/storefront"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-3 font-bold text-white transition hover:bg-white/15"
               >
-                <ShoppingBag size={17} aria-hidden="true" />
-                Orders
-              </Link>
-              <Link
-                href="/dashboard/websites/products"
-                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-purple-50 hover:text-purple-800"
-              >
-                <Package2 size={17} aria-hidden="true" />
-                Catalog
+                Edit Storefront
+                <PanelsTopLeft className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
           </div>
-        </section>
-
-        <div className="mb-5 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-              GetBloomDirect
-            </p>
-            <h2 className="mt-1 text-2xl font-black text-slate-900">
-              Network activity &amp; readiness
-            </h2>
-          </div>
-          <Link
-            href="/dashboard/network"
-            className="hidden items-center gap-1 text-sm font-bold text-emerald-700 transition hover:text-emerald-900 sm:inline-flex"
-          >
-            Open Network <ArrowRight size={16} aria-hidden="true" />
-          </Link>
         </div>
 
-        {/* Verification Status */}
-        <VerificationProgressBar
-          steps={verificationSteps}
-          isVerified={shop?.isVerified ?? false}
-        />
-
-        {/* Operational Readiness */}
-        {readiness && readiness.completionPercentage < 100 && (
-          <div
-            id="shop-readiness"
-            className="mb-12 scroll-mt-24 overflow-hidden rounded-3xl border border-purple-200 bg-white shadow-xl"
-          >
-            <div className="bg-gradient-to-r from-purple-700 to-indigo-700 px-6 py-6 text-white md:px-8">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-widest text-purple-200">
-                    Account Setup
-                  </p>
-
-                  <h2 className="mt-1 text-2xl font-black md:text-3xl">
-                    You&apos;re Almost Ready!
-                  </h2>
-
-                  <p className="mt-2 max-w-2xl text-sm text-purple-100 md:text-base">
-                    Complete the remaining settings below to join the network
-                    and unlock all order features.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl font-black">
-                    {readiness.completionPercentage}%
-                  </span>
-
-                  <span className="text-sm font-semibold text-purple-200">
-                    complete
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-white transition-all duration-500"
-                  style={{
-                    width: `${readiness.completionPercentage}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="p-6 md:p-8">
-              <div className="grid gap-4 md:grid-cols-2">
-                <ReadinessItem
-                  label="Account Created"
-                  description="Your Bloom account has been created."
-                  completed={readiness.requirements.accountCreated}
-                />
-
-                <ReadinessItem
-                  label="Email Verified"
-                  description="Confirm ownership of your email address."
-                  completed={readiness.requirements.emailVerified}
-                  href="/dashboard/verification"
-                />
-
-                <ReadinessItem
-                  label="Business Information"
-                  description="Required: phone number, street address, city, state, and ZIP code."
-                  completed={readiness.requirements.businessInfoComplete}
-                  href="/dashboard/settings#business-information"
-                />
-
-                <ReadinessItem
-                  label="Delivery Settings"
-                  description="Configure the areas your shop can deliver to."
-                  completed={readiness.requirements.deliveryConfigured}
-                  href="/dashboard/settings#delivery-settings"
-                />
-
-                <ReadinessItem
-                  label="Payment Method"
-                  description="Add at least one way other florists can pay you."
-                  completed={readiness.requirements.paymentConfigured}
-                  href="/dashboard/settings#payment-methods"
-                />
-
-                <ReadinessItem
-                  label="Taxes & Fees"
-                  description="Confirm your shop's tax and fee settings."
-                  completed={readiness.requirements.financialsConfigured}
-                  href="/dashboard/settings#financial-settings"
-                />
-              </div>
-
-              <div className="mt-8 flex flex-col gap-4 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-bold text-slate-800">
-                    Estimated time remaining: 3 minutes
-                  </p>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    You can use the dashboard while completing these settings.
-                  </p>
-                </div>
-
-                <Link
-                  href="/dashboard/settings"
-                  className="rounded-xl bg-purple-700 px-6 py-3 text-center font-bold text-white shadow-lg transition hover:bg-purple-800"
-                >
-                  Complete Setup
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Invite A Shop */}
-        <div className="mb-12 bg-gradient-to-br from-emerald-400 to-emerald-700 rounded-3xl p-10 text-center text-white shadow-2xl flex flex-col gap-2">
-          <h2 className="text-2xl font-black tracking-wide md:text-3xl">
-            Invite A Florist To GetBloomDirect!
-          </h2>
-          <p className="tracking-wide md:text-lg">
-            Help the GetBloomDirect network grow by inviting florists to join!
-          </p>
-          <button
-            className="px-4 py-2 rounded-xl shadow-2xl bg-purple-700 text-white mt-4 sm:mx-auto sm:px-20 sm:text-lg"
-            onClick={() => setInviteFriendsVisible(true)}
-          >
-            Send Invite
-          </button>
-        </div>
-
-        {/* Monthly Sent Order Usage */}
-        <div className="mb-12 rounded-3xl border border-purple-200 bg-white p-6 shadow-xl md:p-8">
-          {usageLoading || !monthlySendUsage ? (
-            <div className="text-center text-gray-500">
-              Loading monthly order usage...
-            </div>
-          ) : (
-            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-widest text-purple-600">
-                  Orders Sent This Month
-                </p>
-
-                <div className="mt-2 flex items-end gap-3">
-                  <span className="text-5xl font-black text-slate-900">
-                    {monthlySendUsage.sentThisMonth}
-                  </span>
-
-                  {!monthlySendUsage.isPro && (
-                    <span className="pb-1 text-2xl font-bold text-slate-400">
-                      / {monthlySendUsage.limit}
-                    </span>
-                  )}
-                </div>
-
-                {monthlySendUsage.isPro ? (
-                  <p className="mt-2 font-semibold text-emerald-700">
-                    Unlimited sending with Bloom Pro
-                  </p>
-                ) : monthlySendUsage.remaining === 0 ? (
-                  <p className="mt-2 font-bold text-red-600">
-                    You have reached your monthly sending limit.
-                  </p>
-                ) : monthlySendUsage.remaining !== null &&
-                  monthlySendUsage.remaining <= 2 ? (
-                  <p className="mt-2 font-bold text-amber-700">
-                    Only {monthlySendUsage.remaining} order
-                    {monthlySendUsage.remaining === 1 ? "" : "s"} remaining this
-                    month.
-                  </p>
-                ) : (
-                  <p className="mt-2 text-slate-600">
-                    {monthlySendUsage.remaining} orders remaining this month.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
-                <Link
-                  href="/dashboard/incoming?role=originating&period=current-month"
-                  className="rounded-xl border border-purple-200 px-5 py-3 text-center font-bold text-purple-700 transition-colors hover:bg-purple-50"
-                >
-                  View This Month&apos;s Orders
-                </Link>
-
-                {!monthlySendUsage.isPro && (
-                  <Link
-                    href="/dashboard/upgrade"
-                    className="rounded-xl bg-purple-600 px-5 py-3 text-center font-bold text-white transition-colors hover:bg-purple-700"
-                  >
-                    Upgrade to Bloom Pro
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bloom Pro Performance Overview */}
-        <section className="mb-12">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="p-5 sm:p-6 lg:p-8">
+          <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-purple-600">
-                Bloom Pro
+              <h3 className="text-lg font-black text-slate-950">Website essentials</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                The places you'll use most often.
               </p>
+            </div>
+          </div>
 
-              <h2 className="mt-1 text-3xl font-black text-slate-900">
-                Performance Overview
-              </h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <WebsiteShortcut
+              href="/dashboard/websites/orders"
+              title="Website Orders"
+              description="See and manage orders placed through your storefront."
+              icon={<ShoppingBag className="h-5 w-5" aria-hidden="true" />}
+            />
+            <WebsiteShortcut
+              href="/dashboard/websites/products"
+              title="Products"
+              description="Add arrangements, pricing tiers, add-ons, and images."
+              icon={<Package2 className="h-5 w-5" aria-hidden="true" />}
+            />
+            <WebsiteShortcut
+              href="/dashboard/websites/storefront"
+              title="Storefront Editor"
+              description="Control banners, homepage sections, and site presentation."
+              icon={<PanelsTopLeft className="h-5 w-5" aria-hidden="true" />}
+            />
+            <WebsiteShortcut
+              href="/dashboard/websites/branding"
+              title="Branding"
+              description="Manage your logo, colors, and brand identity."
+              icon={<Palette className="h-5 w-5" aria-hidden="true" />}
+            />
+            <WebsiteShortcut
+              href="/dashboard/websites/reports"
+              title="Website Reports"
+              description="Review website order performance and sales activity."
+              icon={<BarChart3 className="h-5 w-5" aria-hidden="true" />}
+            />
+            <WebsiteShortcut
+              href="/dashboard/websites/launch"
+              title="Launch & Billing"
+              description="Manage launch readiness, plan, and website billing."
+              icon={<Rocket className="h-5 w-5" aria-hidden="true" />}
+            />
+          </div>
+        </div>
+      </section>
 
-              <p className="mt-1 text-slate-600">
-                Accepted fulfillment business through GetBloomDirect.
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.42fr)]">
+        <div className="rounded-[26px] border border-emerald-200 bg-white p-6 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Network className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                    GetBloomDirect
+                  </p>
+                  <h2 className="mt-0.5 text-xl font-black text-slate-950">
+                    Florist-to-florist network
+                  </h2>
+                </div>
+              </div>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+                Send orders to other florists, manage incoming network orders, and find shops in the network.
               </p>
             </div>
 
-            {shop?.isPro && (
-              <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                {[
-                  {
-                    value: "month" as const,
-                    label: "This Month",
-                  },
-                  {
-                    value: "year" as const,
-                    label: "This Year",
-                  },
-                  {
-                    value: "all" as const,
-                    label: "All Time",
-                  },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setReportPeriod(option.value)}
-                    className={[
-                      "rounded-lg px-4 py-2 text-sm font-bold",
-                      "transition-colors",
-                      reportPeriod === option.value
-                        ? "bg-purple-600 text-white shadow-sm"
-                        : "text-slate-600 hover:bg-purple-50 hover:text-purple-700",
-                    ].join(" ")}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {shop?.isPro ? (
-            <>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                {/* Fulfillment Value */}
-                <div className="rounded-3xl border border-emerald-200 bg-white p-8 shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl">
-                  <p className="text-sm font-bold uppercase tracking-wider text-emerald-700">
-                    Fulfillment Value
-                  </p>
-
-                  <div className="mt-4 text-4xl font-black text-slate-900 md:text-3xl">
-                    {reportLoading
-                      ? "—"
-                      : formatCurrencyFromCents(
-                          reportSummary?.fulfillmentValueCents ?? 0,
-                        )}
-                  </div>
-
-                  <p className="mt-3 text-sm text-slate-500">
-                    Expected fulfillment payout from accepted orders.
-                  </p>
-                </div>
-
-                {/* Orders Received */}
-                <div className="rounded-3xl border border-teal-200 bg-white p-8 shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl">
-                  <p className="text-sm font-bold uppercase tracking-wider text-teal-700">
-                    Orders Received
-                  </p>
-
-                  <div className="mt-4 text-4xl font-black text-slate-900 md:text-3xl">
-                    {reportLoading ? "—" : (reportSummary?.ordersReceived ?? 0)}
-                  </div>
-
-                  <p className="mt-3 text-sm text-slate-500">
-                    Accepted network fulfillment orders.
-                  </p>
-                </div>
-
-                {/* Average Fulfillment Order */}
-                <div className="rounded-3xl border border-cyan-200 bg-white p-8 shadow-xl transition-all hover:-translate-y-1 hover:shadow-2xl">
-                  <p className="text-sm font-bold uppercase tracking-wider text-cyan-700">
-                    Average Fulfillment Order
-                  </p>
-
-                  <div className="mt-4 text-4xl font-black text-slate-900 md:text-3xl">
-                    {reportLoading
-                      ? "—"
-                      : formatCurrencyFromCents(
-                          reportSummary?.averageFulfillmentOrderCents ?? 0,
-                        )}
-                  </div>
-
-                  <p className="mt-3 text-sm text-slate-500">
-                    Average expected payout per accepted order.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-center">
-                <Link
-                  href="/dashboard/reports"
-                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2 font-bold text-purple-700 transition-colors hover:bg-purple-50"
-                >
-                  View Full Reporting
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-3xl bg-gradient-to-r from-purple-600 to-pink-600 p-8 text-center text-white shadow-2xl md:p-12">
-              <h3 className="text-3xl font-black">
-                Unlock Bloom Pro Reporting
-              </h3>
-
-              <p className="mx-auto mt-3 max-w-2xl text-lg text-purple-50">
-                Track fulfillment value, received orders, average order value,
-                tax reporting, and more.
-              </p>
-
+            {!shop?.isPro && monthlySendUsage ? (
               <Link
                 href="/dashboard/upgrade"
-                className="mt-6 inline-flex rounded-xl bg-white px-6 py-3 font-black text-purple-700 transition-transform hover:scale-105"
+                className="inline-flex w-fit items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-700 transition hover:bg-purple-100"
               >
-                Explore Bloom Pro
+                Bloom Pro
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
-            </div>
-          )}
-        </section>
-
-        {/* Pro Tip */}
-        <div
-          className={
-            (isPro ? "hidden" : "hidden") +
-            " mt-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-3xl p-8 border border-amber-200"
-          }
-        >
-          <p className="text-2xl font-bold text-amber-900 mb-2">
-            Pro shops average $1,200/month in extra profit
-          </p>
-          <p className="text-amber-800">
-            Upgrade to Pro → Get featured first in searches + unlimited orders
-          </p>
-        </div>
-      </div>
-
-      {inviteFriendsVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6">
-          <div className="relative w-full h-full bg-white rounded-2xl">
-            <button
-              onClick={() => setInviteFriendsVisible(false)}
-              className="absolute top-3 right-5 text-2xl text-red-600 font-black"
-            >
-              X
-            </button>
-            <div className="py-12 px-4">
-              <form className="space-y-4" onSubmit={handleSendInvite}>
-                {/* From Shop */}
-                <p className="text-gray-600 text-lg font-bold">
-                  From:{" "}
-                  <span className="text-purple-600">{shop?.businessName}</span>
-                </p>
-                {/* To Email */}
-                <div>
-                  <div className="flex gap-1">
-                    <span className="text-red-600 text-xl">*</span>
-                    <label className="text-gray-600 text-lg font-bold">
-                      To:
-                    </label>
-                  </div>
-                  <input
-                    type="email"
-                    className="p-2 border rounded-lg w-full border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
-                    placeholder="Enter florist's email"
-                    value={toEmail}
-                    onChange={(e) => setToEmail(e.target.value)}
-                  />
-                </div>
-                {!personalMessageVisible && (
-                  <button
-                    onClick={() => setPersonalMessageVisible(true)}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 transition-all text-white text-xl font-semibold rounded-xl w-full"
-                  >
-                    Add Personal Message
-                  </button>
-                )}
-                {personalMessageVisible && (
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => setPersonalMessageVisible(false)}
-                      className="px-4 py-2 bg-red-500 hover:bg-red-600 transition-all text-white text-xl font-semibold rounded-xl w-full"
-                    >
-                      Cancel
-                    </button>
-                    <textarea
-                      className="h-32 w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
-                      placeholder="Personal Message (optional)"
-                      value={personalMessage}
-                      onChange={(e) => setPersonalMessage(e.target.value)}
-                    />
-                  </div>
-                )}
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 transition-all text-white text-xl font-semibold rounded-xl w-full"
-                >
-                  Send Invite
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Beta Ad */}
-      {/* <div className="fixed bottom-0 left-0 w-full z-40 from-blue-400 to-slate-500 bg-gradient-to-r shadow-lg">
-        <button
-          onClick={() => setInviteFriendsVisible(true)}
-          className="w-full h-20 text-2xl text-white font-semibold hover:opacity-90 transition"
-        >
-          Invite a florist to join BloomDirect's beta program and help us shape
-          the future of floral delivery!
-        </button>
-      </div> */}
-
-      {/* Invite Friends */}
-      {/* <div
-        className={
-          (inviteFriendsVisible ? "block" : "hidden") +
-          " fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6"
-        }
-      >
-        <div
-          className="from-blue-300 to-white bg-gradient-to-br
-                w-full max-w-xl
-                max-h-[90vh]
-                rounded-3xl shadow-lg
-                flex flex-col
-                overflow-hidden"
-        >
-          <div className="flex justify-between items-center px-6 py-4">
-            <button
-              type="button"
-              onClick={() => handleVisibilityPersonalMessage()}
-              className="bg-purple-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-purple-700 transition"
-            >
-              Add Personal Message
-            </button>
-
-            <button
-              onClick={() => clearInviteFields()}
-              className="text-2xl font-bold text-gray-600 hover:text-gray-800"
-            >
-              X
-            </button>
+            ) : null}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6">
-            <form className="py-6 space-y-6" onSubmit={handleSendInvite}>
-              <label className="block text-xl font-semibold mb-4">
-                To: <br />
-                <span className="text-red-600 text-3xl">*</span>
-                <input
-                  type="email"
-                  className="mt-2 ml-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
-                  placeholder="Enter florist's email"
-                  value={toEmail}
-                  onChange={(e) => setToEmail(e.target.value)}
-                />
-              </label>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <Link
+              href="/dashboard/new-order"
+              className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50"
+            >
+              <PlusCircle className="h-5 w-5 text-emerald-700" aria-hidden="true" />
+              <p className="mt-3 font-black text-slate-900">Create Order</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Send a florist-to-florist order.</p>
+            </Link>
+            <Link
+              href="/dashboard/incoming"
+              className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50"
+            >
+              <FileText className="h-5 w-5 text-emerald-700" aria-hidden="true" />
+              <p className="mt-3 font-black text-slate-900">Network Orders</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Review sent and received orders.</p>
+            </Link>
+            <Link
+              href="/dashboard/network"
+              className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50"
+            >
+              <Network className="h-5 w-5 text-emerald-700" aria-hidden="true" />
+              <p className="mt-3 font-black text-slate-900">Find Florists</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Search shops in the network.</p>
+            </Link>
+          </div>
 
-              <label className="block text-xl font-semibold mb-4">
-                From: <br />
-                <input
-                  type="text"
-                  className="mt-2 ml-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
-                  disabled
-                  value={shopName}
-                />
-              </label>
-
-              {personalMessageVisible && (
-                <textarea
-                  className="h-32 w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                  placeholder="Personal Message (optional)"
-                  value={personalMessage}
-                  onChange={(e) => setPersonalMessage(e.target.value)}
-                />
-              )}
-
-              <div className="border-t px-6 py-4">
-                <button
-                  type="submit"
-                  disabled={sendingInvite}
-                  className="w-full bg-purple-600 text-white py-3 rounded-xl font-semibold hover:bg-purple-700 transition"
-                >
-                  Send Invite to Florist
-                </button>
+          {monthlySendUsage && !monthlySendUsage.isPro ? (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
+                <span>Orders sent this month</span>
+                <span className="text-slate-800">
+                  {monthlySendUsage.sentThisMonth} / {monthlySendUsage.limit}
+                </span>
               </div>
-            </form>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            </div>
+          ) : monthlySendUsage?.isPro ? (
+            <p className="mt-5 text-sm font-semibold text-emerald-700">
+              Unlimited network sending with Bloom Pro.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+            <Settings2 className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <h2 className="mt-4 text-xl font-black text-slate-950">Need something else?</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Account settings, communications, profile tools, and help stay out of your way until you need them.
+          </p>
+          <div className="mt-5 space-y-2">
+            <Link
+              href="/dashboard/communications"
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              Communications
+              <ArrowRight className="h-4 w-4 text-slate-300" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/dashboard/settings"
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              Settings
+              <ArrowRight className="h-4 w-4 text-slate-300" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/support"
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              Support
+              <ArrowRight className="h-4 w-4 text-slate-300" aria-hidden="true" />
+            </Link>
           </div>
         </div>
-      </div> */}
+      </section>
     </div>
   );
 }

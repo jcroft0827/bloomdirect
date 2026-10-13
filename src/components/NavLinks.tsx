@@ -11,12 +11,14 @@ import {
   BarChart3,
   BookOpenText,
   Cable,
+  ChevronDown,
   CircleHelp,
   FileText,
   Globe2,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
+  Mail,
   Network,
   Package2,
   Palette,
@@ -48,21 +50,45 @@ interface NavLinksProps {
   collapsed?: boolean;
 }
 
-function SectionLabel({
+function CollapsibleSection({
+  label,
+  open,
+  onToggle,
+  collapsed,
   children,
-  collapsed = false,
 }: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  collapsed: boolean;
   children: ReactNode;
-  collapsed?: boolean;
 }) {
   if (collapsed) {
-    return <div className="mx-2 my-3 border-t border-slate-200" aria-hidden="true" />;
+    return (
+      <div className="space-y-1">
+        <div className="mx-2 my-3 border-t border-slate-200" aria-hidden="true" />
+        {children}
+      </div>
+    );
   }
 
   return (
-    <p className="px-3 pb-1 pt-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 first:pt-0">
-      {children}
-    </p>
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="group flex w-full items-center justify-between rounded-xl px-3 pb-1.5 pt-3 text-left text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open ? <div className="space-y-1">{children}</div> : null}
+    </div>
   );
 }
 
@@ -76,6 +102,9 @@ export const NavLinks = ({
 }: NavLinksProps) => {
   const [sendUsage, setSendUsage] = useState<MonthlySendUsage | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [websitesOpen, setWebsitesOpen] = useState(true);
+  const [networkOpen, setNetworkOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(pathname.startsWith("/admin"));
   const router = useRouter();
 
   const websiteOrdersPathIsActive =
@@ -131,6 +160,36 @@ export const NavLinks = ({
 
   const iconClass = "h-[18px] w-[18px] shrink-0";
 
+  const navLink = ({
+    href,
+    label,
+    icon,
+    active,
+    badge,
+  }: {
+    href: string;
+    label: string;
+    icon: ReactNode;
+    active: boolean;
+    badge?: ReactNode;
+  }) => (
+    <Link
+      href={href}
+      onClick={onClose}
+      className={navItemClass(active)}
+      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
+    >
+      {icon}
+      {!collapsed ? (
+        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <span className="truncate">{label}</span>
+          {badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+
   const logOut = async () => {
     await signOut({ redirect: false });
     onClose?.();
@@ -151,259 +210,241 @@ export const NavLinks = ({
   };
 
   return (
-    <div
-      className={`flex min-h-0 flex-1 flex-col ${
-        collapsed
-          ? "[&_span]:max-w-0 [&_span]:overflow-hidden [&_span]:whitespace-nowrap [&_span]:opacity-0"
-          : ""
-      }`}
-    >
+    <div className="flex min-h-0 flex-1 flex-col">
       <nav className={`min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain ${collapsed ? "pr-0" : "pr-1"}`}>
-        <Link
-          href="/dashboard"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard")}
+        {navLink({
+          href: "/dashboard",
+          label: "Home",
+          icon: <LayoutDashboard className={iconClass} aria-hidden="true" />,
+          active: pathname === "/dashboard",
+        })}
+
+        {navLink({
+          href: "/dashboard/communications",
+          label: "Communications",
+          icon: <Mail className={iconClass} aria-hidden="true" />,
+          active:
+            pathname === "/dashboard/communications" ||
+            pathname.startsWith("/dashboard/communications/"),
+        })}
+
+        <CollapsibleSection
+          label="BloomWebsites"
+          open={websitesOpen}
+          onToggle={() => setWebsitesOpen((current) => !current)}
+          collapsed={collapsed}
         >
-          <LayoutDashboard className={iconClass} aria-hidden="true" />
-          <span>Dashboard</span>
-        </Link>
+          {navLink({
+            href: "/dashboard/websites",
+            label: "Overview",
+            icon: <Globe2 className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites",
+          })}
 
-        <SectionLabel collapsed={collapsed}>GetBloomDirect</SectionLabel>
+          {navLink({
+            href: "/dashboard/websites/orders",
+            label: "Orders",
+            icon: <ShoppingBag className={iconClass} aria-hidden="true" />,
+            active: websiteOrdersPathIsActive,
+          })}
 
-        {usageLoading ? (
-          <div
-            className={`flex cursor-wait items-center rounded-xl py-2.5 text-sm font-semibold text-slate-400 ${
-              collapsed ? "justify-center px-2" : "gap-3 px-3"
-            }`}
-            aria-label="Loading create order availability"
-          >
-            <PlusCircle className={iconClass} aria-hidden="true" />
-            <span>Create Order</span>
-          </div>
-        ) : sendUsage?.allowed !== false ? (
-          <Link
-            href="/dashboard/new-order"
-            onClick={onClose}
-            className={navItemClass(pathname === "/dashboard/new-order")}
-          >
-            <PlusCircle className={iconClass} aria-hidden="true" />
-            <span>Create Order</span>
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSendLimitReached}
-            className={navItemClass(false)}
-          >
-            <PlusCircle className={iconClass} aria-hidden="true" />
-            <span>Create Order</span>
-          </button>
-        )}
+          {navLink({
+            href: "/dashboard/websites/products",
+            label: "Catalog",
+            icon: <Package2 className={iconClass} aria-hidden="true" />,
+            active: websiteCatalogPathIsActive,
+          })}
 
-        <Link
-          href="/dashboard/incoming"
-          onClick={onClose}
-          className={navItemClass(
-            pathname === "/dashboard/incoming" ||
+          {navLink({
+            href: "/dashboard/websites/reports",
+            label: "Reports",
+            icon: <BarChart3 className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/reports",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/storefront",
+            label: "Storefront",
+            icon: <PanelsTopLeft className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/storefront",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/branding",
+            label: "Branding",
+            icon: <Palette className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/branding",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/about",
+            label: "About Page",
+            icon: <BookOpenText className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/about",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/seo",
+            label: "SEO",
+            icon: <Search className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/seo",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/launch",
+            label: "Launch & Billing",
+            icon: <Rocket className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/launch",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/domain",
+            label: "Domain",
+            icon: <Globe2 className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/domain",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/integrations/tfpos",
+            label: "TFPOS Integration",
+            icon: <Cable className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/integrations/tfpos",
+          })}
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          label="GetBloomDirect"
+          open={networkOpen}
+          onToggle={() => setNetworkOpen((current) => !current)}
+          collapsed={collapsed}
+        >
+          {usageLoading ? (
+            <div
+              className={`flex cursor-wait items-center rounded-xl py-2.5 text-sm font-semibold text-slate-400 ${
+                collapsed ? "justify-center px-2" : "gap-3 px-3"
+              }`}
+              aria-label="Loading create order availability"
+              title={collapsed ? "Create Order" : undefined}
+            >
+              <PlusCircle className={iconClass} aria-hidden="true" />
+              {!collapsed ? <span>Create Order</span> : null}
+            </div>
+          ) : sendUsage?.allowed !== false ? (
+            navLink({
+              href: "/dashboard/new-order",
+              label: "Create Order",
+              icon: <PlusCircle className={iconClass} aria-hidden="true" />,
+              active: pathname === "/dashboard/new-order",
+            })
+          ) : (
+            <button
+              type="button"
+              onClick={handleSendLimitReached}
+              className={navItemClass(false)}
+              title={collapsed ? "Create Order" : undefined}
+              aria-label={collapsed ? "Create Order" : undefined}
+            >
+              <PlusCircle className={iconClass} aria-hidden="true" />
+              {!collapsed ? <span>Create Order</span> : null}
+            </button>
+          )}
+
+          {navLink({
+            href: "/dashboard/incoming",
+            label: "Orders",
+            icon: <FileText className={iconClass} aria-hidden="true" />,
+            active:
+              pathname === "/dashboard/incoming" ||
               pathname.startsWith("/dashboard/orders/") ||
               pathname.startsWith("/orders/"),
-          )}
-        >
-          <FileText className={iconClass} aria-hidden="true" />
-          <span>Orders</span>
-        </Link>
+          })}
 
-        <Link
-          href="/dashboard/network"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/network")}
-        >
-          <Network className={iconClass} aria-hidden="true" />
-          <span>Network</span>
-        </Link>
+          {navLink({
+            href: "/dashboard/network",
+            label: "Network",
+            icon: <Network className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/network",
+          })}
 
-        <Link
-          href="/dashboard/upgrade"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/upgrade")}
-        >
-          <Sparkles className={iconClass} aria-hidden="true" />
-          <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-            <span>Bloom Pro</span>
-            {!pro && (
-              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-700">
-                Upgrade
-              </span>
-            )}
-          </span>
-        </Link>
+          {navLink({
+            href: "/dashboard/upgrade",
+            label: "Bloom Pro",
+            icon: <Sparkles className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/upgrade",
+            badge:
+              !pro && !collapsed ? (
+                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-700">
+                  Upgrade
+                </span>
+              ) : undefined,
+          })}
+        </CollapsibleSection>
 
-        <SectionLabel collapsed={collapsed}>BloomWebsites</SectionLabel>
-
-        <Link
-          href="/dashboard/websites"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites")}
-        >
-          <Globe2 className={iconClass} aria-hidden="true" />
-          <span>Overview</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/orders"
-          onClick={onClose}
-          className={navItemClass(websiteOrdersPathIsActive)}
-        >
-          <ShoppingBag className={iconClass} aria-hidden="true" />
-          <span>Orders</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/products"
-          onClick={onClose}
-          className={navItemClass(websiteCatalogPathIsActive)}
-        >
-          <Package2 className={iconClass} aria-hidden="true" />
-          <span>Catalog</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/reports"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/reports")}
-        >
-          <BarChart3 className={iconClass} aria-hidden="true" />
-          <span>Reports</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/storefront"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/storefront")}
-        >
-          <PanelsTopLeft className={iconClass} aria-hidden="true" />
-          <span>Storefront</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/branding"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/branding")}
-        >
-          <Palette className={iconClass} aria-hidden="true" />
-          <span>Branding</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/about"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/about")}
-        >
-          <BookOpenText className={iconClass} aria-hidden="true" />
-          <span>About Page</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/seo"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/seo")}
-        >
-          <Search className={iconClass} aria-hidden="true" />
-          <span>SEO</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/launch"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/launch")}
-        >
-          <Rocket className={iconClass} aria-hidden="true" />
-          <span>Launch &amp; Billing</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/domain"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/websites/domain")}
-        >
-          <Globe2 className={iconClass} aria-hidden="true" />
-          <span>Domain</span>
-        </Link>
-
-        <Link
-          href="/dashboard/websites/integrations/tfpos"
-          onClick={onClose}
-          className={navItemClass(
-            pathname === "/dashboard/websites/integrations/tfpos",
-          )}
-        >
-          <Cable className={iconClass} aria-hidden="true" />
-          <span>TFPOS Integration</span>
-        </Link>
-
-        <SectionLabel collapsed={collapsed}>My Shop</SectionLabel>
-
-        <Link
-          href={`/dashboard/shops/${slug}`}
-          onClick={onClose}
-          className={navItemClass(pathname === `/dashboard/shops/${slug}`)}
-        >
-          <UserRound className={iconClass} aria-hidden="true" />
-          <span>Public Profile</span>
-        </Link>
-
-        <Link
-          href="/dashboard/settings"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/settings")}
-        >
-          <Settings className={iconClass} aria-hidden="true" />
-          <span>Settings</span>
-        </Link>
-
-        {role === "admin" && (
-          <>
-            <SectionLabel collapsed={collapsed}>Administration</SectionLabel>
-            <Link
-              href="/admin"
-              onClick={onClose}
-              className={navItemClass(pathname.startsWith("/admin"))}
-            >
-              <Store className={iconClass} aria-hidden="true" />
-              <span>Admin Panel</span>
-            </Link>
-          </>
-        )}
+        {role === "admin" ? (
+          <CollapsibleSection
+            label="Administration"
+            open={adminOpen}
+            onToggle={() => setAdminOpen((current) => !current)}
+            collapsed={collapsed}
+          >
+            {navLink({
+              href: "/admin",
+              label: "Admin Panel",
+              icon: <Store className={iconClass} aria-hidden="true" />,
+              active: pathname.startsWith("/admin"),
+            })}
+          </CollapsibleSection>
+        ) : null}
       </nav>
 
-      <div className="mt-4 shrink-0 space-y-1 border-t border-slate-200 pt-4">
-        <Link
-          href="/dashboard/getting-started"
-          onClick={onClose}
-          className={navItemClass(pathname === "/dashboard/getting-started")}
+      <div className="mt-4 shrink-0 border-t border-slate-200 pt-4">
+        <div
+          className={`rounded-2xl border border-purple-100 bg-purple-50/70 ${
+            collapsed ? "space-y-1 p-1.5" : "space-y-1 p-2"
+          }`}
         >
-          <CircleHelp className={iconClass} aria-hidden="true" />
-          <span>Getting Started</span>
-        </Link>
+          {navLink({
+            href: `/dashboard/shops/${slug}`,
+            label: "Profile",
+            icon: <UserRound className={iconClass} aria-hidden="true" />,
+            active: pathname === `/dashboard/shops/${slug}`,
+          })}
 
-        <Link
-          href="/support"
-          onClick={onClose}
-          className={navItemClass(pathname === "/support")}
-        >
-          <LifeBuoy className={iconClass} aria-hidden="true" />
-          <span>Support</span>
-        </Link>
+          {navLink({
+            href: "/dashboard/settings",
+            label: "Settings",
+            icon: <Settings className={iconClass} aria-hidden="true" />,
+            active: pathname.startsWith("/dashboard/settings"),
+          })}
+        </div>
+
+        <div className={`mt-2 ${collapsed ? "space-y-1" : "space-y-0.5"}`}>
+          {navLink({
+            href: "/dashboard/getting-started",
+            label: "Getting Started",
+            icon: <CircleHelp className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/getting-started",
+          })}
+
+          {navLink({
+            href: "/support",
+            label: "Support",
+            icon: <LifeBuoy className={iconClass} aria-hidden="true" />,
+            active: pathname === "/support",
+          })}
+        </div>
 
         <button
           type="button"
           onClick={logOut}
-          className={`flex w-full items-center rounded-xl py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50 ${
+          className={`mt-2 flex w-full items-center rounded-xl py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50 ${
             collapsed ? "justify-center px-2" : "gap-3 px-3"
           }`}
+          title={collapsed ? "Logout" : undefined}
+          aria-label={collapsed ? "Logout" : undefined}
         >
           <LogOut className={iconClass} aria-hidden="true" />
-          <span>Logout</span>
+          {!collapsed ? <span>Logout</span> : null}
         </button>
       </div>
     </div>

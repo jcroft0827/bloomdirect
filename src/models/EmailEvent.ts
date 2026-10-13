@@ -4,6 +4,13 @@ import { model, models, Schema } from "mongoose";
 
 const EmailEventSchema = new Schema(
   {
+    shopId: {
+      type: Schema.Types.ObjectId,
+      ref: "Shop",
+      index: true,
+      default: null,
+    },
+
     type: { type: String, required: true },
     to: { type: String, required: true },
     subject: { type: String, required: true },

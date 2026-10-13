@@ -1,27 +1,58 @@
-// /api/email/resend/route.ts
+import mongoose from "mongoose";
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+
+import { authOptions } from "@/lib/auth";
+import { checkBloomWebsiteRateLimit } from "@/lib/bloom-websites/checkBloomWebsiteRateLimit";
+import { sendInviteFloristEmail } from "@/lib/email/inviteFloristEmail";
 import { connectToDB } from "@/lib/mongoose";
 import { EmailEvent } from "@/models/EmailEvent";
-import { sendInviteFloristEmail } from "@/lib/email/inviteFloristEmail";
+
+const INVITE_EVENT_TYPES = new Set(["invite_florist", "invite-florist"]);
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    console.log("🔥 RESEND API HIT");
-    console.log("BODY:", body);
-    const { emailEventId } = body;
+    const session = await getServerSession(authOptions);
 
-    if (!emailEventId) {
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await checkBloomWebsiteRateLimit({
+      request: req,
+      scope: "email-resend",
+      subject: session.user.id,
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Missing emailEventId" },
+        { error: "Too many resend attempts. Please wait and try again." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        },
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const emailEventId =
+      body && typeof body.emailEventId === "string" ? body.emailEventId : "";
+
+    if (!emailEventId || !mongoose.isValidObjectId(emailEventId)) {
+      return NextResponse.json(
+        { error: "Missing or invalid emailEventId" },
         { status: 400 },
       );
     }
 
     await connectToDB();
 
-    // Find the original email event
-    const originalEvent = await EmailEvent.findById(emailEventId);
+    const originalEvent = await EmailEvent.findOne({
+      _id: emailEventId,
+      shopId: session.user.id,
+    });
 
     if (!originalEvent) {
       return NextResponse.json(
@@ -30,54 +61,50 @@ export async function POST(req: Request) {
       );
     }
 
-    let newEventData;
-
-    // Determine email type and send
-    if (originalEvent.type === "invite-florist") {
-      try {
-        const result = await sendInviteFloristEmail(originalEvent.payload);
-
-        // Create new EmailEvent as sent
-        newEventData = await EmailEvent.create({
-          type: originalEvent.type,
-          to: originalEvent.to,
-          subject: originalEvent.subject,
-          status: "sent",
-          resendId: result.data?.id,
-          payload: originalEvent.payload,
-        });
-      } catch (sendError) {
-        // Create new EmailEvent as failed
-        const message =
-          sendError instanceof Error
-            ? sendError.message
-            : JSON.stringify(sendError);
-        console.error("Resend send error:", message);
-
-        newEventData = await EmailEvent.create({
-          type: originalEvent.type,
-          to: originalEvent.to,
-          subject: originalEvent.subject,
-          status: "failed",
-          error: message,
-          payload: originalEvent.payload,
-        });
-
-        return NextResponse.json(
-          { error: "Failed to resend email", details: message },
-          { status: 500 },
-        );
-      }
-    } else {
+    if (!INVITE_EVENT_TYPES.has(originalEvent.type)) {
       return NextResponse.json(
-        { error: "Unsupported email type" },
+        { error: "This email type cannot be resent from email history." },
         { status: 400 },
       );
     }
 
+    let newEventData;
+
+    try {
+      const result = await sendInviteFloristEmail(originalEvent.payload);
+
+      newEventData = await EmailEvent.create({
+        shopId: session.user.id,
+        type: "invite_florist",
+        to: originalEvent.to,
+        subject: originalEvent.subject,
+        status: "sent",
+        resendId: result.data?.id,
+        payload: originalEvent.payload,
+      });
+    } catch (sendError) {
+      const message =
+        sendError instanceof Error ? sendError.message : "Unknown resend error";
+
+      newEventData = await EmailEvent.create({
+        shopId: session.user.id,
+        type: "invite_florist",
+        to: originalEvent.to,
+        subject: originalEvent.subject,
+        status: "failed",
+        error: message,
+        payload: originalEvent.payload,
+      });
+
+      return NextResponse.json(
+        { error: "Failed to resend email", details: message },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ event: newEventData });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown server error";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -61,6 +61,7 @@ export async function sendFloristInvitation({
     await invitation.save();
 
     await EmailEvent.create({
+      shopId: invitedByShopId,
       type: "admin_invite_florist",
       to: invitation.email,
       subject,
@@ -93,6 +94,7 @@ export async function sendFloristInvitation({
 
     try {
       await EmailEvent.create({
+        shopId: invitedByShopId,
         type: "admin_invite_florist",
         to: invitation.email,
         subject,

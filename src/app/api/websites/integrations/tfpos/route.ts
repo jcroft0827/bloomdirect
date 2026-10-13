@@ -7,6 +7,7 @@ import BloomWebsite from "@/models/BloomWebsite";
 import BloomWebsitePosIntegration from "@/models/BloomWebsitePosIntegration";
 import Shop from "@/models/Shop";
 import { encryptIntegrationSecret } from "@/lib/bloom-websites/pos/integrationSecrets";
+import { assertSafeOutboundHostname } from "@/lib/security-network-destination";
 
 export const runtime = "nodejs";
 
@@ -188,6 +189,25 @@ export async function PATCH(request: Request) {
         { error: "Server address and username are required before enabling TFPOS." },
         { status: 400 },
       );
+    }
+
+    if (enabled && host) {
+      try {
+        await assertSafeOutboundHostname(host, {
+          label: "POS server",
+          allowPrivateInDevelopment: true,
+        });
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "POS server address is not allowed.",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     if (sourceVendor.length > 120) {

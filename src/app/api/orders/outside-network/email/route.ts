@@ -333,6 +333,7 @@ export async function POST(req: Request) {
     });
 
     await EmailEvent.create({
+      shopId: session.user.id,
       type: "outside_network_order_email",
       to: toEmail,
       subject,

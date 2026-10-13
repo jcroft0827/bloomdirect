@@ -23,9 +23,32 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
 
   async headers() {
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(self), microphone=(), geolocation=(self)",
+      },
+      ...(process.env.NODE_ENV === "production"
+        ? [
+            {
+              key: "Strict-Transport-Security",
+              value: "max-age=31536000",
+            },
+          ]
+        : []),
+    ];
+
     return [
       {
-        // Allow API access
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+      {
+        // Existing API CORS policy is retained for compatibility in this batch.
+        // It is tracked in IMPLEMENTATION_CHANGELOG.md for a dedicated origin audit.
         source: "/api/:path*",
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },

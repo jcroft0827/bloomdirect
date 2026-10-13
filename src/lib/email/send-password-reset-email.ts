@@ -5,12 +5,14 @@ import { EmailEvent } from "@/models/EmailEvent";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 type SendPasswordResetEmailParams = {
+  shopId: string;
   to: string;
   businessName?: string;
   resetUrl: string;
 };
 
 export async function sendPasswordResetEmail({
+  shopId,
   to,
   businessName,
   resetUrl,
@@ -87,6 +89,7 @@ export async function sendPasswordResetEmail({
 
     if (result.error) {
       await EmailEvent.create({
+        shopId,
         type: "password_reset",
         to,
         subject,
@@ -99,6 +102,7 @@ export async function sendPasswordResetEmail({
     }
 
     await EmailEvent.create({
+      shopId,
       type: "password_reset",
       to,
       subject,

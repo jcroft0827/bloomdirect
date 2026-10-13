@@ -1,11 +1,14 @@
-// src/app/email-history/page.tsx
-import EmailHistoryClient from "./EmailHistoryClient";
-import Providers from "@/components/Providers";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 
-export default function EmailHistoryPage() {
-  return (
-    <Providers>
-      <EmailHistoryClient />
-    </Providers>
-  );
+import { authOptions } from "@/lib/auth";
+
+export default async function LegacyEmailHistoryPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  redirect("/dashboard/communications");
 }

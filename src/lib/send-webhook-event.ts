@@ -7,6 +7,7 @@ import { getNextRetryTime } from "./webhook-retry";
 import Shop from "@/models/Shop";
 import crypto from "crypto";
 import { decryptWebhookSecret } from "./webhook-secret";
+import { assertSafeWebhookUrl } from "./security-network-destination";
 
 async function postWithTimeout(
   url: string,
@@ -105,6 +106,10 @@ export async function sendWebhookEvent({
       log.signature = signature;
 
       try {
+        // Re-validate immediately before each delivery so a hostname that was
+        // safe when saved cannot later be rebound to a private/internal address.
+        await assertSafeWebhookUrl(hook.url);
+
         const res = await postWithTimeout(
           hook.url,
           {

@@ -1516,8 +1516,8 @@ export default function BloomWebsitePaymentCheckout({
                         {displayTotals
                           ? "This is the exact amount the processor will charge."
                           : fulfillmentType === "pickup"
-                            ? "Tax will be based on the pickup location."
-                            : "Tax will be based on the delivery destination."}
+                            ? "Tax is calculated using this florist's configured tax settings for pickup orders."
+                            : "Tax is calculated using this florist's configured tax settings for delivery orders."}
                       </p>
                     </div>
 

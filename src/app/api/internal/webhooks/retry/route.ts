@@ -4,6 +4,7 @@ import WebhookLog from "@/models/WebhookLog";
 import { connectToDB } from "@/lib/mongoose";
 import { getNextRetryTime } from "@/lib/webhook-retry";
 import Shop from "@/models/Shop";
+import { assertSafeWebhookUrl } from "@/lib/security-network-destination";
 
 async function postWithTimeout(
   url: string,
@@ -24,7 +25,9 @@ async function postWithTimeout(
 }
 
 export async function GET(req: Request) {
-  const cronSecret = process.env.INTERNAL_CRON_SECRET;
+  const cronSecret =
+    process.env.CRON_SECRET ||
+    process.env.INTERNAL_CRON_SECRET;
   const authHeader = req.headers.get("authorization");
 
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
@@ -105,6 +108,8 @@ export async function GET(req: Request) {
         await claimedLog.save();
         continue;
       }
+
+      await assertSafeWebhookUrl(claimedLog.url);
 
       const res = await postWithTimeout(
         claimedLog.url,

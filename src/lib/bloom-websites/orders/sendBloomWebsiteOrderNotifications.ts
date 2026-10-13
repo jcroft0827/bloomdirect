@@ -157,6 +157,7 @@ async function recordEmail({
     ).catch(() => null);
 
     await EmailEvent.create({
+      shopId: order.shop,
       type: `bloomwebsite_${kind}`,
       to: recipient,
       subject,
@@ -198,6 +199,7 @@ async function recordEmail({
   });
 
   await EmailEvent.create({
+    shopId: order.shop,
     type: `bloomwebsite_${kind}`,
     to: recipient,
     subject,

@@ -22,6 +22,38 @@ interface Shop {
   suspensionReason?: string;
 }
 
+function getDashboardPageTitle(pathname: string, slug = "", role = "") {
+  if (pathname === "/dashboard") return "Home";
+  if (pathname === "/dashboard/communications") return "Communications";
+  if (pathname === "/dashboard/new-order") return "New Order";
+  if (pathname === "/dashboard/network") return "Network";
+  if (pathname === "/dashboard/incoming") return "GetBloomDirect Orders";
+  if (pathname.startsWith("/dashboard/orders/") || pathname.startsWith("/orders/")) {
+    return "GetBloomDirect Order";
+  }
+
+  if (pathname === "/dashboard/websites") return "BloomWebsites";
+  if (pathname.startsWith("/dashboard/websites/orders")) return "Website Orders";
+  if (pathname.startsWith("/dashboard/websites/products") || pathname.startsWith("/dashboard/websites/addons")) {
+    return "Catalog";
+  }
+  if (pathname === "/dashboard/websites/reports") return "Website Reports";
+  if (pathname === "/dashboard/websites/storefront") return "Storefront Editor";
+  if (pathname === "/dashboard/websites/branding") return "Branding";
+  if (pathname === "/dashboard/websites/about") return "About Page";
+  if (pathname === "/dashboard/websites/seo") return "SEO";
+  if (pathname === "/dashboard/websites/launch") return "Launch & Billing";
+  if (pathname === "/dashboard/websites/domain") return "Domain";
+  if (pathname === "/dashboard/websites/integrations/tfpos") return "TFPOS Integration";
+
+  if (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")) return "Settings";
+  if (pathname === "/dashboard/getting-started") return "Getting Started";
+  if (slug && pathname === `/dashboard/shops/${slug}`) return "Profile";
+  if (role === "admin" && pathname.startsWith("/admin")) return "Admin Panel";
+
+  return "Dashboard";
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -351,93 +383,7 @@ export default function DashboardLayout({
               {/* Current Page */}
               <div className="hidden xl:block">
                 <h2 className="text-2xl font-bold text-purple-600 xl:text-xl 2xl:text-2xl">
-                  <span
-                    className={
-                      pathname === "/dashboard" ? "block" : "hidden"
-                    }
-                  >
-                    Dashboard
-                  </span>
-
-                  <span
-                    className={
-                      pathname === "/dashboard/new-order"
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    New Order
-                  </span>
-
-                  <span
-                    className={
-                      pathname === "/dashboard/network"
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    Network
-                  </span>
-
-                  <span
-                    className={
-                      pathname === "/dashboard/incoming"
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    Orders
-                  </span>
-
-                  <span
-                    className={
-                      pathname.startsWith("/dashboard/websites/orders")
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    Website Orders
-                  </span>
-
-                  <span
-                    className={
-                      pathname === "/dashboard/settings"
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    Settings
-                  </span>
-
-                  <span
-                    className={
-                      pathname === "/dashboard/pos-integration"
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    POS Integration
-                  </span>
-
-                  <span
-                    className={
-                      pathname === "/dashboard/getting-started"
-                        ? "block"
-                        : "hidden"
-                    }
-                  >
-                    Getting Started
-                  </span>
-
-                  {shop?.role === "admin" && (
-                    <span
-                      className={
-                        pathname === "/admin" ? "block" : "hidden"
-                      }
-                    >
-                      Admin Panel
-                    </span>
-                  )}
+                  {getDashboardPageTitle(pathname, shop?.slug, shop?.role)}
                 </h2>
               </div>
 

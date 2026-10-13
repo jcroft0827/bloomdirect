@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentShop } from "@/lib/get-current-shop";
 import Webhook from "@/models/Webhook";
+import { assertSafeWebhookUrl } from "@/lib/security-network-destination";
 import {
   encryptWebhookSecret,
   generateWebhookSecret,
@@ -15,19 +16,6 @@ const SUPPORTED_EVENTS = [
 
 type SupportedEvent = (typeof SUPPORTED_EVENTS)[number];
 
-function isValidWebhookUrl(value: string) {
-  try {
-    const url = new URL(value);
-
-    if (process.env.NODE_ENV === "production") {
-      return url.protocol === "https:";
-    }
-
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
 
 function mapWebhookForClient(webhook: any) {
   return {
@@ -124,13 +112,15 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!isValidWebhookUrl(url)) {
+    try {
+      await assertSafeWebhookUrl(url);
+    } catch (error) {
       return NextResponse.json(
         {
           error:
-            process.env.NODE_ENV === "production"
-              ? "Webhook URL must be a valid HTTPS URL."
-              : "Webhook URL must be a valid HTTP or HTTPS URL.",
+            error instanceof Error
+              ? error.message
+              : "Webhook URL is not allowed.",
         },
         { status: 400 },
       );

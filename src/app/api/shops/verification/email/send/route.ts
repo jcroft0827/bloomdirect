@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { sendEmailVerificationCode } from "@/lib/email/send-email-verification-code";
 import { getAuthenticatedShop } from "@/lib/shops/getAuthenticatedShop";
+import { checkBloomWebsiteRateLimit } from "@/lib/bloom-websites/checkBloomWebsiteRateLimit";
 
 function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -16,7 +17,7 @@ function hashCode(code: string) {
   return crypto.createHash("sha256").update(code).digest("hex");
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     await connectToDB();
 
@@ -24,6 +25,24 @@ export async function POST() {
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await checkBloomWebsiteRateLimit({
+      request: req,
+      scope: "email-verification-send",
+      subject: session.user.id,
+      limit: 3,
+      windowMs: 60 * 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many verification emails. Please wait and try again." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        },
+      );
     }
 
     const shop = await getAuthenticatedShop(session.user.id);

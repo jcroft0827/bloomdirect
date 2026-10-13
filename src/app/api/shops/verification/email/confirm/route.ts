@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { ensureDefaultDesignerChoice } from "@/lib/offerings/ensureDefaultOfferings";
+import { checkBloomWebsiteRateLimit } from "@/lib/bloom-websites/checkBloomWebsiteRateLimit";
 
 function hashCode(code: string) {
   return crypto.createHash("sha256").update(code).digest("hex");
@@ -32,6 +33,24 @@ export async function POST(req: Request) {
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await checkBloomWebsiteRateLimit({
+      request: req,
+      scope: "email-verification-confirm",
+      subject: session.user.id,
+      limit: 8,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many verification attempts. Please request a new code later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        },
+      );
     }
 
     const { code } = await req.json();

@@ -33,7 +33,8 @@ export async function POST(req: Request, { params }: any) {
 
     authenticatedShopId = shop._id.toString();
 
-    const rateLimit = checkPosApiRateLimit({
+    const rateLimit = await checkPosApiRateLimit({
+      request: req,
       key: `pos-decline:${shop._id.toString()}`,
       limit: 20,
     });

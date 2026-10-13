@@ -124,7 +124,6 @@ interface Shop {
 
 // #endregion
 
-import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import {
   settingsValuesEqual,
@@ -2409,39 +2408,6 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                 )}
               </div>
             )}
-          </div>
-
-          {/* Email History */}
-          <div className="flex flex-col items-center gap-4 bg-gradient-to-br from-blue-100 to-white rounded-3xl shadow-xl p-10 text-center">
-            <p className="font-semibold text-2xl text-gray-900 flex gap-2 items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-                className="w-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
-                />
-              </svg>
-              Email History
-            </p>
-
-            <p className="text-gray-600 max-w-md text-center">
-              View all emails sent from your shop, including invites and system
-              notifications.
-            </p>
-
-            <Link
-              href="/email-history"
-              className="inline-flex items-center justify-center bg-purple-600 hover:bg-purple-700 transition-colors text-white font-semibold text-lg px-10 py-2 rounded-2xl shadow-md"
-            >
-              View Email History
-            </Link>
           </div>
 
           {/* Security Code & Credentials */}

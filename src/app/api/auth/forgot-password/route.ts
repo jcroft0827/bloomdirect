@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 
 import { sendPasswordResetEmail } from "@/lib/email/send-password-reset-email";
+import { checkBloomWebsiteRateLimit } from "@/lib/bloom-websites/checkBloomWebsiteRateLimit";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 
@@ -62,6 +63,18 @@ export async function POST(req: Request) {
       .toLowerCase()
       .trim();
 
+    const rateLimit = await checkBloomWebsiteRateLimit({
+      request: req,
+      scope: "forgot-password",
+      subject: normalizedEmail,
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(genericResponse);
+    }
+
     const shop = await Shop.findOne({
       email: normalizedEmail,
     }).select(
@@ -98,6 +111,7 @@ export async function POST(req: Request) {
 
     try {
       await sendPasswordResetEmail({
+        shopId: shop._id.toString(),
         to: shop.email,
         businessName: shop.businessName,
         resetUrl,

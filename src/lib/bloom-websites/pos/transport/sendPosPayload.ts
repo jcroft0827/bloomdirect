@@ -1,6 +1,8 @@
 import { Readable } from "stream";
 import path from "path";
 
+import { assertSafeOutboundHostname } from "@/lib/security-network-destination";
+
 export type BloomPosTransportProtocol = "ftp" | "ftps" | "sftp";
 
 export type BloomPosTransportConfig = {
@@ -28,9 +30,14 @@ function errorMessage(error: unknown) {
 }
 
 export async function testPosTransportConnection(config: BloomPosTransportConfig) {
+  await assertSafeOutboundHostname(config.host, {
+    label: "POS server",
+    allowPrivateInDevelopment: true,
+  });
+
   if (config.protocol === "sftp") {
-    const module = await import("ssh2-sftp-client");
-    const SftpClient = module.default;
+    const sftpModule = await import("ssh2-sftp-client");
+    const SftpClient = sftpModule.default;
     const client = new SftpClient();
 
     try {
@@ -114,9 +121,14 @@ export async function sendPosPayload({
 }) {
   const destination = remotePath(config.folder, filename);
 
+  await assertSafeOutboundHostname(config.host, {
+    label: "POS server",
+    allowPrivateInDevelopment: true,
+  });
+
   if (config.protocol === "sftp") {
-    const module = await import("ssh2-sftp-client");
-    const SftpClient = module.default;
+    const sftpModule = await import("ssh2-sftp-client");
+    const SftpClient = sftpModule.default;
     const client = new SftpClient();
 
     try {

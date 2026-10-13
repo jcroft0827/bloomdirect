@@ -12,7 +12,8 @@ export async function GET(req: Request) {
 
     const shop = await getShopFromApiKey(req);
 
-    const rateLimit = checkPosApiRateLimit({
+    const rateLimit = await checkPosApiRateLimit({
+      request: req,
       key: `pos-get-orders:${shop._id.toString()}`,
       limit: 60,
     });

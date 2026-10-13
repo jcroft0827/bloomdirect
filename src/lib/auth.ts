@@ -7,6 +7,26 @@ import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import bcrypt from "bcryptjs";
 import { ensureDefaultDesignerChoice } from "./offerings/ensureDefaultOfferings";
+import { checkBloomWebsiteRateLimit } from "./bloom-websites/checkBloomWebsiteRateLimit";
+
+
+function buildRateLimitRequest(headersValue: unknown) {
+  const headers = new Headers();
+
+  if (headersValue && typeof headersValue === "object") {
+    for (const [key, value] of Object.entries(
+      headersValue as Record<string, unknown>,
+    )) {
+      if (typeof value === "string") {
+        headers.set(key, value);
+      } else if (Array.isArray(value)) {
+        headers.set(key, value.map(String).join(","));
+      }
+    }
+  }
+
+  return new Request("http://localhost/internal-login-rate-limit", { headers });
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,13 +36,37 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
 
         await connectToDB();
 
-        // Shop model acts as "user" — select password explicitly
-        const shop = await Shop.findOne({ email: credentials.email }).select(
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+        const rateLimitRequest = buildRateLimitRequest(request?.headers);
+
+        const [accountLimit, clientLimit] = await Promise.all([
+          checkBloomWebsiteRateLimit({
+            request: rateLimitRequest,
+            scope: "login-account",
+            subject: normalizedEmail,
+            limit: 10,
+            windowMs: 15 * 60 * 1000,
+          }),
+          checkBloomWebsiteRateLimit({
+            request: rateLimitRequest,
+            scope: "login-client",
+            subject: "all-accounts",
+            limit: 60,
+            windowMs: 15 * 60 * 1000,
+          }),
+        ]);
+
+        if (!accountLimit.allowed || !clientLimit.allowed) {
+          return null;
+        }
+
+        // Shop model excludes password by default; authentication opts in.
+        const shop = await Shop.findOne({ email: normalizedEmail }).select(
           "+password"
         );
 
