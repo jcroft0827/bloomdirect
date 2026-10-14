@@ -47,22 +47,6 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
-        // Existing API CORS policy is retained for compatibility in this batch.
-        // It is tracked in IMPLEMENTATION_CHANGELOG.md for a dedicated origin audit.
-        source: "/api/:path*",
-        headers: [
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          {
-            key: "Access-Control-Allow-Methods",
-            value: "GET, POST, PUT, DELETE, OPTIONS",
-          },
-          {
-            key: "Access-Control-Allow-Headers",
-            value: "Content-Type, Authorization",
-          },
-        ],
-      },
-      {
         // Disable caching for dashboard pages
         source: "/dashboard/:path*",
         headers: [

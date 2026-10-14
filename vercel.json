@@ -3,6 +3,10 @@
     {
       "path": "/api/internal/bloomwebsites/commerce-recovery",
       "schedule": "17 9 * * *"
+    },
+    {
+      "path": "/api/internal/webhooks/retry",
+      "schedule": "47 9 * * *"
     }
   ]
 }

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
+import ShopSession from "@/models/ShopSession";
 
 export async function POST(req: Request) {
   await connectToDB();
@@ -39,6 +40,13 @@ export async function POST(req: Request) {
 
   user.email = newEmail.toLowerCase();
   await user.save();
+
+  // Changing the sign-in identity requires reauthentication everywhere.
+  await Shop.updateOne(
+    { _id: user._id },
+    { $set: { sessionsValidAfter: new Date() } },
+  );
+  await ShopSession.deleteMany({ shopId: user._id });
 
   return NextResponse.json({
     success: true,

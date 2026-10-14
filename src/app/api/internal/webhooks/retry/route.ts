@@ -6,6 +6,11 @@ import { getNextRetryTime } from "@/lib/webhook-retry";
 import Shop from "@/models/Shop";
 import { assertSafeWebhookUrl } from "@/lib/security-network-destination";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+
 async function postWithTimeout(
   url: string,
   options: RequestInit,
@@ -152,8 +157,15 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({
-    success: true,
-    retried: failedLogs.length,
-  });
+  return Response.json(
+    {
+      success: true,
+      retried: failedLogs.length,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  );
 }

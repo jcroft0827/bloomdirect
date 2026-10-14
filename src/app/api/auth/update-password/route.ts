@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"; // adjust path if needed
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
 import bcrypt from "bcryptjs";
+import ShopSession from "@/models/ShopSession";
 
 export async function POST(req: Request) {
   try {
@@ -53,6 +54,14 @@ export async function POST(req: Request) {
     shop.password = newPassword;
 
     await shop.save();
+
+    // Password changes invalidate every active browser session, including the
+    // current one. The client already signs out after a successful response.
+    await Shop.updateOne(
+      { _id: shop._id },
+      { $set: { sessionsValidAfter: new Date() } },
+    );
+    await ShopSession.deleteMany({ shopId: shop._id });
 
     return NextResponse.json({ success: true });
   } catch (error) {

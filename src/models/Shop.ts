@@ -76,6 +76,13 @@ const shopSchema = new mongoose.Schema(
       default: "0829",
     },
 
+    // JWTs created before this timestamp cannot bootstrap a new tracked
+    // browser session. Used by "sign out other devices" and credential
+    // changes to revoke dormant/legacy sessions safely.
+    sessionsValidAfter: {
+      type: Date,
+    },
+
     // ===============================
     // STATUS / ACCOUNT STATE
     // ===============================

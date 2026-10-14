@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import { connectToDB } from "@/lib/mongoose";
 import Shop from "@/models/Shop";
+import ShopSession from "@/models/ShopSession";
 
 function hashResetToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -101,6 +102,14 @@ export async function POST(req: Request) {
     shop.passwordResetExpires = undefined;
 
     await shop.save();
+
+    // A successful reset is a security boundary: revoke every existing
+    // browser session so a stolen session cannot survive a password reset.
+    await Shop.updateOne(
+      { _id: shop._id },
+      { $set: { sessionsValidAfter: new Date() } },
+    );
+    await ShopSession.deleteMany({ shopId: shop._id });
 
     return NextResponse.json({
       success: true,

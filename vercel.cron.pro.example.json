@@ -2,6 +2,10 @@
   "crons": [
     {
       "path": "/api/internal/bloomwebsites/commerce-recovery",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/internal/webhooks/retry",
       "schedule": "*/5 * * * *"
     }
   ]

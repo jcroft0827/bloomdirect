@@ -301,6 +301,7 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
+  const [signingOutOtherSessions, setSigningOutOtherSessions] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -693,6 +694,43 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
       toast.error("A network error occurred");
     } finally {
       setIsUpdatingPw(false);
+    }
+  };
+
+  const handleSignOutOtherDevices = async () => {
+    const confirmed = window.confirm(
+      "Sign out every other browser and device using this Bloom account? This device will stay signed in.",
+    );
+
+    if (!confirmed) return;
+
+    setSigningOutOtherSessions(true);
+
+    try {
+      const res = await fetch("/api/auth/sessions/sign-out-others", {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Unable to sign out other devices.");
+      }
+
+      const count = Number(data?.signedOutSessions || 0);
+      toast.success(
+        count > 0
+          ? `Signed out ${count} other ${count === 1 ? "session" : "sessions"}.`
+          : "No other active Bloom sessions were found.",
+      );
+    } catch (error) {
+      console.error("Sign out other devices error:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to sign out other devices.",
+      );
+    } finally {
+      setSigningOutOtherSessions(false);
     }
   };
 
@@ -2759,6 +2797,31 @@ export default function SettingsClient({ initialShop }: SettingsClientProps) {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-base font-black text-slate-900">
+                      Other signed-in devices
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Lost a device or used Bloom on a shared computer? Sign out every
+                      other browser and device while keeping this one signed in.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSignOutOtherDevices}
+                    disabled={signingOutOtherSessions}
+                    className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {signingOutOtherSessions
+                      ? "Signing out..."
+                      : "Sign out other devices"}
+                  </button>
+                </div>
               </div>
               {/* Update Email */}
             </div>

@@ -11,6 +11,8 @@ declare module "next-auth" {
       isPro: boolean;
       proSince?: string | null;
       role?: string;
+      sessionId?: string;
+      sessionRevoked?: boolean;
       // any additional fields you expose
       [key: string]: any;
     } & DefaultSession["user"];
@@ -24,6 +26,7 @@ declare module "next-auth" {
     proSince?: string | null;
     logo?: string | null;
     role?: string | null;
+    sessionId?: string;
   }
 }
 
@@ -36,6 +39,8 @@ declare module "next-auth/jwt" {
     proSince?: string | null;
     logo?: string | null;
     role?: string;
+    sessionId?: string;
+    sessionRevoked?: boolean;
     // `sub` will still be set by NextAuth if present
   }
 }
