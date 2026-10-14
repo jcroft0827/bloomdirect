@@ -18,6 +18,7 @@ const allowedStatuses = new Set<BloomWebsiteOrderStatus>([
   "preparation_complete",
   "ready_for_pickup",
   "out_for_delivery",
+  "delivery_attempted",
   "fulfilled",
   "canceled",
 ]);
@@ -37,6 +38,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       typeof body?.cancellationReason === "string"
         ? body.cancellationReason
         : "";
+    const internalNote =
+      typeof body?.internalNote === "string" ? body.internalNote : "";
+    const customerNote =
+      typeof body?.customerNote === "string" ? body.customerNote : "";
+    const notifyCustomer =
+      typeof body?.notifyCustomer === "boolean"
+        ? body.notifyCustomer
+        : undefined;
 
     if (!allowedStatuses.has(nextStatus)) {
       return NextResponse.json(
@@ -50,6 +59,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       shopId: session.user.id,
       nextStatus,
       cancellationReason,
+      internalNote,
+      customerNote,
+      notifyCustomer,
       source: "portal",
       actorId: session.user.id,
       actorLabel:

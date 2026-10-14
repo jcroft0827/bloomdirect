@@ -44,6 +44,7 @@ function formatTypeLabel(type: string) {
     bloomwebsite_customer_status_update: "Website Status Update",
     bloomwebsite_customer_delivery_confirmation: "Website Delivery Confirmation",
     bloomwebsite_customer_refund_confirmation: "Website Refund Confirmation",
+    bloomwebsite_customer_arrangement_photo: "Website Arrangement Photo",
   };
 
   if (labels[type]) return labels[type];

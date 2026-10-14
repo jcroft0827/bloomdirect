@@ -825,7 +825,7 @@ const bloomWebsiteSchema = new Schema(
       fulfillmentWorkflow: {
         type: String,
         enum: ["simple", "detailed"],
-        default: "simple",
+        default: "detailed",
       },
 
       /**
@@ -837,6 +837,46 @@ const bloomWebsiteSchema = new Schema(
       sendDeliveryConfirmation: {
         type: Boolean,
         default: true,
+      },
+
+      /**
+       * Customer email preferences for operational fulfillment milestones.
+       * These defaults intentionally avoid over-emailing customers while
+       * preserving the messages florists most commonly expect.
+       */
+      statusNotifications: {
+        designing: {
+          type: Boolean,
+          default: false,
+        },
+        ready: {
+          type: Boolean,
+          default: false,
+        },
+        readyForPickup: {
+          type: Boolean,
+          default: true,
+        },
+        outForDelivery: {
+          type: Boolean,
+          default: true,
+        },
+        deliveryAttempted: {
+          type: Boolean,
+          default: true,
+        },
+        delivered: {
+          type: Boolean,
+          default: true,
+        },
+        pickedUp: {
+          type: Boolean,
+          default: true,
+        },
+        canceled: {
+          type: Boolean,
+          default: true,
+        },
       },
 
       /**

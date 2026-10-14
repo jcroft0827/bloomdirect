@@ -285,6 +285,48 @@ export async function PATCH(request: Request) {
           data.sendDeliveryConfirmation;
       }
 
+      if ("statusNotifications" in data) {
+        const value = data.statusNotifications;
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          return NextResponse.json(
+            { error: "Invalid customer notification settings." },
+            { status: 400 },
+          );
+        }
+
+        const notificationKeys = [
+          "designing",
+          "ready",
+          "readyForPickup",
+          "outForDelivery",
+          "deliveryAttempted",
+          "delivered",
+          "pickedUp",
+          "canceled",
+        ] as const;
+
+        const normalizedNotifications: Record<string, boolean> = {};
+
+        for (const key of notificationKeys) {
+          const setting = (value as Record<string, unknown>)[key];
+          if (typeof setting !== "boolean") {
+            return NextResponse.json(
+              { error: "Invalid customer notification settings." },
+              { status: 400 },
+            );
+          }
+
+          normalizedNotifications[key] = setting;
+        }
+
+        website.set("orderPolicy.statusNotifications", normalizedNotifications);
+
+        // Preserve compatibility with the legacy delivery-only setting.
+        website.orderPolicy.sendDeliveryConfirmation = Boolean(
+          normalizedNotifications.delivered,
+        );
+      }
+
       /*
        * Operational action:
        * stop/resume website orders today.

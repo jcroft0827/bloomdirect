@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:security": "node --experimental-strip-types --test tests/security-network-destination.test.mjs tests/production-config.test.mjs"
+    "test:security": "node --experimental-strip-types --test tests/security-network-destination.test.mjs tests/production-config.test.mjs",
+    "test:fulfillment": "node --experimental-strip-types --test tests/fulfillment-status.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.990.0",

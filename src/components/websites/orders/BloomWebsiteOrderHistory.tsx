@@ -1,4 +1,6 @@
-import { AlertTriangle, History } from "lucide-react";
+import { AlertTriangle, History, Mail, MessageSquareText } from "lucide-react";
+
+import { getBloomWebsiteOrderStatusLabel } from "@/lib/bloom-websites/orders/fulfillment-status";
 
 function titleCase(value: string) {
   return value
@@ -30,7 +32,16 @@ function displayValue(field: string, value: unknown) {
     return JSON.stringify(value, null, 2);
   }
 
-  if (field === "status" || field === "payment.status") {
+  if (field === "status") {
+    const raw = String(value);
+    if (raw === "in_preparation") return "Designing";
+    if (raw === "preparation_complete") return "Ready";
+    if (raw === "delivery_attempted") return "Delivery Attempted";
+    if (raw === "placed" || raw === "confirmed") return "New";
+    return getBloomWebsiteOrderStatusLabel(raw, "delivery");
+  }
+
+  if (field === "payment.status") {
     return titleCase(String(value));
   }
 
@@ -101,6 +112,36 @@ export default function BloomWebsiteOrderHistory({
                     <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-700">
                       {event.reason}
                     </p>
+                  </div>
+                )}
+
+                {(event.internalNote || event.customerNote) && (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {event.internalNote && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-500">
+                          <MessageSquareText size={14} />
+                          Internal note
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                          {event.internalNote}
+                        </p>
+                      </div>
+                    )}
+                    {event.customerNote && (
+                      <div className="rounded-xl border border-purple-100 bg-purple-50/60 px-4 py-3">
+                        <p className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-purple-700">
+                          <Mail size={14} />
+                          Customer message
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-purple-950">
+                          {event.customerNote}
+                        </p>
+                        <p className="mt-2 text-xs font-bold text-purple-600">
+                          {event.customerNotified ? "Sent with customer email" : "Not emailed"}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

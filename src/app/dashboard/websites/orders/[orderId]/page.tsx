@@ -8,12 +8,19 @@ import { connectToDB } from "@/lib/mongoose";
 import BloomWebsite from "@/models/BloomWebsite";
 import BloomWebsiteOrder from "@/models/BloomWebsiteOrder";
 import BloomWebsiteOrderActions from "@/components/websites/orders/BloomWebsiteOrderActions";
+import BloomWebsiteArrangementPhotos from "@/components/websites/orders/BloomWebsiteArrangementPhotos";
+import BloomWebsiteFulfillmentTimeline from "@/components/websites/orders/BloomWebsiteFulfillmentTimeline";
 import BloomWebsiteOrderEditButton from "@/components/websites/orders/BloomWebsiteOrderEditButton";
 import BloomWebsiteOrderHistory from "@/components/websites/orders/BloomWebsiteOrderHistory";
 import TfposOrderExportCard from "@/components/websites/pos/TfposOrderExportCard";
 import {
   getBloomWebsiteRefundAvailability,
 } from "@/lib/bloom-websites/payments/refundBloomWebsiteOrder";
+import {
+  getBloomWebsiteOrderStatusLabel,
+  resolveBloomWebsiteStatusNotificationPolicy,
+  type BloomWebsiteOrderStatus,
+} from "@/lib/bloom-websites/orders/fulfillment-status";
 
 type PageProps = {
   params: Promise<{ orderId: string }>;
@@ -51,7 +58,9 @@ export default async function BloomWebsiteOrderDetailPage({
   if (!order) notFound();
 
   const website = await BloomWebsite.findById(order.website)
-    .select("orderPolicy.fulfillmentWorkflow")
+    .select(
+      "orderPolicy.fulfillmentWorkflow orderPolicy.statusNotifications orderPolicy.sendDeliveryConfirmation",
+    )
     .lean<any>();
 
   const workflowMode =
@@ -61,14 +70,15 @@ export default async function BloomWebsiteOrderDetailPage({
 
   const refundContext = getBloomWebsiteRefundAvailability(order);
 
-  const displayStatus =
-    order.status === "fulfilled"
-      ? order.fulfillment.type === "delivery"
-        ? "Delivered"
-        : "Picked Up"
-      : order.status === "confirmed"
-        ? "Placed"
-        : label(order.status);
+  const displayStatus = getBloomWebsiteOrderStatusLabel(
+    order.status,
+    order.fulfillment.type,
+  );
+
+  const defaultNotifications = resolveBloomWebsiteStatusNotificationPolicy(
+    website?.orderPolicy?.statusNotifications,
+    website?.orderPolicy?.sendDeliveryConfirmation !== false,
+  );
 
   const editableOrder = {
     customer: {
@@ -151,12 +161,34 @@ export default async function BloomWebsiteOrderDetailPage({
                 workflowMode={workflowMode}
                 paymentStatus={order.payment.status}
                 refundContext={refundContext}
+                defaultNotifications={defaultNotifications}
               />
             </div>
 
           </div>
         </div>
       </section>
+
+      <BloomWebsiteFulfillmentTimeline
+        status={order.status as BloomWebsiteOrderStatus}
+        fulfillmentType={order.fulfillment.type}
+      />
+
+      <BloomWebsiteArrangementPhotos
+        orderId={String(order._id)}
+        customerEmail={order.customer?.email || "customer"}
+        photos={(order.arrangementPhotos || []).map((photo: any) => ({
+          photoId: photo.photoId,
+          imageUrl: photo.imageUrl,
+          caption: photo.caption || "",
+          uploadedAt: photo.uploadedAt
+            ? new Date(photo.uploadedAt).toISOString()
+            : new Date().toISOString(),
+          sentToCustomerAt: photo.sentToCustomerAt
+            ? new Date(photo.sentToCustomerAt).toISOString()
+            : null,
+        }))}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">

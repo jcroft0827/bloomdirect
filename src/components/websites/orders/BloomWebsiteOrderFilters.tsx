@@ -283,13 +283,12 @@ export default function BloomWebsiteOrderFilters({
               className="min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm font-bold text-gray-800 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
             >
               <option value="">All statuses</option>
-              <option value="placed">Placed</option>
-              <option value="in_preparation">In Preparation</option>
-              <option value="preparation_complete">
-                Preparation Complete
-              </option>
+              <option value="placed">New</option>
+              <option value="in_preparation">Designing</option>
+              <option value="preparation_complete">Ready</option>
               <option value="ready_for_pickup">Ready for Pickup</option>
               <option value="out_for_delivery">Out for Delivery</option>
+              <option value="delivery_attempted">Delivery Attempted</option>
               <option value="fulfilled">Delivered / Picked Up</option>
               <option value="canceled">Canceled</option>
             </select>

@@ -27,6 +27,16 @@ type BloomWebsiteOrderPolicy = {
   minProductTotal: number | string;
   fulfillmentWorkflow: "simple" | "detailed";
   sendDeliveryConfirmation: boolean;
+  statusNotifications: {
+    designing: boolean;
+    ready: boolean;
+    readyForPickup: boolean;
+    outForDelivery: boolean;
+    deliveryAttempted: boolean;
+    delivered: boolean;
+    pickedUp: boolean;
+    canceled: boolean;
+  };
   noMoreOrdersTodayUntil: string | null;
   noMoreOrdersForDate: string | null;
 };
@@ -61,12 +71,28 @@ function getInitialPolicy(website: any): BloomWebsiteOrderPolicy {
     minProductTotal: website?.orderPolicy?.minProductTotal ?? 0,
 
     fulfillmentWorkflow:
-      website?.orderPolicy?.fulfillmentWorkflow === "detailed"
-        ? "detailed"
-        : "simple",
+      website?.orderPolicy?.fulfillmentWorkflow === "simple"
+        ? "simple"
+        : "detailed",
 
     sendDeliveryConfirmation:
       website?.orderPolicy?.sendDeliveryConfirmation !== false,
+
+    statusNotifications: {
+      designing: website?.orderPolicy?.statusNotifications?.designing ?? false,
+      ready: website?.orderPolicy?.statusNotifications?.ready ?? false,
+      readyForPickup:
+        website?.orderPolicy?.statusNotifications?.readyForPickup ?? true,
+      outForDelivery:
+        website?.orderPolicy?.statusNotifications?.outForDelivery ?? true,
+      deliveryAttempted:
+        website?.orderPolicy?.statusNotifications?.deliveryAttempted ?? true,
+      delivered:
+        website?.orderPolicy?.statusNotifications?.delivered ??
+        (website?.orderPolicy?.sendDeliveryConfirmation !== false),
+      pickedUp: website?.orderPolicy?.statusNotifications?.pickedUp ?? true,
+      canceled: website?.orderPolicy?.statusNotifications?.canceled ?? true,
+    },
 
     noMoreOrdersTodayUntil: website?.orderPolicy?.noMoreOrdersTodayUntil
       ? String(website.orderPolicy.noMoreOrdersTodayUntil)
@@ -85,6 +111,7 @@ function getEditableOrderPolicy(policy: BloomWebsiteOrderPolicy) {
     minProductTotal: policy.minProductTotal,
     fulfillmentWorkflow: policy.fulfillmentWorkflow,
     sendDeliveryConfirmation: policy.sendDeliveryConfirmation,
+    statusNotifications: policy.statusNotifications,
   };
 }
 
@@ -205,7 +232,8 @@ export default function BloomWebsiteOrderSettings({
 
         minProductTotal: Math.round(minimum * 100) / 100,
         fulfillmentWorkflow: policy.fulfillmentWorkflow,
-        sendDeliveryConfirmation: policy.sendDeliveryConfirmation,
+        sendDeliveryConfirmation: policy.statusNotifications.delivered,
+        statusNotifications: policy.statusNotifications,
       });
 
       const nextPolicy = getInitialPolicy(website);
@@ -478,9 +506,9 @@ export default function BloomWebsiteOrderSettings({
                   : "border-gray-200 bg-white hover:border-gray-300"
               }`}
             >
-              <p className="font-black text-gray-950">Simple</p>
+              <p className="font-black text-gray-950">Quick Complete</p>
               <p className="mt-1 text-sm leading-5 text-gray-500">
-                Keep the portal lightweight: Placed → Delivered or Picked Up.
+                Keep the portal lightweight: New → Delivered or Picked Up.
               </p>
             </button>
 
@@ -498,42 +526,79 @@ export default function BloomWebsiteOrderSettings({
                   : "border-gray-200 bg-white hover:border-gray-300"
               }`}
             >
-              <p className="font-black text-gray-950">Detailed</p>
+              <div className="flex items-center gap-2">
+                <p className="font-black text-gray-950">Full Tracking</p>
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-purple-700">Recommended</span>
+              </div>
               <p className="mt-1 text-sm leading-5 text-gray-500">
-                Track preparation, readiness, delivery progress, and completion.
+                Track Designing, Ready, delivery progress, attempted delivery, and completion.
               </p>
             </button>
           </div>
         </div>
 
-        {/* DELIVERY CONFIRMATION */}
+        {/* CUSTOMER STATUS EMAILS */}
         <div className="mt-8 border-t border-gray-100 pt-7">
-          <div className="flex items-start justify-between gap-5 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 sm:p-5">
-            <div className="flex gap-3">
-              <Send size={20} className="mt-0.5 shrink-0 text-purple-700" />
-              <div>
-                <p className="font-black text-gray-950">
-                  Customer Delivery Confirmation
-                </p>
-                <p className="mt-1 max-w-xl text-sm leading-6 text-gray-500">
-                  Send the customer a delivery-confirmation email when this
-                  portal marks a delivery order delivered. Turn this off if
-                  your POS already sends that message.
-                </p>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <Send size={18} className="text-purple-700" />
+            <h4 className="font-black text-gray-950">Customer Status Emails</h4>
+          </div>
 
-            <input
-              type="checkbox"
-              checked={policy.sendDeliveryConfirmation}
-              onChange={(event) =>
-                setPolicy((current) => ({
-                  ...current,
-                  sendDeliveryConfirmation: event.target.checked,
-                }))
-              }
-              className="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-            />
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+            Choose which fulfillment milestones automatically send the customer
+            an email. You can still turn an email on or off for an individual
+            status update from the order itself.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[
+              ["designing", "Designing", "Usually kept internal."],
+              ["ready", "Ready", "Arrangement/design work is complete."],
+              ["readyForPickup", "Ready for Pickup", "Pickup order is ready."],
+              ["outForDelivery", "Out for Delivery", "Delivery has left the shop."],
+              ["deliveryAttempted", "Delivery Attempted", "Customer should know a delivery could not be completed."],
+              ["delivered", "Delivered", "Delivery confirmation."],
+              ["pickedUp", "Picked Up", "Pickup completion confirmation."],
+              ["canceled", "Canceled", "Cancellation notice."],
+            ].map(([key, title, description]) => {
+              const notificationKey = key as keyof BloomWebsiteOrderPolicy["statusNotifications"];
+              return (
+                <label
+                  key={key}
+                  className="flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 transition hover:border-purple-200 hover:bg-purple-50/40"
+                >
+                  <span>
+                    <span className="block font-black text-gray-950">{title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-gray-500">
+                      {description}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={policy.statusNotifications[notificationKey]}
+                    onChange={(event) =>
+                      setPolicy((current) => ({
+                        ...current,
+                        statusNotifications: {
+                          ...current.statusNotifications,
+                          [notificationKey]: event.target.checked,
+                        },
+                        ...(notificationKey === "delivered"
+                          ? { sendDeliveryConfirmation: event.target.checked }
+                          : {}),
+                      }))
+                    }
+                    className="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-purple-100 bg-purple-50/60 p-4 text-sm leading-6 text-purple-950">
+            <strong>Recommended:</strong> Out for Delivery, Delivery Attempted,
+            Delivered/Picked Up, and Canceled. Bloom keeps Designing and Ready
+            quiet by default so customers are not over-notified.
           </div>
         </div>
 

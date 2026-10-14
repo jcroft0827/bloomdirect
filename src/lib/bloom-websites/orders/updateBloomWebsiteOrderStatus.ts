@@ -4,19 +4,16 @@ import { connectToDB } from "@/lib/mongoose";
 import BloomWebsite from "@/models/BloomWebsite";
 import BloomWebsiteOrder from "@/models/BloomWebsiteOrder";
 import {
+  getBloomWebsiteOrderStatusLabel,
+  shouldNotifyBloomWebsiteStatus,
+  type BloomWebsiteOrderStatus,
+} from "./fulfillment-status";
+import {
   sendBloomWebsiteDeliveryConfirmation,
   sendBloomWebsiteStatusNotification,
 } from "./sendBloomWebsiteOrderNotifications";
 
-export type BloomWebsiteOrderStatus =
-  | "placed"
-  | "confirmed"
-  | "in_preparation"
-  | "preparation_complete"
-  | "ready_for_pickup"
-  | "out_for_delivery"
-  | "fulfilled"
-  | "canceled";
+export type { BloomWebsiteOrderStatus } from "./fulfillment-status";
 
 export type BloomWebsiteFulfillmentEventSource =
   | "portal"
@@ -37,10 +34,10 @@ export class BloomWebsiteOrderStatusError extends Error {
 }
 
 /*
- * Server-side transitions intentionally allow skipping operational steps.
- * A florist may use every milestone, only mark the order complete, or later
- * have a POS/API supply status updates. The portal workflow setting controls
- * what is emphasized in the UI; it does not trap an order in a rigid state.
+ * Transitions intentionally allow skipping operational steps. BloomWebsite
+ * must support shops that work every milestone as well as shops whose POS or
+ * team only records a few key moments. Delivery Attempted is retryable so a
+ * florist can make another delivery run without creating a new order.
  */
 const transitions: Record<
   BloomWebsiteOrderStatus,
@@ -51,16 +48,16 @@ const transitions: Record<
     "preparation_complete",
     "ready_for_pickup",
     "out_for_delivery",
+    "delivery_attempted",
     "fulfilled",
     "canceled",
   ],
-  // Kept for backward compatibility with orders created before the
-  // manual Confirm Order step was removed from BloomWebsites.
   confirmed: [
     "in_preparation",
     "preparation_complete",
     "ready_for_pickup",
     "out_for_delivery",
+    "delivery_attempted",
     "fulfilled",
     "canceled",
   ],
@@ -68,26 +65,44 @@ const transitions: Record<
     "preparation_complete",
     "ready_for_pickup",
     "out_for_delivery",
+    "delivery_attempted",
     "fulfilled",
     "canceled",
   ],
   preparation_complete: [
     "ready_for_pickup",
     "out_for_delivery",
+    "delivery_attempted",
     "fulfilled",
     "canceled",
   ],
   ready_for_pickup: ["fulfilled", "canceled"],
-  out_for_delivery: ["fulfilled", "canceled"],
+  out_for_delivery: ["delivery_attempted", "fulfilled", "canceled"],
+  delivery_attempted: ["out_for_delivery", "fulfilled", "canceled"],
   fulfilled: [],
   canceled: [],
 };
+
+function normalizeNote(value: string, maxLength: number) {
+  const note = String(value || "").trim();
+  if (note.length > maxLength) {
+    throw new BloomWebsiteOrderStatusError(
+      "NOTE_TOO_LONG",
+      `Order note must be ${maxLength.toLocaleString("en-US")} characters or fewer.`,
+      400,
+    );
+  }
+  return note;
+}
 
 export async function updateBloomWebsiteOrderStatus({
   orderId,
   shopId,
   nextStatus,
   cancellationReason = "",
+  internalNote = "",
+  customerNote = "",
+  notifyCustomer,
   source = "portal",
   actorId = "",
   actorLabel = "",
@@ -96,6 +111,9 @@ export async function updateBloomWebsiteOrderStatus({
   shopId: string;
   nextStatus: BloomWebsiteOrderStatus;
   cancellationReason?: string;
+  internalNote?: string;
+  customerNote?: string;
+  notifyCustomer?: boolean;
   source?: BloomWebsiteFulfillmentEventSource;
   actorId?: string;
   actorLabel?: string;
@@ -141,19 +159,24 @@ export async function updateBloomWebsiteOrderStatus({
   }
 
   if (
-    nextStatus === "out_for_delivery" &&
+    ["out_for_delivery", "delivery_attempted"].includes(nextStatus) &&
     order.fulfillment.type !== "delivery"
   ) {
     throw new BloomWebsiteOrderStatusError(
       "FULFILLMENT_STATUS_MISMATCH",
-      "Only delivery orders can be marked out for delivery.",
+      "Only delivery orders can use delivery-progress statuses.",
       400,
     );
   }
 
+  const resolvedInternalNote = normalizeNote(internalNote, 5000);
+  const resolvedCustomerNote = normalizeNote(customerNote, 2000);
   const resolvedCancellationReason =
     nextStatus === "canceled"
-      ? cancellationReason.trim() || "Order canceled by florist."
+      ? normalizeNote(
+          cancellationReason || customerNote || "Order canceled by florist.",
+          1000,
+        ) || "Order canceled by florist."
       : "";
 
   if (nextStatus === "canceled") {
@@ -175,10 +198,25 @@ export async function updateBloomWebsiteOrderStatus({
     } as any;
   }
 
-  const now = new Date();
+  const website = await BloomWebsite.findById(order.website)
+    .select(
+      "orderPolicy.statusNotifications orderPolicy.sendDeliveryConfirmation",
+    )
+    .lean<any>();
 
-  // confirmedAt remains for historical orders, but no new portal action
-  // deliberately creates the confirmed state.
+  const resolvedNotifyCustomer =
+    typeof notifyCustomer === "boolean"
+      ? notifyCustomer
+      : shouldNotifyBloomWebsiteStatus(
+          website?.orderPolicy?.statusNotifications,
+          nextStatus,
+          order.fulfillment.type,
+          website?.orderPolicy?.sendDeliveryConfirmation !== false,
+        );
+
+  const now = new Date();
+  const eventId = `BWF_${randomUUID()}`;
+
   if (nextStatus === "confirmed") order.confirmedAt = now;
   if (nextStatus === "in_preparation") order.preparationStartedAt = now;
   if (nextStatus === "preparation_complete") {
@@ -186,13 +224,18 @@ export async function updateBloomWebsiteOrderStatus({
   }
   if (nextStatus === "ready_for_pickup") order.readyForPickupAt = now;
   if (nextStatus === "out_for_delivery") order.outForDeliveryAt = now;
+  if (nextStatus === "delivery_attempted") order.deliveryAttemptedAt = now;
   if (nextStatus === "fulfilled") order.fulfilledAt = now;
 
   order.status = nextStatus;
   order.fulfillmentEvents = order.fulfillmentEvents || [];
   order.fulfillmentEvents.push({
+    eventId,
     status: nextStatus,
     source,
+    internalNote: resolvedInternalNote,
+    customerNote: resolvedCustomerNote,
+    customerNotified: false,
     occurredAt: now,
   } as any);
 
@@ -205,9 +248,14 @@ export async function updateBloomWebsiteOrderStatus({
           ? "api"
           : "system";
 
+  const statusLabel = getBloomWebsiteOrderStatusLabel(
+    nextStatus,
+    order.fulfillment.type,
+  );
+
   order.historyEvents = order.historyEvents || [];
   order.historyEvents.push({
-    eventId: `BWH_${randomUUID()}`,
+    eventId,
     kind: "status_changed",
     source,
     actor: {
@@ -226,8 +274,11 @@ export async function updateBloomWebsiteOrderStatus({
     summary:
       nextStatus === "canceled"
         ? "Order canceled"
-        : `Order status changed to ${nextStatus.replaceAll("_", " ")}`,
+        : `Order status changed to ${statusLabel}`,
     reason: resolvedCancellationReason,
+    internalNote: resolvedInternalNote,
+    customerNote: resolvedCustomerNote,
+    customerNotified: false,
     referenceType: "status",
     referenceId: nextStatus,
     changes: [
@@ -244,27 +295,50 @@ export async function updateBloomWebsiteOrderStatus({
 
   await order.save();
 
-  if (nextStatus === "fulfilled" && order.fulfillment.type === "delivery") {
-    const website = await BloomWebsite.findById(order.website)
-      .select("orderPolicy.sendDeliveryConfirmation")
-      .lean<any>();
+  if (resolvedNotifyCustomer) {
+    let notificationSent = false;
 
-    if (website?.orderPolicy?.sendDeliveryConfirmation !== false) {
-      await sendBloomWebsiteDeliveryConfirmation(String(order._id)).catch(
-        (error) => {
-          console.error(
-            "BloomWebsite delivery confirmation failed:",
-            error,
-          );
-        },
+    if (nextStatus === "fulfilled" && order.fulfillment.type === "delivery") {
+      notificationSent = Boolean(
+        await sendBloomWebsiteDeliveryConfirmation(String(order._id), {
+          customerNote: resolvedCustomerNote,
+          scope: eventId,
+        }).catch((error) => {
+          console.error("BloomWebsite delivery confirmation failed:", error);
+          return false;
+        }),
+      );
+    } else {
+      notificationSent = Boolean(
+        await sendBloomWebsiteStatusNotification(String(order._id), {
+          customerNote: resolvedCustomerNote,
+          scope: eventId,
+        }).catch((error) => {
+          console.error("BloomWebsite status notification failed:", error);
+          return false;
+        }),
       );
     }
-  } else {
-    await sendBloomWebsiteStatusNotification(String(order._id)).catch(
-      (error) => {
-        console.error("BloomWebsite status notification failed:", error);
-      },
-    );
+
+    if (notificationSent) {
+      await BloomWebsiteOrder.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            "fulfillmentEvents.$[fulfillment].customerNotified": true,
+            "historyEvents.$[history].customerNotified": true,
+          },
+        },
+        {
+          arrayFilters: [
+            { "fulfillment.eventId": eventId },
+            { "history.eventId": eventId },
+          ],
+        },
+      ).catch((error) => {
+        console.error("BloomWebsite notification audit update failed:", error);
+      });
+    }
   }
 
   return order;

@@ -2,13 +2,15 @@ import { getResend } from "@/lib/resend";
 import { EmailEvent } from "@/models/EmailEvent";
 import BloomWebsiteOrder from "@/models/BloomWebsiteOrder";
 import Shop from "@/models/Shop";
+import { getBloomWebsiteOrderStatusLabel } from "./fulfillment-status";
 
 type NotificationKind =
   | "customer_order_confirmation"
   | "florist_new_order"
   | "customer_status_update"
   | "customer_delivery_confirmation"
-  | "customer_refund_confirmation";
+  | "customer_refund_confirmation"
+  | "customer_arrangement_photo";
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -33,44 +35,36 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#039;");
 }
 
-function statusLabel(status: string) {
-  switch (status) {
-    case "confirmed":
-      return "Confirmed";
-    case "in_preparation":
-      return "In preparation";
-    case "preparation_complete":
-      return "Preparation complete";
-    case "ready_for_pickup":
-      return "Ready for pickup";
-    case "out_for_delivery":
-      return "Out for delivery";
-    case "fulfilled":
-      return "Completed";
-    case "canceled":
-      return "Canceled";
-    default:
-      return "Order update";
-  }
+function statusLabel(status: string, fulfillmentType: "delivery" | "pickup") {
+  return getBloomWebsiteOrderStatusLabel(status, fulfillmentType);
 }
 
-function eventAlreadySent(order: any, kind: NotificationKind, status = "") {
+
+function eventAlreadySent(
+  order: any,
+  kind: NotificationKind,
+  status = "",
+  scope = "",
+) {
   const statusScoped =
     kind === "customer_status_update" ||
     kind === "customer_refund_confirmation";
 
-  return Array.isArray(order.communications?.events) &&
-    order.communications.events.some(
-      (event: any) =>
-        event.kind === kind &&
-        (!statusScoped || event.status === status),
-    );
+  return (
+    Array.isArray(order.communications?.events) &&
+    order.communications.events.some((event: any) => {
+      if (event.kind !== kind) return false;
+      if (scope) return event.scope === scope;
+      return !statusScoped || event.status === status;
+    })
+  );
 }
 
 async function recordEmail({
   order,
   kind,
   status = "",
+  scope = "",
   recipient,
   subject,
   payload,
@@ -79,19 +73,21 @@ async function recordEmail({
   order: any;
   kind: NotificationKind;
   status?: string;
+  scope?: string;
   recipient: string;
   subject: string;
   payload: Record<string, unknown>;
   send: () => Promise<any>;
 }) {
-  if (!recipient || eventAlreadySent(order, kind, status)) return;
+  if (!recipient) return false;
+  if (eventAlreadySent(order, kind, status, scope)) return true;
 
   const statusScoped =
     kind === "customer_status_update" ||
     kind === "customer_refund_confirmation";
   const eventScope = {
     kind,
-    ...(statusScoped ? { status } : {}),
+    ...(scope ? { scope } : statusScoped ? { status } : {}),
   };
   const claimedAt = new Date();
 
@@ -115,6 +111,7 @@ async function recordEmail({
         "communications.events": {
           kind,
           status,
+          scope,
           recipient,
           resendId: "",
           sentAt: claimedAt,
@@ -124,7 +121,7 @@ async function recordEmail({
     { new: false },
   );
 
-  if (!claimed) return;
+  if (!claimed) return true;
 
   let result: any;
 
@@ -167,7 +164,7 @@ async function recordEmail({
     }).catch(() => null);
 
     console.error(`BloomWebsite ${kind} email failed:`, message);
-    return;
+    return false;
   }
 
   const resendId = result?.data?.id || "";
@@ -188,7 +185,11 @@ async function recordEmail({
       arrayFilters: [
         {
           "event.kind": kind,
-          ...(statusScoped ? { "event.status": status } : {}),
+          ...(scope
+            ? { "event.scope": scope }
+            : statusScoped
+              ? { "event.status": status }
+              : {}),
           "event.recipient": recipient,
           "event.resendId": "",
         },
@@ -209,6 +210,8 @@ async function recordEmail({
   }).catch((error) => {
     console.error(`BloomWebsite ${kind} email audit log failed:`, error);
   });
+
+  return true;
 }
 
 export async function sendBloomWebsitePlacedNotifications(orderId: string) {
@@ -416,21 +419,23 @@ export async function sendBloomWebsitePlacedNotifications(orderId: string) {
   });
 }
 
-export async function sendBloomWebsiteStatusNotification(orderId: string) {
+export async function sendBloomWebsiteStatusNotification(
+  orderId: string,
+  options: { customerNote?: string; scope?: string } = {},
+) {
   const order = await BloomWebsiteOrder.findById(orderId);
-  if (!order || order.status === "placed") return;
+  if (!order || order.status === "placed") return false;
 
-  const label =
-    order.status === "fulfilled" && order.fulfillment.type === "pickup"
-      ? "Picked up"
-      : statusLabel(order.status);
+  const label = statusLabel(order.status, order.fulfillment.type);
   const storefrontName = order.storefront?.siteName || "Your florist";
   const resend = getResend();
+  const customerNote = String(options.customerNote || "").trim();
 
-  await recordEmail({
+  return recordEmail({
     order,
     kind: "customer_status_update",
     status: order.status,
+    scope: options.scope || "",
     recipient: order.customer.email,
     subject: `${storefrontName}: ${label} — ${order.orderNumber}`,
     payload: {
@@ -438,6 +443,7 @@ export async function sendBloomWebsiteStatusNotification(orderId: string) {
       orderNumber: order.orderNumber,
       kind: "customer_status_update",
       status: order.status,
+      customerNote,
     },
     send: () =>
       resend.emails.send({
@@ -446,15 +452,25 @@ export async function sendBloomWebsiteStatusNotification(orderId: string) {
         subject: `${storefrontName}: ${label} — ${order.orderNumber}`,
         html: `
           <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:28px;color:#1f2937;">
-            <h1 style="font-size:28px;margin:0;">${escapeHtml(label)}</h1>
-            <p style="font-size:16px;line-height:1.6;">
-              Your order <strong>${escapeHtml(order.orderNumber)}</strong> from
-              ${escapeHtml(storefrontName)} is now <strong>${escapeHtml(label.toLowerCase())}</strong>.
-            </p>
-            <p style="color:#6b7280;font-size:13px;">
-              ${order.fulfillment.type === "pickup" ? "Pickup" : "Delivery"} date:
-              ${escapeHtml(order.fulfillment.requestedDate)}
-            </p>
+            <div style="background:#111827;color:#fff;border-radius:20px;padding:28px;">
+              <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#c4b5fd;">Order update</div>
+              <h1 style="font-size:28px;margin:8px 0 0;">${escapeHtml(label)}</h1>
+            </div>
+            <div style="padding:24px 4px;">
+              <p style="font-size:16px;line-height:1.6;">
+                Your order <strong>${escapeHtml(order.orderNumber)}</strong> from
+                ${escapeHtml(storefrontName)} is now <strong>${escapeHtml(label.toLowerCase())}</strong>.
+              </p>
+              ${
+                customerNote
+                  ? `<div style="margin:18px 0;padding:16px 18px;border-radius:14px;background:#f5f3ff;color:#4c1d95;line-height:1.6;"><strong>Note from the florist:</strong><br>${escapeHtml(customerNote).replaceAll("\n", "<br>")}</div>`
+                  : ""
+              }
+              <p style="color:#6b7280;font-size:13px;">
+                ${order.fulfillment.type === "pickup" ? "Pickup" : "Delivery"} date:
+                ${escapeHtml(order.fulfillment.requestedDate)}
+              </p>
+            </div>
           </div>
         `,
       }),
@@ -462,14 +478,17 @@ export async function sendBloomWebsiteStatusNotification(orderId: string) {
 }
 
 
-export async function sendBloomWebsiteDeliveryConfirmation(orderId: string) {
+export async function sendBloomWebsiteDeliveryConfirmation(
+  orderId: string,
+  options: { customerNote?: string; scope?: string } = {},
+) {
   const order = await BloomWebsiteOrder.findById(orderId);
   if (
     !order ||
     order.status !== "fulfilled" ||
     order.fulfillment.type !== "delivery"
   ) {
-    return;
+    return false;
   }
 
   const storefrontName = order.storefront?.siteName || "Your florist";
@@ -480,10 +499,12 @@ export async function sendBloomWebsiteDeliveryConfirmation(orderId: string) {
     .filter(Boolean)
     .join(" ");
   const resend = getResend();
+  const customerNote = String(options.customerNote || "").trim();
 
-  await recordEmail({
+  return recordEmail({
     order,
     kind: "customer_delivery_confirmation",
+    scope: options.scope || "",
     recipient: order.customer.email,
     subject: `${storefrontName}: Your order has been delivered — ${order.orderNumber}`,
     payload: {
@@ -491,6 +512,7 @@ export async function sendBloomWebsiteDeliveryConfirmation(orderId: string) {
       orderNumber: order.orderNumber,
       kind: "customer_delivery_confirmation",
       status: "fulfilled",
+      customerNote,
     },
     send: () =>
       resend.emails.send({
@@ -514,6 +536,11 @@ export async function sendBloomWebsiteDeliveryConfirmation(orderId: string) {
                   : ""
               }
               <p><strong>Delivery date:</strong> ${escapeHtml(order.fulfillment.requestedDate)}</p>
+              ${
+                customerNote
+                  ? `<div style="margin:18px 0;padding:16px 18px;border-radius:14px;background:#f5f3ff;color:#4c1d95;line-height:1.6;"><strong>Note from the florist:</strong><br>${escapeHtml(customerNote).replaceAll("\n", "<br>")}</div>`
+                  : ""
+              }
               <p style="margin-top:26px;color:#6b7280;font-size:13px;line-height:1.6;">
                 Thank you for ordering from ${escapeHtml(storefrontName)}.
               </p>
@@ -524,6 +551,70 @@ export async function sendBloomWebsiteDeliveryConfirmation(orderId: string) {
   });
 }
 
+
+export async function sendBloomWebsiteArrangementPhoto(
+  orderId: string,
+  photoId: string,
+) {
+  const order = await BloomWebsiteOrder.findById(orderId);
+  if (!order) return false;
+
+  const photo = Array.isArray(order.arrangementPhotos)
+    ? order.arrangementPhotos.find((entry: any) => entry.photoId === photoId)
+    : null;
+
+  if (!photo) return false;
+
+  const storefrontName = order.storefront?.siteName || "Your florist";
+  const resend = getResend();
+  const caption = String(photo.caption || "").trim();
+
+  return recordEmail({
+    order,
+    kind: "customer_arrangement_photo",
+    status: order.status,
+    scope: photoId,
+    recipient: order.customer.email,
+    subject: `${storefrontName}: A photo of your arrangement — ${order.orderNumber}`,
+    payload: {
+      orderId: String(order._id),
+      orderNumber: order.orderNumber,
+      kind: "customer_arrangement_photo",
+      photoId,
+      imageUrl: photo.imageUrl,
+      caption,
+    },
+    send: () =>
+      resend.emails.send({
+        from: "BloomWebsites Orders <orders@getbloomdirect.com>",
+        to: order.customer.email,
+        subject: `${storefrontName}: A photo of your arrangement — ${order.orderNumber}`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:28px;color:#1f2937;">
+            <div style="background:#111827;color:#fff;border-radius:20px;padding:28px;">
+              <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#c4b5fd;">From your florist</div>
+              <h1 style="margin:8px 0 0;font-size:30px;">Here’s a photo of your arrangement</h1>
+            </div>
+            <div style="padding:24px 4px;">
+              <p style="font-size:16px;line-height:1.6;">
+                ${escapeHtml(storefrontName)} shared a photo from order
+                <strong>${escapeHtml(order.orderNumber)}</strong>.
+              </p>
+              <img src="${escapeHtml(photo.imageUrl)}" alt="Arrangement for ${escapeHtml(order.orderNumber)}" style="display:block;width:100%;max-width:560px;height:auto;margin:20px auto;border-radius:18px;" />
+              ${
+                caption
+                  ? `<p style="margin:18px 0;padding:16px 18px;border-radius:14px;background:#f9fafb;line-height:1.6;">${escapeHtml(caption).replaceAll("\n", "<br>")}</p>`
+                  : ""
+              }
+              <p style="margin-top:24px;color:#6b7280;font-size:13px;line-height:1.6;">
+                This photo is a courtesy update from your florist. Natural flowers and substitutions can vary slightly from photographs.
+              </p>
+            </div>
+          </div>
+        `,
+      }),
+  });
+}
 
 export async function sendBloomWebsiteRefundNotification(
   orderId: string,

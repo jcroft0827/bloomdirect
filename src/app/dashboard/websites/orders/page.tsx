@@ -11,6 +11,7 @@ import {
 import BloomWebsiteOrderFilters from "@/components/websites/orders/BloomWebsiteOrderFilters";
 import authOptions from "@/lib/auth";
 import { connectToDB } from "@/lib/mongoose";
+import { getBloomWebsiteOrderStatusLabel } from "@/lib/bloom-websites/orders/fulfillment-status";
 import BloomWebsiteOrder from "@/models/BloomWebsiteOrder";
 import BloomWebsiteProduct from "@/models/BloomWebsiteProduct";
 
@@ -26,19 +27,16 @@ function escapeRegex(value: string) {
 }
 
 function statusLabel(value: string, fulfillmentType?: string) {
-  if (value === "fulfilled") {
-    return fulfillmentType === "pickup" ? "Picked Up" : "Delivered";
-  }
-  if (value === "confirmed") return "Placed";
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+  return getBloomWebsiteOrderStatusLabel(
+    value,
+    fulfillmentType === "pickup" ? "pickup" : "delivery",
+  );
 }
 
 function statusClasses(value: string) {
   if (value === "fulfilled") return "bg-emerald-100 text-emerald-700";
   if (value === "canceled") return "bg-red-100 text-red-700";
+  if (value === "delivery_attempted") return "bg-orange-100 text-orange-800";
   if (value === "out_for_delivery" || value === "ready_for_pickup") {
     return "bg-blue-100 text-blue-700";
   }

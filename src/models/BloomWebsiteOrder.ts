@@ -704,6 +704,7 @@ const communicationEventSchema = new Schema(
         "customer_status_update",
         "customer_delivery_confirmation",
         "customer_refund_confirmation",
+        "customer_arrangement_photo",
       ],
     },
     status: {
@@ -711,6 +712,12 @@ const communicationEventSchema = new Schema(
       trim: true,
       default: "",
       maxlength: 80,
+    },
+    scope: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 180,
     },
     recipient: optionalString,
     resendId: optionalString,
@@ -788,6 +795,8 @@ const orderHistoryEventSchema = new Schema(
         "status_changed",
         "order_adjusted",
         "refund_recorded",
+        "arrangement_photo_added",
+        "arrangement_photo_sent",
       ],
     },
     source: {
@@ -842,10 +851,71 @@ const orderHistoryEventSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    internalNote: {
+      type: String,
+      trim: true,
+      maxlength: 5000,
+      default: "",
+    },
+    customerNote: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+      default: "",
+    },
+    customerNotified: {
+      type: Boolean,
+      default: false,
+    },
     occurredAt: {
       type: Date,
       required: true,
       default: Date.now,
+    },
+  },
+  { _id: false },
+);
+
+const arrangementPhotoSchema = new Schema(
+  {
+    photoId: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 180,
+    },
+    fileKey: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 600,
+    },
+    imageUrl: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1200,
+    },
+    caption: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: "",
+    },
+    uploadedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    uploadedBy: {
+      type: String,
+      trim: true,
+      maxlength: 240,
+      default: "",
+    },
+    sentToCustomerAt: {
+      type: Date,
+      default: null,
     },
   },
   { _id: false },
@@ -1035,6 +1105,7 @@ const bloomWebsiteOrderSchema = new Schema(
         "preparation_complete",
         "ready_for_pickup",
         "out_for_delivery",
+        "delivery_attempted",
         "fulfilled",
         "canceled",
       ],
@@ -1068,6 +1139,11 @@ const bloomWebsiteOrderSchema = new Schema(
       },
     },
 
+    arrangementPhotos: {
+      type: [arrangementPhotoSchema],
+      default: [],
+    },
+
     /*
      * Operational timestamps are separate from the canonical status string.
      * They make fulfillment history useful for the florist and future POS
@@ -1089,11 +1165,21 @@ const bloomWebsiteOrderSchema = new Schema(
       type: Date,
       default: null,
     },
+    deliveryAttemptedAt: {
+      type: Date,
+      default: null,
+    },
 
     fulfillmentEvents: {
       type: [
         new Schema(
           {
+            eventId: {
+              type: String,
+              required: true,
+              trim: true,
+              maxlength: 180,
+            },
             status: {
               type: String,
               required: true,
@@ -1104,6 +1190,7 @@ const bloomWebsiteOrderSchema = new Schema(
                 "preparation_complete",
                 "ready_for_pickup",
                 "out_for_delivery",
+                "delivery_attempted",
                 "fulfilled",
                 "canceled",
               ],
@@ -1113,6 +1200,22 @@ const bloomWebsiteOrderSchema = new Schema(
               required: true,
               enum: ["portal", "pos", "api", "system"],
               default: "portal",
+            },
+            internalNote: {
+              type: String,
+              trim: true,
+              maxlength: 5000,
+              default: "",
+            },
+            customerNote: {
+              type: String,
+              trim: true,
+              maxlength: 2000,
+              default: "",
+            },
+            customerNotified: {
+              type: Boolean,
+              default: false,
             },
             occurredAt: {
               type: Date,
