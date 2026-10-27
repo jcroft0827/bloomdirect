@@ -631,7 +631,9 @@ export async function validateBloomWebsiteCheckoutPreflight(
             Math.min(
               1440,
               Math.round(
-                Number(website.pickupPolicy?.preparationMinutes) || 60,
+                (website.pickupPolicy?.preparationMinutes == null || !Number.isFinite(Number(website.pickupPolicy.preparationMinutes))
+                  ? 60
+                  : Number(website.pickupPolicy.preparationMinutes)),
               ),
             ),
           ),

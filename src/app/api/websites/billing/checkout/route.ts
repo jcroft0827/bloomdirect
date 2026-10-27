@@ -1,3 +1,4 @@
+import { areNewBloomWebsiteActivationsPaused, WEBSITE_ACTIVATION_PAUSED_MESSAGE } from "@/lib/prelaunchHold";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
@@ -15,6 +16,9 @@ import Shop from "@/models/Shop";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (areNewBloomWebsiteActivationsPaused()) {
+    return NextResponse.json({ error: WEBSITE_ACTIVATION_PAUSED_MESSAGE, code: "WEBSITE_ACTIVATION_PAUSED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
   try {
     const session = await getServerSession(authOptions);
 

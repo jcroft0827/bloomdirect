@@ -69,3 +69,10 @@ body {
 .btn .leave {
   background: #059669;
 }
+/* BloomWebsites: apply button shape to actual controls, never product or occasion cards.
+ * Text links and full-card anchor surfaces are deliberately not targeted.
+ * Semantic CTA links should be inline-flex / inline-block, not block cards.
+ */
+[data-bloom-button-corners="subtle"] :is(button, a.inline-flex, a.inline-block)[class*="rounded-"]:not([data-bloom-keep-shape]) { border-radius: 0.25rem !important; }
+[data-bloom-button-corners="rounded"] :is(button, a.inline-flex, a.inline-block)[class*="rounded-"]:not([data-bloom-keep-shape]) { border-radius: 0.75rem !important; }
+[data-bloom-button-corners="pill"] :is(button, a.inline-flex, a.inline-block)[class*="rounded-"]:not([data-bloom-keep-shape]) { border-radius: 9999px !important; }

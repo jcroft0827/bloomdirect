@@ -18,6 +18,7 @@ import {
   DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,
   DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
   normalizeBloomWebsiteLogoSize,
+  normalizeBloomWebsiteButtonCorners,
   normalizeStorefrontHexColor,
 } from "@/lib/bloom-websites/storefront-theme";
 import {
@@ -222,6 +223,7 @@ type UpdateBloomWebsiteBrandingBody = {
   branding?: {
     logo?: unknown;
     logoSize?: unknown;
+    buttonCorners?: unknown;
     tagline?: unknown;
     primaryColor?: unknown;
     accentColor?: unknown;
@@ -291,6 +293,7 @@ export async function PATCH(request: Request) {
       typeof body.branding?.logoSize === "string" ? body.branding.logoSize : undefined,
     );
 
+    const buttonCorners = normalizeBloomWebsiteButtonCorners(typeof body.branding?.buttonCorners === "string" ? body.branding.buttonCorners : undefined);
     const primaryColor = normalizeStorefrontHexColor(
       typeof body.branding?.primaryColor === "string"
         ? body.branding.primaryColor
@@ -447,6 +450,7 @@ export async function PATCH(request: Request) {
     if (brandingWasProvided) {
       updateSet["branding.logo"] = logo;
       updateSet["branding.logoSize"] = logoSize;
+      updateSet["branding.buttonCorners"] = buttonCorners;
       updateSet["branding.tagline"] = tagline;
       updateSet["branding.primaryColor"] = primaryColor;
       updateSet["branding.accentColor"] = accentColor;
@@ -563,6 +567,7 @@ export async function PATCH(request: Request) {
           "theme",
           "branding.logo",
           "branding.logoSize",
+          "branding.buttonCorners",
           "branding.tagline",
           "branding.primaryColor",
           "branding.accentColor",
@@ -591,6 +596,7 @@ export async function PATCH(request: Request) {
         branding?: {
           logo?: string;
           logoSize?: string;
+          buttonCorners?: string;
           tagline?: string;
           primaryColor?: string;
           accentColor?: string;
@@ -636,6 +642,7 @@ export async function PATCH(request: Request) {
         branding: {
           logo: website.branding?.logo || "",
           logoSize: normalizeBloomWebsiteLogoSize(website.branding?.logoSize),
+          buttonCorners: normalizeBloomWebsiteButtonCorners(website.branding?.buttonCorners),
 
           tagline: website.branding?.tagline || "",
 

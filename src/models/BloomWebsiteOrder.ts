@@ -75,6 +75,7 @@ const customerSnapshotSchema = new Schema(
 
 const recipientSnapshotSchema = new Schema(
   {
+    email: {type: String, trim:true, lowercase:true, maxlength:320, default:""},
     firstName: {
       type: String,
       trim: true,
@@ -332,6 +333,11 @@ const fulfillmentSchema = new Schema(
       default: 0,
     },
 
+    pickupDetails: {
+      person: {type:String,enum:["","recipient","customer","other"],default:""},
+      firstName: optionalString, lastName: optionalString, phone: optionalString,
+      instructions: {type:String,trim:true,maxlength:500,default:""},
+    },
     pickupLocation: {
       businessName: optionalString,
       address: {
@@ -1064,6 +1070,10 @@ const bloomWebsiteOrderSchema = new Schema(
       required: true,
     },
 
+    // C2B: original merchandise and applied discount audit trail.
+    // Kept separate from legacy gross line subtotals.
+    couponSnapshot: { type: Schema.Types.Mixed, default: null },
+
     tax: {
       type: taxSchema,
       required: true,
@@ -1471,8 +1481,36 @@ bloomWebsiteOrderSchema.pre("validate", function (next) {
     }
   }
 
+  // Merchandise line snapshots retain their original (pre-discount) prices.
+  // Paid coupon checkouts must subtract the canonical discount exactly once.
+  // Do not trust a missing or malformed coupon snapshot to reduce the total.
+  const coupon = order.couponSnapshot;
+  let merchandiseDiscountCents = 0;
+  if (coupon != null) {
+    if (
+      coupon.version !== 1 ||
+      typeof coupon.couponId !== "string" || !coupon.couponId ||
+      typeof coupon.code !== "string" || !coupon.code ||
+      !Number.isSafeInteger(coupon.originalMerchandiseCents) ||
+      coupon.originalMerchandiseCents !== order.totals.subtotalCents ||
+      !Number.isSafeInteger(coupon.discountCents) ||
+      coupon.discountCents < 0 ||
+      coupon.discountCents > order.totals.subtotalCents ||
+      coupon.discountedMerchandiseCents !==
+        order.totals.subtotalCents - coupon.discountCents ||
+      coupon.fulfillmentFeeCents !== order.totals.fulfillmentFeeCents ||
+      coupon.taxAmountCents !== order.totals.taxAmountCents ||
+      coupon.tipCents !== order.totals.tipCents ||
+      coupon.chargedTotalCents !== order.totals.totalCents
+    ) {
+      return next(new Error("BloomWebsite coupon financial snapshot is inconsistent."));
+    }
+    merchandiseDiscountCents = coupon.discountCents;
+  }
+
   const expectedTotal =
-    order.totals.subtotalCents +
+    order.totals.subtotalCents -
+    merchandiseDiscountCents +
     order.totals.fulfillmentFeeCents +
     order.totals.taxAmountCents +
     order.totals.tipCents;

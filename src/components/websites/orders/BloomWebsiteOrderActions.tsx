@@ -2,7 +2,6 @@
 
 import {
   Ban,
-  Loader2,
   Mail,
   MessageSquareText,
   RotateCcw,
@@ -12,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import BloomSpinner from "@/components/BloomSpinner";
 
 import BloomWebsiteRefundBuilder, {
   type BloomWebsiteRefundContext,
@@ -75,6 +75,7 @@ export default function BloomWebsiteOrderActions({
   paymentStatus,
   refundContext,
   defaultNotifications,
+  arrangementPhotos,
 }: {
   orderId: string;
   status: Status;
@@ -83,6 +84,7 @@ export default function BloomWebsiteOrderActions({
   paymentStatus: string;
   refundContext: BloomWebsiteRefundContext;
   defaultNotifications: BloomWebsiteStatusNotificationPolicy;
+  arrangementPhotos: { photoId: string; imageUrl: string; caption?: string }[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -91,6 +93,7 @@ export default function BloomWebsiteOrderActions({
   const [internalNote, setInternalNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
   const [notifyCustomer, setNotifyCustomer] = useState(false);
+  const [notificationPhotoId, setNotificationPhotoId] = useState("");
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelInternalNote, setCancelInternalNote] = useState("");
@@ -207,6 +210,7 @@ export default function BloomWebsiteOrderActions({
     setPendingAction(action);
     setInternalNote("");
     setCustomerNote("");
+    setNotificationPhotoId("");
     setNotifyCustomer(
       defaultNotifyForStatus(
         action.status,
@@ -222,6 +226,7 @@ export default function BloomWebsiteOrderActions({
       internalNote?: string;
       customerNote?: string;
       notifyCustomer?: boolean;
+      notificationPhotoId?: string;
       cancellationReason?: string;
     } = {},
   ) {
@@ -250,6 +255,7 @@ export default function BloomWebsiteOrderActions({
         internalNote,
         customerNote: notifyCustomer ? customerNote : "",
         notifyCustomer,
+        notificationPhotoId: notifyCustomer ? notificationPhotoId : "",
       });
 
       toast.success(
@@ -461,6 +467,20 @@ export default function BloomWebsiteOrderActions({
                   />
                 </label>
 
+                {notifyCustomer && arrangementPhotos.length > 0 && ["ready_for_pickup", "preparation_complete", "out_for_delivery", "fulfilled"].includes(pendingAction.status) && (
+                  <label className="mt-4 block border-t border-purple-100 pt-4">
+                    <span className="text-sm font-black text-purple-950">Arrangement photo in this email</span>
+                    <select value={notificationPhotoId} onChange={(event) => setNotificationPhotoId(event.target.value)} className="mt-2 w-full rounded-xl border border-purple-200 bg-white px-3 py-3 text-sm">
+                      <option value="">Don't include a photo</option>
+                      {arrangementPhotos.map((photo, index) => (
+                        <option key={photo.photoId} value={photo.photoId}>Include arrangement photo {index + 1}{photo.caption ? ` — ${photo.caption.slice(0, 48)}` : ""}</option>
+                      ))}
+                    </select>
+                    {notificationPhotoId && <img src={arrangementPhotos.find((photo) => photo.photoId === notificationPhotoId)?.imageUrl} alt="Selected arrangement" className="mt-3 h-28 w-auto rounded-lg object-cover" />}
+                    <span className="mt-2 block text-xs text-purple-700">The image appears in the same status email. To send a photo separately, use the arrangement photo section.</span>
+                  </label>
+                )}
+
                 {notifyCustomer && (
                   <label className="mt-4 block border-t border-purple-100 pt-4">
                     <span className="text-sm font-black text-purple-950">
@@ -495,7 +515,7 @@ export default function BloomWebsiteOrderActions({
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-purple-700 px-5 py-3 text-sm font-black text-white hover:bg-purple-800 disabled:opacity-50"
               >
                 {busy === pendingAction.status && (
-                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  <BloomSpinner size={16} />
                 )}
                 Save Status
               </button>
@@ -601,7 +621,7 @@ export default function BloomWebsiteOrderActions({
                 onClick={cancelOrder}
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white hover:bg-red-800 disabled:opacity-50"
               >
-                {busy === "cancel" && <Loader2 size={16} className="mr-2 animate-spin" />}
+                {busy === "cancel" && <BloomSpinner size={16} />}
                 {canRefund ? "Refund & Cancel" : "Cancel Order"}
               </button>
             </div>

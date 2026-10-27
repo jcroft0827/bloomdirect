@@ -9,6 +9,8 @@ import {
   releaseBloomWebsiteInventory,
 } from "@/lib/bloom-websites/bloomWebsiteInventoryReservations";
 import { generateBloomWebsiteOrderNumber } from "@/lib/bloom-websites/generateBloomWebsiteOrderNumber";
+import { buildCouponPaymentSnapshot } from "@/lib/bloom-websites/coupons/buildCouponPaymentSnapshot";
+import { commitCouponRedemption, releaseCouponUse } from "@/lib/bloom-websites/coupons/reserveCouponUse";
 import { bloomNativeTaxProvider } from "@/lib/bloom-websites/tax/bloomNativeTaxProvider";
 import type { BloomTaxCalculationResult } from "@/lib/bloom-websites/tax/types";
 import { getBloomPaymentProvider } from "./getBloomPaymentProvider";
@@ -100,7 +102,11 @@ function fulfillmentSnapshot(snapshot: any) {
       type: "pickup",
       requestedDate: fulfillment.requestedDate,
       timezone: snapshot.timezone,
-      window: { type: "anytime", from: "", to: "" },
+      window: {
+        type: snapshot.pickupDetails?.timeFrom && snapshot.pickupDetails?.timeTo ? "custom" : "anytime",
+        from: clean(snapshot.pickupDetails?.timeFrom), to: clean(snapshot.pickupDetails?.timeTo),
+      },
+      pickupDetails: snapshot.pickupDetails || {},
       deliveryAddress: {},
       deliveryFeeCents: 0,
       pickupLocation: {
@@ -203,6 +209,42 @@ async function createOrderOnce(attempt: any) {
     );
   }
 
+  // Validate any coupon snapshot against the processor-authoritative amount
+  // before a paid order is created. Old/no-coupon payments are unaffected.
+  let couponSnapshot = null;
+  if (attempt.couponSnapshot != null) {
+    try {
+      const supplied = attempt.couponSnapshot;
+      couponSnapshot = buildCouponPaymentSnapshot({
+        couponId: supplied.couponId,
+        code: supplied.code,
+        checkoutAttemptId: attempt.attemptId,
+        merchandiseSubtotalCents: supplied.originalMerchandiseCents,
+        merchandiseDiscountCents: supplied.discountCents,
+        fulfillmentFeeCents: supplied.fulfillmentFeeCents,
+        tipCents: supplied.tipCents,
+        taxAmountCents: supplied.taxAmountCents,
+        chargedTotalCents: supplied.chargedTotalCents,
+      });
+      if (
+        couponSnapshot.chargedTotalCents !== finalTotalCents ||
+        couponSnapshot.chargedTotalCents !== paymentAmountCents ||
+        couponSnapshot.originalMerchandiseCents !== snapshot.totals.subtotalCents ||
+        couponSnapshot.fulfillmentFeeCents !== snapshot.totals.fulfillmentFeeCents ||
+        couponSnapshot.tipCents !== tipCents ||
+        couponSnapshot.taxAmountCents !== taxAmountCents
+      ) {
+        throw new Error("Coupon totals do not match the paid checkout.");
+      }
+    } catch {
+      throw new BloomPaymentFinalizationError(
+        "COUPON_PAYMENT_SNAPSHOT_MISMATCH",
+        "Paid checkout coupon amounts do not reconcile. Manual payment review is required.",
+        { status: 500, retryable: false },
+      );
+    }
+  }
+
   for (let attemptNumber = 0; attemptNumber < 5; attemptNumber += 1) {
     try {
       return await BloomWebsiteOrder.create({
@@ -219,6 +261,7 @@ async function createOrderOnce(attempt: any) {
         customer: snapshot.customer,
         recipient: {
           ...snapshot.recipient,
+          email: clean(snapshot.recipientEmail),
           address:
             snapshot.fulfillment?.type === "delivery"
               ? snapshot.fulfillment.deliveryAddress || {}
@@ -229,6 +272,7 @@ async function createOrderOnce(attempt: any) {
         fulfillment: fulfillmentSnapshot(snapshot),
         items: orderItemSnapshots(snapshot.cart),
         itemCount: snapshot.cart.itemCount,
+        couponSnapshot,
         totals: {
           productSubtotalCents: snapshot.totals.productSubtotalCents,
           addonSubtotalCents: snapshot.totals.addonSubtotalCents,
@@ -417,6 +461,25 @@ export async function finalizeBloomWebsitePayment({
         }
       }
 
+      // Processor-confirmed terminal failures cannot consume a coupon use.
+      // Cleanup is retryable; never release an in-flight or unverified payment.
+      if (attempt.couponSnapshot?.couponId) {
+        try {
+          await releaseCouponUse({
+            couponId: String(attempt.couponSnapshot.couponId),
+            shopId: String(attempt.shop),
+            websiteId: String(attempt.website),
+            attemptId: String(attempt.attemptId),
+          });
+        } catch {
+          throw new BloomPaymentFinalizationError(
+            "COUPON_TERMINAL_CLEANUP_FAILED",
+            "The payment ended, but its coupon reservation could not be released.",
+            { status: 500, retryable: true },
+          );
+        }
+      }
+
       const terminalCode =
         verifiedPayment.status === "canceled"
           ? "PAYMENT_CANCELED"
@@ -500,6 +563,25 @@ export async function finalizeBloomWebsitePayment({
   }
 
   const order = await createOrderOnce(attempt);
+
+  // Shared browser/webhook/recovery path: a paid coupon commits exactly once.
+  // Never mark order_committed while its redemption remains unaccounted for.
+  if (attempt.couponSnapshot?.couponId) {
+    try {
+      await commitCouponRedemption({
+        couponId: String(attempt.couponSnapshot.couponId),
+        shopId: String(attempt.shop),
+        websiteId: String(attempt.website),
+        attemptId: String(attempt.attemptId),
+      });
+    } catch {
+      throw new BloomPaymentFinalizationError(
+        "COUPON_REDEMPTION_COMMIT_FAILED",
+        "Paid order requires coupon redemption reconciliation.",
+        { status: 500, retryable: true },
+      );
+    }
+  }
 
   const calculation = attempt.tax?.calculationSnapshot as
     | BloomTaxCalculationResult

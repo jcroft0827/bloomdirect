@@ -14,7 +14,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Loader2,
   MapPin,
   Phone,
   ShoppingBag,
@@ -23,6 +22,8 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import BloomSpinner from "@/components/BloomSpinner";
+import { formatPersonName, formatUsPhone } from "@/lib/bloom-websites/checkout/formatContactInput";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -71,7 +72,7 @@ export default function BloomWebsiteDeliveryCheckout({
   const { items, itemCount, openCart } = useBloomWebsiteCart();
   const checkout = useBloomWebsiteCheckout();
   const {
-    fulfillmentType, recipient, deliveryAddress, requestedDate, pickupRequestedDate,
+    fulfillmentType, recipient, deliveryAddress, requestedDate, pickupRequestedDate, pickupDetails, setPickupDetails,
     deliveryInstructions, validatedDelivery, validatedPickup,
     setFulfillmentType, setRecipient, setDeliveryAddress, setRequestedDate,
     setPickupRequestedDate, setDeliveryInstructions, setValidatedDelivery, setValidatedPickup,
@@ -119,7 +120,7 @@ export default function BloomWebsiteDeliveryCheckout({
   }
 
   async function validateDelivery() {
-    const normalizedRecipient = { firstName: recipient.firstName.trim(), lastName: recipient.lastName.trim(), phone: recipient.phone.trim() };
+    const normalizedRecipient = { firstName: recipient.firstName.trim(), lastName: recipient.lastName.trim(), email: recipient.email.trim(), phone: recipient.phone.trim() };
     const normalizedAddress = {
       address1: deliveryAddress.address1.trim(), address2: deliveryAddress.address2.trim(), city: deliveryAddress.city.trim(),
       state: deliveryAddress.state.trim().toUpperCase(), zip: deliveryAddress.zip.trim(),
@@ -148,6 +149,10 @@ export default function BloomWebsiteDeliveryCheckout({
 
   async function validatePickup() {
     if (!pickupRequestedDate) throw new Error("Please choose a pickup date.");
+    if (pickupDetails.person === "other" && (!pickupDetails.firstName.trim() || !pickupDetails.lastName.trim())) throw new Error("Enter the first and last name of the person picking up.");
+    if (!recipient.firstName.trim() || !recipient.lastName.trim()) throw new Error("Enter the recipient's name for the pickup order.");
+    if (Boolean(pickupDetails.timeFrom) !== Boolean(pickupDetails.timeTo)) throw new Error("Choose both pickup time fields or leave both blank.");
+    if (pickupDetails.timeFrom && pickupDetails.timeFrom >= pickupDetails.timeTo) throw new Error("Pickup end time must be after the start time.");
     const response = await fetch(`/api/websites/storefront/${encodeURIComponent(previewSlug)}/pickup`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items: cartPayload, requestedDate: pickupRequestedDate }),
@@ -198,15 +203,29 @@ export default function BloomWebsiteDeliveryCheckout({
 
             {fulfillmentType === "delivery" ? <>
               <div><BloomWebsiteSameDayCountdown previewSlug={previewSlug}/></div>
-              <div className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-7"><SectionTitle icon={<UserRound size={20}/>} title="Recipient" text="Who should the florist ask for at the delivery location?"/><div className="mt-6 grid gap-5 sm:grid-cols-2"><Field label="First Name" value={recipient.firstName} onChange={(value)=>setRecipient({...recipient,firstName:value})}/><Field label="Last Name" value={recipient.lastName} onChange={(value)=>setRecipient({...recipient,lastName:value})}/><Field label="Phone" value={recipient.phone} onChange={(value)=>setRecipient({...recipient,phone:value})} className="sm:col-span-2" icon={<Phone size={15}/>} required/></div></div>
+              <div className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-7"><SectionTitle icon={<UserRound size={20}/>} title="Recipient" text="Who should the florist ask for at the delivery location?"/><div className="mt-6 grid gap-5 sm:grid-cols-2"><Field label="First Name" value={recipient.firstName} onChange={(value)=>setRecipient({...recipient,firstName:value})}/><Field label="Last Name" value={recipient.lastName} onChange={(value)=>setRecipient({...recipient,lastName:value})}/><Field label="Email (optional)" value={recipient.email} onChange={(value)=>setRecipient({...recipient,email:value})}/><Field label="Phone" value={recipient.phone} onChange={(value)=>setRecipient({...recipient,phone:value})} className="sm:col-span-2" icon={<Phone size={15}/>} required/></div></div>
               <div className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-7"><SectionTitle icon={<MapPin size={20}/>} title="Delivery Address" text="We'll securely verify this address against the florist's delivery area."/><div className="mt-6 grid gap-5 sm:grid-cols-2"><Field label="Street Address" value={deliveryAddress.address1} onChange={(value)=>setDeliveryAddress({...deliveryAddress,address1:value})} className="sm:col-span-2"/><Field label="Apartment / Suite" value={deliveryAddress.address2} onChange={(value)=>setDeliveryAddress({...deliveryAddress,address2:value})} className="sm:col-span-2" optional/><Field label="City" value={deliveryAddress.city} onChange={(value)=>setDeliveryAddress({...deliveryAddress,city:value})}/><Field label="State" value={deliveryAddress.state} onChange={(value)=>setDeliveryAddress({...deliveryAddress,state:value})}/><Field label="ZIP Code" value={deliveryAddress.zip} onChange={(value)=>setDeliveryAddress({...deliveryAddress,zip:value})}/></div></div>
               <div className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-7"><SectionTitle icon={<CalendarDays size={20}/>} title="Delivery Date" text="Choose when you would like the arrangement delivered."/><input type="date" min={minimumDate} value={requestedDate} onChange={(e)=>setRequestedDate(e.target.value)} className={inputClassName}/><label className="mt-5 block text-sm font-black text-gray-800">Delivery Instructions <span className="font-semibold text-gray-400">Optional</span><textarea value={deliveryInstructions} onChange={(e)=>setDeliveryInstructions(e.target.value)} rows={3} maxLength={300} className={inputClassName} placeholder="Gate code, front desk, special directions…"/></label></div>
             </> : <>
+              <div className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-7">
+                <SectionTitle icon={<UserRound size={20}/>} title="Pickup contact" text="Tell the florist who will collect these flowers." />
+                <p className="mt-5 text-sm font-bold text-gray-800">Recipient information</p>
+                <label className="mt-5 block text-sm font-bold text-gray-800">Who is picking up?
+                  <select className={inputClassName} value={pickupDetails.person} onChange={e=>setPickupDetails({...pickupDetails,person:e.target.value as "recipient"|"customer"|"other"})}>
+                    <option value="recipient">The recipient</option><option value="customer">The person placing the order</option><option value="other">Someone else</option>
+                  </select>
+                </label>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Recipient first name" value={recipient.firstName} onChange={v=>setRecipient({...recipient,firstName:v})}/><Field label="Recipient last name" value={recipient.lastName} onChange={v=>setRecipient({...recipient,lastName:v})}/><Field label="Recipient email (optional)" value={recipient.email} onChange={v=>setRecipient({...recipient,email:v})}/><Field label="Recipient phone (optional)" value={recipient.phone} onChange={v=>setRecipient({...recipient,phone:v})}/></div>
+                {pickupDetails.person === "other" && <div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Pickup person's first name" value={pickupDetails.firstName} onChange={v=>setPickupDetails({...pickupDetails,firstName:v})}/><Field label="Pickup person's last name" value={pickupDetails.lastName} onChange={v=>setPickupDetails({...pickupDetails,lastName:v})}/><Field label="Pickup person's phone (optional)" value={pickupDetails.phone} onChange={v=>setPickupDetails({...pickupDetails,phone:v})} className="sm:col-span-2"/></div>}
+                <label className="mt-5 block text-sm font-bold text-gray-800">Pickup instructions (optional)<textarea className={inputClassName} rows={3} maxLength={500} value={pickupDetails.instructions} onChange={e=>setPickupDetails({...pickupDetails,instructions:e.target.value})} placeholder="Details the florist should know about collection"/></label>
+                <p className="mt-3 text-xs text-gray-500">Requested pickup times are preferences, not a guaranteed ready time. The florist's preparation time still applies.</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">{(["timeFrom","timeTo"] as const).map(key=><label key={key} className="text-sm font-bold text-gray-800">{key==="timeFrom"?"Pickup window starts":"Pickup window ends"}<input type="time" className={inputClassName} value={pickupDetails[key]} onChange={e=>setPickupDetails({...pickupDetails,[key]:e.target.value})}/></label>)}</div>
+              </div>
               <div className="rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-7"><SectionTitle icon={<CalendarDays size={20}/>} title="Pickup Date" text="Choose the day you would like to pick up your order."/><input type="date" min={minimumDate} value={pickupRequestedDate} onChange={(e)=>setPickupRequestedDate(e.target.value)} className={inputClassName}/>{pickupInfo && <div className="mt-6 grid gap-4 sm:grid-cols-2"><Info icon={<MapPin size={18}/>} title={pickupInfo.location.businessName || "Pickup Location"} text={pickupInfo.location.formattedAddress || "Pickup address unavailable"}/><Info icon={<Clock3 size={18}/>} title="Preparation" text={`Allow about ${pickupInfo.policy.preparationMinutes} minutes for preparation after your order is confirmed.`}/></div>}{pickupInfo?.policy.instructions && <div className="mt-5 rounded-2xl bg-gray-50 p-4"><p className="text-xs font-black uppercase tracking-[0.12em] text-gray-400">Pickup Instructions</p><p className="mt-2 text-sm leading-6 text-gray-600">{pickupInfo.policy.instructions}</p></div>}</div>
             </>}
 
             {validationError && <div className="flex gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700"><AlertCircle size={19} className="shrink-0"/><span>{validationError}</span></div>}
-            <button type="button" onClick={handleValidate} disabled={isValidating} className="inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{backgroundColor:"var(--bloom-primary)",color:"var(--bloom-primary-foreground)"}}>{isValidating ? <><Loader2 size={18} className="animate-spin"/>Checking {fulfillmentType === "pickup" ? "Pickup" : "Delivery"}...</> : <>Continue to Card Message</>}</button>
+            <button type="button" onClick={handleValidate} disabled={isValidating} className="inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60" style={{backgroundColor:"var(--bloom-primary)",color:"var(--bloom-primary-foreground)"}}>{isValidating ? <><BloomSpinner size={18}/>Checking {fulfillmentType === "pickup" ? "Pickup" : "Delivery"}...</> : <>Continue to Card Message</>}</button>
           </section>
 
           <aside className="lg:sticky lg:top-6"><div className="rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm"><h2 className="text-lg font-black text-gray-950">Fulfillment Summary</h2>{activeValidation ? <div className="mt-5"><div className="flex items-start gap-3 rounded-2xl bg-gray-50 p-4"><CheckCircle2 size={19} className="mt-0.5 shrink-0 text-emerald-600"/><div><p className="text-sm font-black text-gray-950">{fulfillmentType === "pickup" ? "Pickup verified" : "Delivery verified"}</p><p className="mt-1 text-sm leading-6 text-gray-500">{fulfillmentType === "pickup" ? validatedPickup?.location.formattedAddress : validatedDelivery?.address.formattedAddress}</p><p className="mt-1 text-sm font-bold text-gray-700">{dateLabel(activeValidation.requestedDate)}</p></div></div><div className="mt-5 space-y-3 text-sm"><Row label="Subtotal" value={money(activeValidation.cartSubtotalCents)}/><Row label="Delivery" value={fulfillmentType === "pickup" ? "$0.00" : money(validatedDelivery?.feeCents || 0)}/><div className="border-t border-gray-100 pt-3"><Row label="Total before tax" value={money(activeValidation.totalBeforeTaxCents)} strong/></div></div></div> : <p className="mt-3 text-sm leading-6 text-gray-500">Choose a fulfillment method and verify it to continue.</p>}</div></aside>
@@ -217,6 +236,6 @@ export default function BloomWebsiteDeliveryCheckout({
 }
 
 function SectionTitle({icon,title,text}:{icon:ReactNode;title:string;text:string}) { return <div className="flex items-start gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{backgroundColor:"color-mix(in srgb, var(--bloom-primary) 10%, white)",color:"var(--bloom-primary)"}}>{icon}</div><div><h2 className="text-lg font-black text-gray-950">{title}</h2><p className="mt-1 text-sm leading-6 text-gray-500">{text}</p></div></div>; }
-function Field({label,value,onChange,className="",optional=false,required=false,icon}:{label:string;value:string;onChange:(value:string)=>void;className?:string;optional?:boolean;required?:boolean;icon?:ReactNode}) { return <label className={`text-sm font-black text-gray-800 ${className}`}><span className="flex items-center gap-2">{icon}{label}{optional && <span className="font-semibold text-gray-400">Optional</span>}{required && <span className="font-semibold text-red-500">Required</span>}</span><input type="text" value={value} onChange={(e)=>onChange(e.target.value)} className={inputClassName}/></label>; }
+function Field({label,value,onChange,className="",optional=false,required=false,icon}:{label:string;value:string;onChange:(value:string)=>void;className?:string;optional?:boolean;required?:boolean;icon?:ReactNode}) { return <label className={`text-sm font-black text-gray-800 ${className}`}><span className="flex items-center gap-2">{icon}{label}{optional && <span className="font-semibold text-gray-400">Optional</span>}{required && <span className="font-semibold text-red-500">Required</span>}</span><input type="text" value={value} onChange={(e)=>onChange(/phone/i.test(label) ? formatUsPhone(e.target.value) : /(?:first|last) name/i.test(label) ? formatPersonName(e.target.value) : e.target.value)} inputMode={/phone/i.test(label) ? "tel" : undefined} autoComplete={/phone/i.test(label) ? "tel" : undefined} className={inputClassName}/></label>; }
 function Info({icon,title,text}:{icon:ReactNode;title:string;text:string}) { return <div className="flex gap-3 rounded-2xl border border-gray-100 p-4"><div style={{color:"var(--bloom-primary)"}}>{icon}</div><div><p className="text-sm font-black text-gray-950">{title}</p><p className="mt-1 text-sm leading-6 text-gray-500">{text}</p></div></div>; }
 function Row({label,value,strong=false}:{label:string;value:string;strong?:boolean}) { return <div className="flex items-center justify-between gap-4"><span className={strong?"font-black text-gray-950":"font-semibold text-gray-500"}>{label}</span><span className="font-black text-gray-950">{value}</span></div>; }

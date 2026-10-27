@@ -1,3 +1,4 @@
+import { areNewBloomWebsiteActivationsPaused, WEBSITE_ACTIVATION_PAUSED_MESSAGE } from "@/lib/prelaunchHold";
 import authOptions from "@/lib/auth";
 import { getBloomWebsiteLaunchReadiness } from "@/lib/bloom-websites/getBloomWebsiteLaunchReadiness";
 import { getBloomWebsiteVercelStatus } from "@/lib/bloom-websites/vercel-domain-provisioning";
@@ -143,6 +144,15 @@ export async function POST(request: Request) {
           publishedAt: pausedWebsite.publishedAt ?? null,
         },
       });
+    }
+
+    // Block first publication server-side, not merely through the dashboard.
+    // Previously live websites can still resume after an ordinary pause.
+    if (body.action === "publish" && areNewBloomWebsiteActivationsPaused()) {
+      return NextResponse.json(
+        { error: WEBSITE_ACTIVATION_PAUSED_MESSAGE, code: "WEBSITE_ACTIVATION_PAUSED" },
+        { status: 403, headers: { "Cache-Control": "no-store" } },
+      );
     }
 
     const expectedStatus =

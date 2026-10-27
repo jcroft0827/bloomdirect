@@ -1,3 +1,4 @@
+import { getOrderCouponSummary } from "@/lib/bloom-websites/coupons/orderCouponSummary";
 import { getResend } from "@/lib/resend";
 import { EmailEvent } from "@/models/EmailEvent";
 import BloomWebsiteOrder from "@/models/BloomWebsiteOrder";
@@ -230,6 +231,16 @@ export async function sendBloomWebsitePlacedNotifications(orderId: string) {
   const storefrontName =
     order.storefront?.siteName || shop.businessName || "Your florist";
 
+  const coupon = getOrderCouponSummary(order);
+  const financialRows = `
+    <div style="font-size:13px;line-height:1.9;margin-top:12px;">
+      <div>Merchandise subtotal: <strong>${money(order.totals.subtotalCents)}</strong></div>
+      ${coupon ? `<div style="color:#15803d;">Coupon (${escapeHtml(coupon.code)}): <strong>−${money(coupon.discountCents)}</strong></div>` : ""}
+      <div>${order.fulfillment.type === "pickup" ? "Pickup" : "Delivery"}: <strong>${money(order.totals.fulfillmentFeeCents)}</strong></div>
+      ${order.totals.tipCents > 0 ? `<div>Gratuity: <strong>${money(order.totals.tipCents)}</strong></div>` : ""}
+      <div>Sales tax: <strong>${money(order.totals.taxAmountCents)}</strong></div>
+    </div>`;
+
   const itemRows = order.items
     .map(
       (item: any) => `
@@ -364,6 +375,7 @@ export async function sendBloomWebsitePlacedNotifications(orderId: string) {
                 ${itemRows}
               </table>
               <div style="border-top:1px solid #e5e7eb;margin-top:14px;padding-top:16px;text-align:right;">
+                ${financialRows}
                 <div style="font-size:18px;font-weight:800;">Total ${money(order.totals.totalCents)}</div>
               </div>
               <p style="margin-top:28px;color:#6b7280;font-size:13px;line-height:1.6;">
@@ -403,6 +415,8 @@ export async function sendBloomWebsitePlacedNotifications(orderId: string) {
               <p><strong>Customer:</strong> ${escapeHtml(customerName)}</p>
               <p><strong>Fulfillment:</strong> ${order.fulfillment.type === "pickup" ? "Pickup" : "Delivery"} on ${escapeHtml(order.fulfillment.requestedDate)}</p>
               <p><strong>Items:</strong> ${order.itemCount}</p>
+              ${financialRows}
+              <p style="font-size:18px;font-weight:800;">Total paid: ${money(order.totals.totalCents)}</p>
               <div style="margin-top:18px;">
                 ${floristItemRows}
               </div>
@@ -419,9 +433,18 @@ export async function sendBloomWebsitePlacedNotifications(orderId: string) {
   });
 }
 
+function statusArrangementPhotoHtml(order: any, photoId?: string) {
+  if (!photoId) return "";
+  const photo = Array.isArray(order.arrangementPhotos)
+    ? order.arrangementPhotos.find((entry: any) => entry.photoId === photoId)
+    : null;
+  if (!photo?.imageUrl || !/^https:\/\//i.test(photo.imageUrl)) return "";
+  return `<div style="margin:24px 0"><p style="font-size:15px;font-weight:700">A photo of your arrangement</p><img src="${escapeHtml(photo.imageUrl)}" alt="Your floral arrangement" style="display:block;width:100%;max-width:520px;height:auto;border-radius:14px" />${photo.caption ? `<p style="color:#6b7280">${escapeHtml(photo.caption)}</p>` : ""}</div>`;
+}
+
 export async function sendBloomWebsiteStatusNotification(
   orderId: string,
-  options: { customerNote?: string; scope?: string } = {},
+  options: { customerNote?: string; scope?: string; notificationPhotoId?: string } = {},
 ) {
   const order = await BloomWebsiteOrder.findById(orderId);
   if (!order || order.status === "placed") return false;
@@ -430,6 +453,7 @@ export async function sendBloomWebsiteStatusNotification(
   const storefrontName = order.storefront?.siteName || "Your florist";
   const resend = getResend();
   const customerNote = String(options.customerNote || "").trim();
+  const selectedPhotoHtml = statusArrangementPhotoHtml(order, options.notificationPhotoId);
 
   return recordEmail({
     order,
@@ -444,6 +468,7 @@ export async function sendBloomWebsiteStatusNotification(
       kind: "customer_status_update",
       status: order.status,
       customerNote,
+      ...(selectedPhotoHtml ? { notificationPhotoId: options.notificationPhotoId } : {}),
     },
     send: () =>
       resend.emails.send({
@@ -461,6 +486,7 @@ export async function sendBloomWebsiteStatusNotification(
                 Your order <strong>${escapeHtml(order.orderNumber)}</strong> from
                 ${escapeHtml(storefrontName)} is now <strong>${escapeHtml(label.toLowerCase())}</strong>.
               </p>
+              ${selectedPhotoHtml}
               ${
                 customerNote
                   ? `<div style="margin:18px 0;padding:16px 18px;border-radius:14px;background:#f5f3ff;color:#4c1d95;line-height:1.6;"><strong>Note from the florist:</strong><br>${escapeHtml(customerNote).replaceAll("\n", "<br>")}</div>`
@@ -480,7 +506,7 @@ export async function sendBloomWebsiteStatusNotification(
 
 export async function sendBloomWebsiteDeliveryConfirmation(
   orderId: string,
-  options: { customerNote?: string; scope?: string } = {},
+  options: { customerNote?: string; scope?: string; notificationPhotoId?: string } = {},
 ) {
   const order = await BloomWebsiteOrder.findById(orderId);
   if (
@@ -500,6 +526,7 @@ export async function sendBloomWebsiteDeliveryConfirmation(
     .join(" ");
   const resend = getResend();
   const customerNote = String(options.customerNote || "").trim();
+  const selectedPhotoHtml = statusArrangementPhotoHtml(order, options.notificationPhotoId);
 
   return recordEmail({
     order,
@@ -513,6 +540,7 @@ export async function sendBloomWebsiteDeliveryConfirmation(
       kind: "customer_delivery_confirmation",
       status: "fulfilled",
       customerNote,
+      ...(selectedPhotoHtml ? { notificationPhotoId: options.notificationPhotoId } : {}),
     },
     send: () =>
       resend.emails.send({
@@ -536,6 +564,7 @@ export async function sendBloomWebsiteDeliveryConfirmation(
                   : ""
               }
               <p><strong>Delivery date:</strong> ${escapeHtml(order.fulfillment.requestedDate)}</p>
+              ${selectedPhotoHtml}
               ${
                 customerNote
                   ? `<div style="margin:18px 0;padding:16px 18px;border-radius:14px;background:#f5f3ff;color:#4c1d95;line-height:1.6;"><strong>Note from the florist:</strong><br>${escapeHtml(customerNote).replaceAll("\n", "<br>")}</div>`

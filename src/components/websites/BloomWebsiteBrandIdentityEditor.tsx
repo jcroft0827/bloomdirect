@@ -23,6 +23,7 @@ import { uploadWebsiteImage } from "@/lib/bloom-websites/uploadWebsiteImage";
 import type {
   BloomWebsiteHeroInfoCardContent,
   BloomWebsiteLogoSize,
+  BloomWebsiteButtonCorners,
   BloomWebsiteHeroSlide,
   BloomWebsiteHomepageSectionContent,
   BloomWebsiteThemeName,
@@ -33,6 +34,7 @@ type BrandValues = {
   siteName: string;
   logo: string;
   logoSize: BloomWebsiteLogoSize;
+  buttonCorners: BloomWebsiteButtonCorners;
   tagline: string;
   primaryColor: string;
   accentColor: string;
@@ -106,6 +108,7 @@ export default function BloomWebsiteBrandIdentityEditor({ previewSlug, initialVa
           branding: {
             logo: values.logo,
             logoSize: values.logoSize,
+            buttonCorners: values.buttonCorners,
             tagline: values.tagline,
             primaryColor,
             accentColor,
@@ -130,6 +133,7 @@ export default function BloomWebsiteBrandIdentityEditor({ previewSlug, initialVa
         siteName: data.website?.siteName || siteName,
         logo: data.website?.branding?.logo || "",
         logoSize: data.website?.branding?.logoSize || values.logoSize,
+        buttonCorners: data.website?.branding?.buttonCorners || values.buttonCorners,
         tagline: data.website?.branding?.tagline || "",
         primaryColor: data.website?.branding?.primaryColor || primaryColor,
         accentColor: data.website?.branding?.accentColor || accentColor,
@@ -199,13 +203,26 @@ export default function BloomWebsiteBrandIdentityEditor({ previewSlug, initialVa
 
           <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7"><div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-black text-gray-950">Brand Colors</h2><p className="mt-1 text-sm leading-6 text-gray-500">Bloom protects contrast and readability while using these colors throughout the storefront.</p></div><button type="button" onClick={() => { update("primaryColor", "#654783"); update("accentColor", "#37a156"); }} className="inline-flex items-center gap-1 text-xs font-black text-purple-700"><RefreshCcw size={14} /> Reset</button></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><ColorField label="Primary Color" value={values.primaryColor} fallback="#654783" onChange={(value) => update("primaryColor", value)} /><ColorField label="Accent Color" value={values.accentColor} fallback="#37a156" onChange={(value) => update("accentColor", value)} /></div></section>
 
+          <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
+            <h2 className="text-xl font-black text-gray-950">Button shape</h2>
+            <p className="mt-1 text-sm text-gray-500">Choose how buttons look on your customer-facing website. Dashboard buttons are unchanged.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {(["subtle", "rounded", "pill"] as const).map((corner) => (
+                <button type="button" key={corner} onClick={() => update("buttonCorners", corner)} aria-pressed={values.buttonCorners === corner}
+                  className={`flex flex-col items-center gap-3 rounded-xl border p-4 transition ${values.buttonCorners === corner ? "border-purple-600 bg-purple-50 ring-2 ring-purple-100" : "border-gray-200 hover:border-purple-300"}`}>
+                  <span className={`inline-flex bg-purple-700 px-4 py-2 text-xs font-bold text-white ${corner === "subtle" ? "rounded" : corner === "rounded" ? "rounded-xl" : "rounded-full"}`}>Shop Flowers</span>
+                  <span className="text-sm font-semibold capitalize">{corner}</span>
+                </button>
+              ))}
+            </div>
+          </section>
           <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="text-xl font-black text-gray-950">Brand Statement</h2><p className="mt-1 text-sm leading-6 text-gray-500">A short line that appears with your shop identity in the footer and supporting brand areas.</p><textarea rows={3} maxLength={180} value={values.tagline} onChange={(e) => update("tagline", e.target.value)} placeholder="Fresh flowers, thoughtful design, and personal service." className="mt-5 w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm leading-6" /></section>
 
           <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7"><div className="flex items-start gap-3"><Link2 size={18} className="mt-0.5 text-purple-600" /><div><h2 className="text-xl font-black text-gray-950">Social Media</h2><p className="mt-1 text-sm leading-6 text-gray-500">These shared links power your BloomWebsite footer and GetBloomDirect public profile.</p></div></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><SocialInput label="Facebook" icon={<Facebook size={16} />} value={values.socialLinks.facebook} onChange={(value) => updateSocial("facebook", value)} /><SocialInput label="Instagram" icon={<Instagram size={16} />} value={values.socialLinks.instagram} onChange={(value) => updateSocial("instagram", value)} /><SocialInput label="Pinterest" icon={<MapPin size={16} />} value={values.socialLinks.pinterest} onChange={(value) => updateSocial("pinterest", value)} /><SocialInput label="TikTok" icon={<Music2 size={16} />} value={values.socialLinks.tiktok} onChange={(value) => updateSocial("tiktok", value)} /></div></section>
         </div>
 
         <div className="min-w-0 xl:sticky xl:top-6 xl:h-fit">
-          <BloomWebsiteLiveStorefrontViewer previewSlug={previewSlug} theme={previewValues.theme} siteName={values.siteName} logo={values.logo} logoSize={values.logoSize} tagline={values.tagline} heroHeadline={primaryHero?.headline || ""} heroSubheadline={primaryHero?.subheadline || ""} heroInfoCard={previewValues.heroInfoCard} trustPoints={previewValues.trustPoints} socialLinks={values.socialLinks} sectionContent={previewValues.sectionContent} primaryColor={primaryColor} accentColor={accentColor} heroImage={primaryHero?.imageUrl || ""} heroSlides={previewValues.heroSlides} />
+          <BloomWebsiteLiveStorefrontViewer previewSlug={previewSlug} buttonCorners={values.buttonCorners} theme={previewValues.theme} siteName={values.siteName} logo={values.logo} logoSize={values.logoSize} tagline={values.tagline} heroHeadline={primaryHero?.headline || ""} heroSubheadline={primaryHero?.subheadline || ""} heroInfoCard={previewValues.heroInfoCard} trustPoints={previewValues.trustPoints} socialLinks={values.socialLinks} sectionContent={previewValues.sectionContent} primaryColor={primaryColor} accentColor={accentColor} heroImage={primaryHero?.imageUrl || ""} heroSlides={previewValues.heroSlides} />
         </div>
       </div>
 

@@ -21,8 +21,10 @@ type BillingState = {
 export default function BloomWebsiteBillingCard({
   websiteId,
   billing,
+  activationsPaused = false,
 }: {
   websiteId: string;
+  activationsPaused?: boolean;
   billing: BillingState;
 }) {
   const [billingPeriod, setBillingPeriod] =
@@ -31,6 +33,10 @@ export default function BloomWebsiteBillingCard({
   const [portalLoading, setPortalLoading] = useState(false);
 
   async function startCheckout() {
+    if (activationsPaused) {
+      toast.error("BloomWebsites publishing is coming soon. You can continue building and previewing for free.");
+      return;
+    }
     try {
       setCheckoutLoading(true);
 
@@ -281,21 +287,23 @@ export default function BloomWebsiteBillingCard({
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={startCheckout}
-          disabled={checkoutLoading}
-          className="mx-auto mt-8 flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-xl bg-purple-700 px-6 py-3 text-sm font-black text-white transition hover:bg-purple-800 disabled:opacity-50"
-        >
-          {checkoutLoading && (
-            <Loader2 size={17} className="animate-spin" />
-          )}
-          {checkoutLoading
-            ? "Opening Secure Checkout..."
-            : billingPeriod === "annual"
-              ? "Activate for $1,349/year"
-              : "Activate for $129/month"}
-        </button>
+        {activationsPaused ? (
+          <div role="status" className="mx-auto mt-8 max-w-md rounded-xl border border-purple-200 bg-purple-50 px-5 py-4 text-center">
+            <p className="font-black text-purple-900">Publishing coming soon</p>
+            <p className="mt-2 text-sm leading-6 text-purple-800">
+              Keep creating and previewing your website for free. New subscriptions and first-time publishing are paused for now; everything you save will be here when launch opens.
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={startCheckout}
+            disabled={checkoutLoading}
+            className="mx-auto mt-8 flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-xl bg-purple-700 px-6 py-3 text-sm font-black text-white transition hover:bg-purple-800 disabled:opacity-50"
+          >
+            {checkoutLoading ? "Opening Secure Checkout..." : billingPeriod === "annual" ? "Activate for $1,349/year" : "Activate for $129/month"}
+          </button>
+        )}
 
         <p className="mt-3 text-center text-xs leading-5 text-gray-500">
           $0 setup fee · $0 Bloom order fee · Payment processor fees

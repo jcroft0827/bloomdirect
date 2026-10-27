@@ -1,4 +1,5 @@
 import BloomWebsiteCartProvider from "@/components/websites/storefront/BloomWebsiteCartProvider";
+import BloomWebsiteWeddingsStorefront from "@/components/websites/storefront/BloomWebsiteWeddingsStorefront";
 import BloomWebsiteAboutStorefront from "@/components/websites/storefront/BloomWebsiteAboutStorefront";
 import BloomWebsiteCardMessageCheckout from "@/components/websites/storefront/BloomWebsiteCardMessageCheckout";
 import BloomWebsiteCheckoutProvider from "@/components/websites/storefront/BloomWebsiteCheckoutProvider";
@@ -60,7 +61,7 @@ function isKnownStorefrontPagePath(path: string[]) {
     return true;
   }
 
-  if (path.length === 1 && ["shop", "about"].includes(path[0] || "")) {
+  if (path.length === 1 && ["shop", "about", "weddings"].includes(path[0] || "")) {
     return true;
   }
 
@@ -167,6 +168,16 @@ export async function generateMetadata({
     return getBloomWebsiteAboutMetadata(storefront, {
       publicOrigin,
     });
+  }
+
+  if (path.length === 1 && path[0] === "weddings") {
+    const storefront = await getBloomWebsiteStorefront(tenant.previewSlug, tenant.shopId);
+    if (!storefront?.website.weddingsPage?.enabled) return getBloomWebsitePreviewFallbackMetadata();
+    return {
+      title: `${storefront.website.weddingsPage.heading} | ${storefront.website.siteName}`,
+      description: (storefront.website.weddingsPage.introduction || `Wedding and event floral design by ${storefront.website.siteName}.`).slice(0, 160),
+      alternates: { canonical: `${publicOrigin}/weddings` },
+    };
   }
 
   if (path.length === 1 && path[0] === "shop") {
@@ -300,6 +311,9 @@ export default async function BloomWebsiteLiveRouteBoundary({
         <BloomWebsiteAboutStorefront storefront={storefront} basePath="" />
       </>
     );
+  } else if (path.length === 1 && path[0] === "weddings") {
+    if (!storefront.website.weddingsPage?.enabled) notFound();
+    content = <BloomWebsiteWeddingsStorefront storefront={storefront} basePath="" />;
   } else if (path.length === 1 && path[0] === "shop") {
     const catalog = await getBloomWebsiteStorefrontCatalog(
       tenant.previewSlug,

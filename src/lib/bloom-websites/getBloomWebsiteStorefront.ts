@@ -24,6 +24,7 @@ import Shop from "@/models/Shop";
 
 import type {
   BloomWebsiteStorefront,
+  BloomWebsiteAboutSection,
   BloomWebsiteThemeName,
 } from "@/types/bloom-website";
 
@@ -46,6 +47,7 @@ type BloomWebsiteLean = {
   branding?: {
     logo?: string;
     logoSize?: string;
+    buttonCorners?: string;
 
     tagline?: string;
 
@@ -70,9 +72,31 @@ type BloomWebsiteLean = {
     merchandisingSections?: unknown;
   };
 
+  weddingsPage?: {
+    floralDecoration?: "none" | "softBorder" | "hanging" | "border" | "corners" | "subtle" | "full";
+    headingAlignment?: "left" | "center" | "right";
+    contentAlignment?: "left" | "center" | "right";
+    headingAlignmentDesktop?: "left" | "center" | "right";
+    headingAlignmentMobile?: "left" | "center" | "right";
+    contentAlignmentDesktop?: "left" | "center" | "right";
+    contentAlignmentMobile?: "left" | "center" | "right";
+    enabled?: boolean;
+    heading?: string;
+    introduction?: string;
+    services?: string;
+    eventTypes?: string;
+    serviceArea?: string;
+    consultationText?: string;
+    portfolioHeading?: string;
+    portfolioDescription?: string;
+    portfolio?: Array<{ url?: string; alt?: string; caption?: string }>;
+  };
+
   aboutPage?: {
     enabled?: boolean;
     heading?: string;
+    useCustomImage?: boolean;
+    customImageUrl?: string;
     contentMode?: "custom" | "guided";
     facts?: {
       openingYear?: string;
@@ -84,10 +108,13 @@ type BloomWebsiteLean = {
       differentiators?: string;
     };
     sections?: Array<{
-      key?: "story" | "specialties" | "community";
+      key?: "story" | "specialties" | "community" | "extra1" | "extra2" | "extra3";
       enabled?: boolean;
       title?: string;
       body?: string;
+      textAlignment?: "left" | "center" | "right";
+      desktopTextAlignment?: "left" | "center" | "right";
+      mobileTextAlignment?: "left" | "center" | "right";
       sortOrder?: number;
     }>;
   };
@@ -272,6 +299,26 @@ function isAnnouncementActive(input: {
   return true;
 }
 
+function normalizeResponsiveAlignment(
+  value: string | undefined,
+  fallback: "left" | "center" | "right",
+): "left" | "center" | "right" {
+  return value === "left" || value === "center" || value === "right"
+    ? value
+    : fallback;
+}
+
+function normalizeWeddingFloralDecoration(
+  value: string | undefined,
+): "none" | "softBorder" {
+  if (value === "none") return "none";
+  if (value === "softBorder") return "softBorder";
+  if (value === "hanging" || value === "border" || value === "corners" || value === "subtle" || value === "full") {
+    return "softBorder";
+  }
+  return "none";
+}
+
 export async function getBloomWebsiteStorefront(
   previewSlug: string,
   ownerShopId?: string,
@@ -301,6 +348,7 @@ export async function getBloomWebsiteStorefront(
         "branding",
         "homepage",
         "aboutPage",
+        "weddingsPage",
         "seo",
         "announcement",
         "orderPolicy",
@@ -371,6 +419,7 @@ export async function getBloomWebsiteStorefront(
 
     logo: website.branding?.logo,
     logoSize: website.branding?.logoSize,
+    buttonCorners: website.branding?.buttonCorners,
 
     tagline: website.branding?.tagline,
 
@@ -419,6 +468,7 @@ export async function getBloomWebsiteStorefront(
       branding: {
         logo: storefrontTheme.logo,
         logoSize: storefrontTheme.logoSize,
+        buttonCorners: storefrontTheme.buttonCorners,
 
         tagline: storefrontTheme.tagline,
 
@@ -482,7 +532,55 @@ export async function getBloomWebsiteStorefront(
         ),
       },
 
+      weddingsPage: (() => {
+        const headingDesktop = normalizeResponsiveAlignment(
+          website.weddingsPage?.headingAlignmentDesktop ?? website.weddingsPage?.headingAlignment,
+          "center",
+        );
+        const headingMobile = normalizeResponsiveAlignment(
+          website.weddingsPage?.headingAlignmentMobile ?? website.weddingsPage?.headingAlignmentDesktop ?? website.weddingsPage?.headingAlignment,
+          headingDesktop,
+        );
+        const contentDesktop = normalizeResponsiveAlignment(
+          website.weddingsPage?.contentAlignmentDesktop ?? website.weddingsPage?.contentAlignment,
+          "left",
+        );
+        const contentMobile = normalizeResponsiveAlignment(
+          website.weddingsPage?.contentAlignmentMobile ?? website.weddingsPage?.contentAlignmentDesktop ?? website.weddingsPage?.contentAlignment,
+          contentDesktop,
+        );
+
+        return {
+          floralDecoration: normalizeWeddingFloralDecoration(website.weddingsPage?.floralDecoration),
+          headingAlignment: headingDesktop,
+          contentAlignment: contentDesktop,
+          headingAlignmentDesktop: headingDesktop,
+          headingAlignmentMobile: headingMobile,
+          contentAlignmentDesktop: contentDesktop,
+          contentAlignmentMobile: contentMobile,
+          enabled: website.weddingsPage?.enabled === true,
+          heading: website.weddingsPage?.heading?.trim() || "Weddings & Events",
+          introduction: website.weddingsPage?.introduction?.trim() || "",
+          services: website.weddingsPage?.services?.trim() || "",
+          eventTypes: website.weddingsPage?.eventTypes?.trim() || "",
+          serviceArea: website.weddingsPage?.serviceArea?.trim() || "",
+          consultationText: website.weddingsPage?.consultationText?.trim() || "",
+          portfolioHeading: website.weddingsPage?.portfolioHeading?.trim() || "Selected Work",
+          portfolioDescription:
+            website.weddingsPage?.portfolioDescription?.trim() || "Weddings, events & meaningful moments",
+          portfolio: (website.weddingsPage?.portfolio || [])
+            .slice(0, 18)
+            .map((photo) => ({
+              url: photo.url || "",
+              alt: photo.alt || "",
+              caption: photo.caption || "",
+            }))
+            .filter((photo) => photo.url),
+        };
+      })(),
       aboutPage: {
+        useCustomImage: website.aboutPage?.useCustomImage === true,
+        customImageUrl: website.aboutPage?.customImageUrl?.trim() || "",
         enabled: website.aboutPage?.enabled !== false,
         heading: website.aboutPage?.heading?.trim() || "About Us",
         contentMode:
@@ -527,19 +625,33 @@ export async function getBloomWebsiteStorefront(
           const byKey = new Map(
             (website.aboutPage?.sections || [])
               .filter((section) =>
-                ["story", "specialties", "community"].includes(
+                ["story", "specialties", "community", "extra1", "extra2", "extra3"].includes(
                   section.key || "",
                 ),
               )
               .map((section) => [section.key, section]),
           );
 
-          return defaults
-            .map((section) => {
+          return [...defaults, ...(["extra1", "extra2", "extra3"] as const).filter(key => byKey.has(key)).map((key, index) => ({ key: key as "extra1" | "extra2" | "extra3", enabled: true, title: "More About Us", body: "", sortOrder: index + 3 }))]
+            .map((section): BloomWebsiteAboutSection => {
               const stored = byKey.get(section.key);
+
+              const legacyAlignment = normalizeResponsiveAlignment(
+                stored?.textAlignment,
+                "left",
+              );
 
               return {
                 key: section.key,
+                textAlignment: legacyAlignment,
+                desktopTextAlignment: normalizeResponsiveAlignment(
+                  stored?.desktopTextAlignment ?? stored?.textAlignment,
+                  legacyAlignment,
+                ),
+                mobileTextAlignment: normalizeResponsiveAlignment(
+                  stored?.mobileTextAlignment ?? stored?.textAlignment,
+                  legacyAlignment,
+                ),
                 enabled: stored?.enabled !== false,
                 title: stored?.title?.trim() || section.title,
                 body:

@@ -15,6 +15,42 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
+      url: `${BASE_URL}/florist-websites`,
+      lastModified: new Date("2026-10-27"),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${BASE_URL}/florist-ecommerce`,
+      lastModified: new Date("2026-10-27"),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${BASE_URL}/switch-florist-website`,
+      lastModified: new Date("2026-10-27"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified: new Date("2026-10-27"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/blog/how-much-does-a-florist-website-cost`,
+      lastModified: new Date("2026-10-27"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}/blog/florist-website-seo`,
+      lastModified: new Date("2026-10-27"),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
       url: `${BASE_URL}/vision`,
       lastModified: new Date("2026-07-26"),
       changeFrequency: "monthly",

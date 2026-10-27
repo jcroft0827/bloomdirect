@@ -36,7 +36,7 @@ export default async function BloomWebsiteAboutPreviewPage({ params }: Props) {
 
   const { previewSlug } = await params;
   const storefront = await getBloomWebsiteStorefront(previewSlug, session.user.id);
-  if (!storefront || storefront.website.aboutPage?.enabled === false) notFound();
+  if (!storefront) notFound();
 
   return (
     <div className="pb-28 sm:pb-20">

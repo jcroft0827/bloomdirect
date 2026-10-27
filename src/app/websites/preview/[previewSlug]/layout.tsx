@@ -1,6 +1,7 @@
 import BloomWebsiteCartProvider from "@/components/websites/storefront/BloomWebsiteCartProvider";
 import BloomWebsiteCheckoutProvider from "@/components/websites/storefront/BloomWebsiteCheckoutProvider";
 import BloomWebsiteThemeSurface from "@/components/websites/storefront/BloomWebsiteThemeSurface";
+import BloomWebsitePreviewButtonCorners from "@/components/websites/storefront/BloomWebsitePreviewButtonCorners";
 
 import { normalizeBloomWebsiteStorefrontTheme } from "@/lib/bloom-websites/storefront-theme";
 import { connectToDB } from "@/lib/mongoose";
@@ -66,6 +67,7 @@ type WebsiteLean = {
     logo?: string;
 
     tagline?: string;
+    buttonCorners?: string;
 
     primaryColor?: string;
     accentColor?: string;
@@ -90,6 +92,7 @@ export default async function PreviewLayout({
         "theme",
         "branding.logo",
         "branding.tagline",
+        "branding.buttonCorners",
         "branding.primaryColor",
         "branding.accentColor",
         "branding.backgroundStyle",
@@ -103,6 +106,7 @@ export default async function PreviewLayout({
     logo: website?.branding?.logo,
 
     tagline: website?.branding?.tagline,
+    buttonCorners: website?.branding?.buttonCorners,
 
     primaryColor: website?.branding?.primaryColor,
 
@@ -118,6 +122,7 @@ export default async function PreviewLayout({
 
   return (
     <BloomWebsiteThemeSurface theme={storefrontTheme}>
+      <BloomWebsitePreviewButtonCorners />
       <BloomWebsiteCheckoutProvider previewSlug={previewSlug}>
         <BloomWebsiteCartProvider
           previewSlug={previewSlug}

@@ -7,9 +7,11 @@ import {
   PackageCheck,
   Plus,
   ShoppingBag,
+  ZoomIn,
 } from "lucide-react";
 
 import { useMemo, useState } from "react";
+import ProductImageLightbox from "@/components/websites/storefront/ProductImageLightbox";
 
 import { useBloomWebsiteCart } from "@/components/websites/storefront/BloomWebsiteCartProvider";
 
@@ -46,7 +48,6 @@ function getDefaultTier(
 export default function ProductConfigurator({
   product,
   primaryColor,
-  accentColor,
   variant = "classic",
 }: ProductConfiguratorProps) {
   const elegant = variant === "elegant";
@@ -73,6 +74,7 @@ export default function ProductConfigurator({
   >(initialTier?.label ?? null);
 
   const [selectedImage, setSelectedImage] = useState(initialImage);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
 
@@ -176,17 +178,20 @@ export default function ProductConfigurator({
   }
 
   return (
-    <div className={elegant ? "grid gap-12 lg:grid-cols-[1.08fr_0.92fr] lg:gap-20" : "grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16"}>
+    <div className={elegant ? "grid items-start gap-9 md:gap-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-14 xl:gap-20" : "grid items-start gap-9 md:gap-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12 xl:gap-16"}>
       {/* PRODUCT MEDIA */}
-      <section className="min-w-0">
+      <section aria-label="Product photos" className="min-w-0">
         <div className={elegant ? "relative overflow-hidden bg-[#f6f3ee]" : "relative overflow-hidden rounded-[2rem] border border-gray-100 bg-white"}>
           <div className="aspect-square">
             {selectedImage ? (
-              <img
-                src={selectedImage}
-                alt={product.seo.imageAltText || product.name}
-                className="h-full w-full object-contain p-4 sm:p-7"
-              />
+              <button type="button" onClick={() => setLightboxOpen(true)} aria-label={`Enlarge ${product.name} photo`} className="group relative block h-full w-full cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-gray-950">
+                <img
+                  src={selectedImage}
+                  alt={product.seo.imageAltText || product.name}
+                  className="h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-[1.04] sm:p-7"
+                />
+                <span className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-semibold text-gray-900 shadow-md"><ZoomIn size={16} /> View larger</span>
+              </button>
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-pink-50 via-purple-50 to-green-50">
                 <Flower2
@@ -213,7 +218,7 @@ export default function ProductConfigurator({
         </div>
 
         {productImages.length > 1 && (
-          <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-5">
+          <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2" aria-label="Choose a product photo">
             {productImages.map((image, index) => {
               const isSelected = image === selectedImage;
 
@@ -224,7 +229,7 @@ export default function ProductConfigurator({
                   onClick={() => setSelectedImage(image)}
                   aria-label={`View ${product.name} photo ${index + 1}`}
                   aria-pressed={isSelected}
-                  className={`aspect-square overflow-hidden border bg-white p-2 transition ${elegant ? "rounded-none" : "rounded-2xl"} ${
+                  className={`aspect-square w-[76px] shrink-0 snap-start overflow-hidden border bg-white p-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-950 sm:w-[92px] ${elegant ? "rounded-none" : "rounded-2xl"} ${
                     isSelected
                       ? "border-gray-950 ring-1 ring-gray-950"
                       : "border-gray-200 hover:border-gray-400"
@@ -242,8 +247,12 @@ export default function ProductConfigurator({
         )}
       </section>
 
+      {lightboxOpen && selectedImage && (
+        <ProductImageLightbox images={productImages} selectedImage={selectedImage} productName={product.name} onSelectImage={setSelectedImage} onClose={() => setLightboxOpen(false)} />
+      )}
+
       {/* PRODUCT CONFIGURATION */}
-      <section className="min-w-0 lg:pt-4">
+      <section aria-label="Choose your arrangement" className="min-w-0 lg:pt-1">
         <p
           className={elegant ? "text-[10px] font-semibold uppercase tracking-[0.22em]" : "text-sm font-black uppercase tracking-[0.18em]"}
           style={{
@@ -260,6 +269,12 @@ export default function ProductConfigurator({
         {product.shortDescription && (
           <p className="mt-5 text-lg leading-8 text-gray-600">
             {product.shortDescription}
+          </p>
+        )}
+
+        {availableTiers.length > 0 && (
+          <p className={elegant ? "mt-5 font-serif text-2xl text-stone-900" : "mt-5 text-2xl font-extrabold text-gray-950"}>
+            {availableTiers.length > 1 ? "Starting at " : ""}${Math.min(...availableTiers.map((tier) => tier.price)).toFixed(2)}
           </p>
         )}
 
@@ -323,9 +338,6 @@ export default function ProductConfigurator({
               {availableTiers.map((tier) => {
                 const isSelected = tier.label === selectedTier?.label;
 
-                const isPopular =
-                  tier.label === "deluxe" && availableTiers.length > 1;
-
                 return (
                   <button
                     key={tier.label}
@@ -334,7 +346,7 @@ export default function ProductConfigurator({
                     aria-checked={isSelected}
                     disabled={!canPurchase}
                     onClick={() => handleTierSelect(tier)}
-                    className={`relative w-full border p-5 text-left transition ${elegant ? "rounded-none" : "rounded-2xl"} ${
+                    className={`relative w-full border p-4 text-left transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-950 sm:p-5 ${elegant ? "rounded-none" : "rounded-2xl"} ${
                       isSelected
                         ? "border-gray-950 bg-gray-50 shadow-sm"
                         : "border-gray-200 bg-white hover:border-gray-400"
@@ -350,19 +362,6 @@ export default function ProductConfigurator({
                           <span className="font-black text-gray-950">
                             {formatTierLabel(tier.label)}
                           </span>
-
-                          {isPopular && (
-                            <span
-                              className={
-                                elegant
-                                  ? "text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-500"
-                                  : "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white"
-                              }
-                              style={elegant ? undefined : { backgroundColor: accentColor }}
-                            >
-                              Popular
-                            </span>
-                          )}
 
                           {isSelected && (
                             <span
@@ -418,7 +417,7 @@ export default function ProductConfigurator({
                     disabled={!canPurchase}
                     onClick={() => toggleAddon(addon)}
                     aria-pressed={isSelected}
-                    className={`relative flex min-w-0 items-center gap-3 border p-3 text-left transition ${elegant ? "rounded-none" : "rounded-2xl"} ${
+                    className={`relative flex min-w-0 items-center gap-3 border p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-950 ${elegant ? "rounded-none" : "rounded-2xl"} ${
                       isSelected
                         ? "border-gray-950 bg-gray-50 shadow-sm"
                         : "border-gray-200 bg-white hover:border-gray-400"
@@ -562,7 +561,7 @@ export default function ProductConfigurator({
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className={elegant ? "mt-6 flex w-full items-center justify-center gap-2 border px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:opacity-90" : "mt-5 flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-black text-white shadow-sm transition hover:opacity-95"}
+                className={elegant ? "mt-6 flex min-h-14 w-full items-center justify-center gap-2 border px-6 py-4 text-sm font-semibold uppercase tracking-[0.13em] text-white transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-950" : "mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-base font-black text-white shadow-sm transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-950"}
                 style={{
                   backgroundColor: primaryColor,
                 }}
@@ -571,7 +570,7 @@ export default function ProductConfigurator({
                 Add to Cart
               </button>
 
-              <p className="mt-3 text-center text-xs leading-5 text-gray-500">
+              <p className="mt-3 text-center text-xs leading-5 text-gray-600">
                 Delivery and payment details are completed at checkout.
               </p>
             </>

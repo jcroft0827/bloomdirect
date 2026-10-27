@@ -251,6 +251,7 @@ const bloomWebsiteSchema = new Schema(
         enum: ["small", "standard", "large", "xlarge"],
         default: "standard",
       },
+      buttonCorners: { type: String, enum: ["subtle", "rounded", "pill"], default: "pill" },
 
       primaryColor: {
         type: String,
@@ -570,7 +571,35 @@ const bloomWebsiteSchema = new Schema(
     // ABOUT PAGE
     // ===============================
 
+    weddingsPage: {
+      floralDecoration: { type: String, enum: ["none", "softBorder", "hanging", "border", "corners", "subtle", "full"], default: "none" },
+      /** Legacy shared alignment fields retained for backward compatibility. */
+      headingAlignment: { type: String, enum: ["left", "center", "right"], default: "center" },
+      contentAlignment: { type: String, enum: ["left", "center", "right"], default: "left" },
+      headingAlignmentDesktop: { type: String, enum: ["left", "center", "right"], default: "center" },
+      headingAlignmentMobile: { type: String, enum: ["left", "center", "right"], default: "center" },
+      contentAlignmentDesktop: { type: String, enum: ["left", "center", "right"], default: "left" },
+      contentAlignmentMobile: { type: String, enum: ["left", "center", "right"], default: "left" },
+      enabled: { type: Boolean, default: false },
+      heading: { type: String, trim: true, maxlength: 140, default: "Weddings & Events" },
+      introduction: { type: String, trim: true, maxlength: 1600, default: "" },
+      services: { type: String, trim: true, maxlength: 2000, default: "" },
+      eventTypes: { type: String, trim: true, maxlength: 1200, default: "" },
+      serviceArea: { type: String, trim: true, maxlength: 600, default: "" },
+      consultationText: { type: String, trim: true, maxlength: 600, default: "" },
+      portfolioHeading: { type: String, trim: true, maxlength: 120, default: "Selected Work" },
+      portfolioDescription: { type: String, trim: true, maxlength: 220, default: "Weddings, events & meaningful moments" },
+      portfolio: [{
+        _id: false,
+        url: { type: String, trim: true, maxlength: 2000, required: true },
+        alt: { type: String, trim: true, maxlength: 180, default: "" },
+        caption: { type: String, trim: true, maxlength: 240, default: "" },
+      }],
+    },
+
     aboutPage: {
+      useCustomImage: { type: Boolean, default: false },
+      customImageUrl: { type: String, trim: true, maxlength: 4096, default: "" },
       enabled: {
         type: Boolean,
         default: true,
@@ -645,7 +674,7 @@ const bloomWebsiteSchema = new Schema(
           {
             key: {
               type: String,
-              enum: ["story", "specialties", "community"],
+              enum: ["story", "specialties", "community", "extra1", "extra2", "extra3"],
               required: true,
             },
             enabled: {
@@ -664,6 +693,10 @@ const bloomWebsiteSchema = new Schema(
               maxlength: 6000,
               default: "",
             },
+            /** Legacy shared alignment retained for backward compatibility. */
+            textAlignment: { type: String, enum: ["left", "center", "right"], default: "left" },
+            desktopTextAlignment: { type: String, enum: ["left", "center", "right"], default: "left" },
+            mobileTextAlignment: { type: String, enum: ["left", "center", "right"], default: "left" },
             sortOrder: {
               type: Number,
               min: 0,

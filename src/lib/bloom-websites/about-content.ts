@@ -41,14 +41,14 @@ export function getDefaultBloomWebsiteAboutSections(
       key: "specialties",
       enabled: true,
       title: "What We Do Best",
-      body: "",
+      body: "Flowers help celebrate milestones, express gratitude, offer comfort, and bring beauty into everyday life.",
       sortOrder: 1,
     },
     {
       key: "community",
       enabled: true,
       title: "Rooted in Our Community",
-      body: "",
+      body: "We believe flowers can bring people together and make meaningful moments feel even more personal.",
       sortOrder: 2,
     },
   ];
@@ -134,4 +134,22 @@ export function generateBloomWebsiteAboutSections({
       sortOrder: 2,
     },
   ];
+}
+
+/** Neutral, editable starter copy derived from public shop identity only.
+ * Never infer opening date, ownership, specializations, delivery radius, or guarantees.
+ */
+export function getBloomWebsiteAboutStarterCopy(input: {
+  businessName: string;
+  city?: string;
+  state?: string;
+  fallbackStory?: string;
+}): Record<"story" | "specialties" | "community", string> {
+  const name = clean(input.businessName) || "Our flower shop";
+  const place = [clean(input.city), clean(input.state)].filter(Boolean).join(", ");
+  return {
+    story: clean(input.fallbackStory) || `${name}${place ? ` is a flower shop in ${place}` : " is a flower shop"}. Flowers can help us celebrate, remember, connect, and make everyday moments feel special. Use this space to tell customers your real story, how your shop began, and what inspires your work.`,
+    specialties: `At ${name}, every occasion is an opportunity to express something meaningful with flowers. Tell customers which floral designs and services your shop actually offers and what makes your approach special.`,
+    community: `${name}${place ? ` is based in ${place}` : " values its local community"}. Share the real neighborhoods you serve, local relationships, or community activities you participate in, so customers can get to know the people behind your flower shop.`,
+  };
 }

@@ -162,12 +162,21 @@ export default async function BloomWebsiteOrderDetailPage({
                 paymentStatus={order.payment.status}
                 refundContext={refundContext}
                 defaultNotifications={defaultNotifications}
+                arrangementPhotos={(order.arrangementPhotos || []).map((photo: any) => ({ photoId: photo.photoId, imageUrl: photo.imageUrl, caption: photo.caption || "" }))}
               />
             </div>
 
           </div>
         </div>
       </section>
+
+      {workflowMode === "simple" && !["fulfilled", "canceled"].includes(order.status) && (
+        <div className="rounded-2xl border border-purple-200 bg-purple-50 px-5 py-4 text-sm text-purple-950">
+          <p className="font-bold">This website uses Quick Complete order tracking.</p>
+          <p className="mt-1">To track Designing, Ready, Out for Delivery and other milestones, select <strong>Full Tracking</strong> in Website Settings → Order Workflow, then save your settings.</p>
+          <Link href="/dashboard/settings" className="mt-3 inline-flex rounded-lg bg-white px-4 py-2 font-bold text-purple-800 ring-1 ring-purple-200 hover:bg-purple-100">Open Website Settings →</Link>
+        </div>
+      )}
 
       <BloomWebsiteFulfillmentTimeline
         status={order.status as BloomWebsiteOrderStatus}
@@ -380,10 +389,49 @@ export default async function BloomWebsiteOrderDetailPage({
               {order.customer.firstName} {order.customer.lastName}
             </p>
             <p className="mt-1 text-sm text-gray-500">{order.customer.email}</p>
-            {order.customer.phone && (
-              <p className="mt-1 text-sm text-gray-500">{order.customer.phone}</p>
+            <p className="mt-1 text-sm text-gray-500">Phone: {order.customer.phone || "Not provided"}</p>
+          </section>
+
+          <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2">
+              <UserRound size={18} className="text-purple-700" />
+              <h2 className="font-black text-gray-950">
+                Recipient
+              </h2>
+            </div>
+            {order.recipient?.firstName || order.recipient?.lastName || order.recipient?.company || order.recipient?.phone || order.recipient?.email ? (
+              <>
+                {(order.recipient?.firstName || order.recipient?.lastName) && (
+                  <p className="mt-4 font-bold text-gray-900">
+                    {[order.recipient.firstName, order.recipient.lastName].filter(Boolean).join(" ")}
+                  </p>
+                )}
+                {order.recipient?.email && <p className="mt-1 text-sm text-gray-500">{order.recipient.email}</p>}
+                {order.recipient?.company && (
+                  <p className="mt-1 text-sm text-gray-500">{order.recipient.company}</p>
+                )}
+                {order.recipient?.phone && (
+                  <p className="mt-1 text-sm text-gray-500">{order.recipient.phone}</p>
+                )}
+              </>
+            ) : (
+              <p className="mt-4 text-sm text-gray-500">No recipient details were saved with this order.</p>
             )}
           </section>
+
+          {order.fulfillment.type === "pickup" && <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="font-black text-gray-950">Pickup Person & Instructions</h2>
+            <p className="mt-3 text-sm font-bold text-gray-900">
+              {order.fulfillment.pickupDetails?.person === "recipient"
+                ? [order.recipient?.firstName,order.recipient?.lastName].filter(Boolean).join(" ") || "Recipient (name not saved)"
+                : order.fulfillment.pickupDetails?.person === "other"
+                  ? [order.fulfillment.pickupDetails?.firstName,order.fulfillment.pickupDetails?.lastName].filter(Boolean).join(" ") || "Pickup name not saved"
+                  : [order.customer?.firstName,order.customer?.lastName].filter(Boolean).join(" ") || "Customer (name not saved)"}
+            </p>
+            {order.fulfillment.pickupDetails?.phone && <p className="mt-1 text-sm text-gray-500">{order.fulfillment.pickupDetails.phone}</p>}
+            {order.fulfillment.pickupDetails?.instructions && <p className="mt-3 whitespace-pre-wrap text-sm text-gray-600">{order.fulfillment.pickupDetails.instructions}</p>}
+            {!order.fulfillment.pickupDetails?.person && <p className="mt-3 text-xs text-gray-500">Legacy order: separate pickup person was not collected.</p>}
+          </section>}
 
           <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-2">
@@ -408,15 +456,6 @@ export default async function BloomWebsiteOrderDetailPage({
 
             {order.fulfillment.type === "delivery" && (
               <>
-                <p className="mt-3 text-sm font-bold text-gray-800">
-                  {order.recipient.firstName} {order.recipient.lastName}
-                </p>
-                {order.recipient.company && (
-                  <p className="mt-1 text-sm text-gray-500">{order.recipient.company}</p>
-                )}
-                {order.recipient.phone && (
-                  <p className="mt-1 text-sm text-gray-500">{order.recipient.phone}</p>
-                )}
                 <p className="mt-1 text-sm leading-6 text-gray-500">
                   {[
                     order.fulfillment.deliveryAddress?.address1,
@@ -449,6 +488,15 @@ export default async function BloomWebsiteOrderDetailPage({
                 <span className="text-gray-500">Subtotal</span>
                 <span className="font-bold">{money(order.totals.subtotalCents)}</span>
               </div>
+              {order.couponSnapshot?.version === 1 &&
+                typeof order.couponSnapshot.code === "string" &&
+                Number.isSafeInteger(order.couponSnapshot.discountCents) &&
+                order.couponSnapshot.discountCents > 0 && (
+                  <div className="flex justify-between gap-4 text-green-700">
+                    <span className="font-semibold">Coupon ({order.couponSnapshot.code})</span>
+                    <span className="font-bold">−{money(order.couponSnapshot.discountCents)}</span>
+                  </div>
+                )}
               <div className="flex justify-between gap-4">
                 <span className="text-gray-500">Fulfillment</span>
                 <span className="font-bold">{money(order.totals.fulfillmentFeeCents)}</span>

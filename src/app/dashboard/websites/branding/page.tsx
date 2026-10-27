@@ -26,6 +26,7 @@ type WebsiteLean = {
   branding?: {
     logo?: string;
     logoSize?: string;
+    buttonCorners?: string;
     tagline?: string;
     primaryColor?: string;
     accentColor?: string;
@@ -76,6 +77,7 @@ export default async function BloomWebsiteBrandingPage() {
     themeName: website.theme,
     logo: website.branding?.logo,
     logoSize: website.branding?.logoSize,
+    buttonCorners: website.branding?.buttonCorners,
     tagline: website.branding?.tagline,
     primaryColor: website.branding?.primaryColor,
     accentColor: website.branding?.accentColor,
@@ -97,6 +99,7 @@ export default async function BloomWebsiteBrandingPage() {
         siteName: website.siteName,
         logo: theme.logo,
         logoSize: theme.logoSize,
+        buttonCorners: theme.buttonCorners,
         tagline: theme.tagline,
         primaryColor: theme.primaryColor || DEFAULT_BLOOM_WEBSITE_PRIMARY_COLOR,
         accentColor: theme.accentColor || DEFAULT_BLOOM_WEBSITE_ACCENT_COLOR,

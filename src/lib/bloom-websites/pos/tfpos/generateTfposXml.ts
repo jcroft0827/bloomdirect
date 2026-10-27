@@ -1,3 +1,4 @@
+import { getOrderCouponSummary } from "@/lib/bloom-websites/coupons/orderCouponSummary";
 import type { TfposSafePaymentDetails } from "./getTfposSafePaymentDetails";
 
 export type TfposTransportProtocol = "ftp" | "ftps" | "sftp";
@@ -136,8 +137,8 @@ function productLines(order: any) {
         quantity: 1,
         unitCostCents: tipCents,
         itemNumber: "BLOOM-TIP",
-        itemName: "Gratuity",
-        description: "Customer gratuity collected by BloomWebsites.",
+        itemName: "TIP",
+        description: "Customer tip collected by BloomWebsites.",
       }),
     );
   }
@@ -146,7 +147,9 @@ function productLines(order: any) {
 }
 
 function buildOrderNotes(order: any, payment: TfposSafePaymentDetails) {
+  const coupon = getOrderCouponSummary(order);
   const notes = [
+    coupon ? `Coupon ${coupon.code}: -${money(coupon.discountCents)} (already included in payment total)` : "",
     `BloomWebsites order ${clean(order?.orderNumber)}`,
     `Payment provider: ${clean(order?.payment?.provider) || "unknown"}`,
     payment.transactionId ? `Processor transaction: ${payment.transactionId}` : "",
@@ -224,12 +227,33 @@ export function generateTfposXml({
     ? clean(order?.fulfillment?.pickupLocation?.businessName)
     : clean(order?.recipient?.company);
 
+  const pickup = order?.fulfillment?.pickupDetails || {};
+  const pickupRole = clean(pickup.person);
+  const personName = pickupRole === "recipient"
+    ? [clean(order?.recipient?.firstName), clean(order?.recipient?.lastName)].filter(Boolean).join(" ")
+    : pickupRole === "customer"
+      ? [clean(order?.customer?.firstName), clean(order?.customer?.lastName)].filter(Boolean).join(" ")
+      : pickupRole === "other"
+        ? [clean(pickup.firstName), clean(pickup.lastName)].filter(Boolean).join(" ")
+        : "";
+  const pickupPhone = pickupRole === "other" ? clean(pickup.phone) : pickupRole === "recipient" ? clean(order?.recipient?.phone) : clean(order?.customer?.phone);
+  const pickupInstructionParts = [
+    personName ? `${personName} is picking up this order${pickupPhone ? ` (phone: ${pickupPhone})` : ""}.` : "",
+    clean(pickup.instructions),
+  ].filter(Boolean);
   const deliveryInstructions = isPickup
-    ? clean(order?.fulfillment?.pickupLocation?.instructions)
+    ? pickupInstructionParts.join(" ")
     : clean(order?.recipient?.deliveryInstructions);
+  const formatPickupTime = (value: unknown) => {
+    const v = clean(value);
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return "";
+    const [h,m] = v.split(":").map(Number);
+    return `${String(h % 12 || 12).padStart(2,"0")}:${String(m).padStart(2,"0")} ${h < 12 ? "AM" : "PM"}`;
+  };
 
   const taxRate = effectiveTaxRate(order).toFixed(4);
   const paymentTotal = money(order?.totals?.totalCents);
+  const coupon = getOrderCouponSummary(order);
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -264,11 +288,13 @@ export function generateTfposXml({
     `<recipientPhone>${xml(recipientPhone)}</recipientPhone>`,
     "</recipient>",
     "<card>",
-    `<cardMessage>${xml(clean(order?.cardMessage) || "[No Card Message]")}</cardMessage>`,
+    `<cardMessage>${xml(clean(order?.cardMessage))}</cardMessage>`,
     "<cardType>Other</cardType>",
     "</card>",
     "<delivery>",
     `<deliveryDate>${xml(clean(order?.fulfillment?.requestedDate))}</deliveryDate>`,
+    `<delTime1>${xml(isPickup ? formatPickupTime(order?.fulfillment?.window?.from) : "")}</delTime1>`,
+    `<delTime2>${xml(isPickup ? formatPickupTime(order?.fulfillment?.window?.to) : "")}</delTime2>`,
     `<deliveryBusinessName>${xml(deliveryBusinessName)}</deliveryBusinessName>`,
     `<deliveryAddress1>${xml(clean(deliveryAddress?.address1))}</deliveryAddress1>`,
     `<deliveryAddress2>${xml(clean(deliveryAddress?.address2))}</deliveryAddress2>`,
@@ -294,8 +320,8 @@ export function generateTfposXml({
     `<paymentCardHolderName>${xml(clean(payment.cardholderName))}</paymentCardHolderName>`,
     `<paymentCardApproval>${xml(clean(payment.approvalCode) || "Paid")}</paymentCardApproval>`,
     `<paymentCardTransID>${xml(clean(payment.transactionId) || clean(order?.payment?.providerPaymentId))}</paymentCardTransID>`,
-    "<discountValue>0.00</discountValue>",
-    "<discountCode></discountCode>",
+    `<discountValue>${xml(money(coupon?.discountCents || 0))}</discountValue>`,
+    `<discountCode>${xml(coupon?.code || "")}</discountCode>`,
     `<paymentTotal>${xml(paymentTotal)}</paymentTotal>`,
     "</payment>",
     "</order>",

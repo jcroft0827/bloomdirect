@@ -1,0 +1,12 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { classifyCouponHold } from '../src/lib/bloom-websites/coupons/classifyCouponHold.ts';
+const id = '507f1f77bcf86cd799439011';
+const base = { couponId: id, attempt: {status:'payment_processing', couponSnapshot:{couponId:id},providerPaymentId:'pi_test'} };
+test('active provider payment must stay held',()=>assert.equal(classifyCouponHold(base),'active_payment_with_provider_id'));
+test('missing provider ID is ambiguous, not safe for automatic release',()=>assert.equal(classifyCouponHold({...base,attempt:{...base.attempt,providerPaymentId:''}}),'ambiguous_payment_without_provider_id'));
+test('a failed attempt requires review before release',()=>assert.equal(classifyCouponHold({...base,attempt:{...base.attempt,status:'failed'}}),'eligible_for_review_after_failure'));
+test('paid/committed attempts require reconciliation review',()=>{for(const status of ['payment_succeeded','order_committed'])assert.equal(classifyCouponHold({...base,attempt:{...base.attempt,status}}),'already_committed_needs_review')});
+test('missing attempt cannot trigger auto release',()=>assert.equal(classifyCouponHold({couponId:id,attempt:null}),'missing_checkout_attempt'));
+test('coupon identity mismatch detected',()=>assert.equal(classifyCouponHold({...base,attempt:{...base.attempt,couponSnapshot:{couponId:'other'}}}),'mismatched_coupon_snapshot'));
+test('preparation state held for review',()=>assert.equal(classifyCouponHold({...base,attempt:{...base.attempt,status:'validated'}}),'validated_or_created_needs_review'));

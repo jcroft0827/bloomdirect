@@ -42,6 +42,7 @@ type CheckoutBody = {
   requestedDate?: unknown;
   customer?: unknown;
   recipient?: unknown;
+  pickupDetails?: unknown;
   deliveryAddress?: unknown;
   deliveryInstructions?: unknown;
   cardMessage?: unknown;
@@ -264,6 +265,12 @@ export async function POST(
     const requestedDate = cleanString(body.requestedDate);
     const customer = parseContact(body.customer);
     const recipient = parseRecipient(body.recipient);
+    const recipientRecord = isRecord(body.recipient) ? body.recipient : {};
+    const pd = isRecord(body.pickupDetails) ? body.pickupDetails : {};
+    const pickupDetails = fulfillmentType === "pickup" ? {
+      person: cleanString(pd.person), firstName: cleanString(pd.firstName), lastName: cleanString(pd.lastName), phone: cleanString(pd.phone),
+      instructions: cleanString(pd.instructions), timeFrom: cleanString(pd.timeFrom), timeTo: cleanString(pd.timeTo),
+    } : undefined;
     const deliveryAddress = parseDeliveryAddress(body.deliveryAddress);
 
     await connectToDB();
@@ -340,6 +347,8 @@ export async function POST(
       requestedDate,
       customer,
       recipient,
+      recipientEmail: cleanString(recipientRecord.email),
+      pickupDetails,
       deliveryAddress:
         fulfillmentType === "delivery" ? deliveryAddress : undefined,
       deliveryInstructions: cleanString(body.deliveryInstructions),

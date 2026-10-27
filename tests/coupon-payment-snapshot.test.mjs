@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildCouponPaymentSnapshot as build } from '../src/lib/bloom-websites/coupons/buildCouponPaymentSnapshot.ts';
+const valid = { couponId:'coupon123', code:'welcome10', checkoutAttemptId:'attempt123', merchandiseSubtotalCents:10000, merchandiseDiscountCents:1000, fulfillmentFeeCents:1200, tipCents:1000, taxAmountCents:720, chargedTotalCents:11920 };
+test('validates and freezes the original and discounted totals', () => {
+  const x = build(valid);
+  assert.equal(x.originalMerchandiseCents,10000);
+  assert.equal(x.discountedMerchandiseCents,9000);
+  assert.equal(x.chargedTotalCents,11920);
+  assert.equal(x.code,'WELCOME10');
+  assert.equal(Object.isFrozen(x), true);
+});
+test('rejects charge mismatch', () => assert.throws(() => build({...valid,chargedTotalCents:12000}),/reconcile/));
+test('rejects discount greater than merchandise', () => assert.throws(() => build({...valid, merchandiseDiscountCents:10001}),/exceeds/));
+test('allows zero tax with a nontaxable tip', () => { const x=build({...valid,taxAmountCents:0,chargedTotalCents:11200}); assert.equal(x.taxAmountCents,0); });
+test('allows 100 percent merchandise coupon while charging delivery and tips', () => { const x=build({...valid,merchandiseDiscountCents:10000,taxAmountCents:0,chargedTotalCents:2200}); assert.equal(x.discountedMerchandiseCents,0); });
+test('rejects negative amounts', () => assert.throws(() => build({...valid,tipCents:-1}),/non-negative/));
+test('rejects fractional cents', () => assert.throws(() => build({...valid,taxAmountCents:1.1}),/safe integer/));
+test('rejects unsafe integers', () => assert.throws(() => build({...valid,merchandiseSubtotalCents:Number.MAX_SAFE_INTEGER + 1}),/safe integer/));
+test('requires durable attempt ID', () => assert.throws(() => build({...valid,checkoutAttemptId:'  '}),/required/));
+test('rejects invalid code', () => assert.throws(() => build({...valid,code:'x'}),/Invalid coupon/));

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorizeCouponSandboxPreparation, couponOwnerUiSandboxReady } from "@/lib/bloom-websites/coupons/authorizeCouponSandboxPreparation";
 
 import { authorizeBloomWebsiteStorefrontAccess } from "@/lib/bloom-websites/authorizeBloomWebsiteStorefrontAccess";
 import { checkBloomWebsiteRateLimit } from "@/lib/bloom-websites/checkBloomWebsiteRateLimit";
@@ -85,8 +86,16 @@ export async function POST(request: Request, { params }: RouteContext) {
     const requestedDate = clean(body.requestedDate);
     const customer = record(body.customer);
     const recipient = record(body.recipient);
+    const pickup = record(body.pickupDetails);
     const deliveryAddress = record(body.deliveryAddress);
     const tipCents = Number(body.tipCents ?? 0);
+    const submittedCoupon = clean(body.couponCode);
+    const hasCouponInput = body.couponCode !== undefined && body.couponCode !== null && body.couponCode !== "";
+    // Public clients never receive a coupon activation capability. A specific
+    // development-only Stripe test-key + secret-token guard is checked below.
+    if (hasCouponInput && (!submittedCoupon || submittedCoupon.length > 64)) {
+      return NextResponse.json({ error: "Invalid coupon code.", code: "INVALID_COUPON" }, { status: 400 });
+    }
 
     if (
       !slug ||
@@ -105,7 +114,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     await connectToDB();
 
     const website = await BloomWebsite.findOne({ previewSlug: slug })
-      .select("_id shop status customDomain domainVerified")
+      .select("_id shop status customDomain domainVerified paymentSettings.provider")
       .lean<any>();
 
     if (!website) {
@@ -119,6 +128,22 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     if (!access.allowed) {
       return access.response;
+    }
+
+    // UI sandbox and private-token sandbox must share the same authorization
+    // decision as the checkout capability endpoint. Never enable public coupons here.
+    const couponProvider = website.paymentSettings?.provider === "fiserv" ? "fiserv" : "stripe";
+    const ownerSandboxAuthorized = access.mode === "owner_preview" &&
+      couponProvider === "stripe" && couponOwnerUiSandboxReady();
+    const tokenSandboxAuthorized = authorizeCouponSandboxPreparation({
+      token: request.headers.get("x-bloom-coupon-sandbox-token") ?? "",
+      paymentProvider: couponProvider,
+    });
+    if (hasCouponInput && !(ownerSandboxAuthorized || tokenSandboxAuthorized)) {
+      return NextResponse.json(
+        { error: "Coupon redemption is not available yet.", code: "COUPON_REDEMPTION_UNAVAILABLE" },
+        { status: 409 },
+      );
     }
 
     const rateLimit = await checkBloomWebsiteRateLimit({
@@ -182,6 +207,11 @@ export async function POST(request: Request, { params }: RouteContext) {
     const fingerprint = createBloomWebsiteCheckoutRequestFingerprint({
       websiteId: String(website._id),
       ...input,
+      recipientEmail: clean(recipient.email),
+      pickupDetails: fulfillmentType === "pickup" ? {
+        person: clean(pickup.person), firstName: clean(pickup.firstName), lastName: clean(pickup.lastName), phone: clean(pickup.phone),
+        instructions: clean(pickup.instructions), timeFrom: clean(pickup.timeFrom), timeTo: clean(pickup.timeTo),
+      } : undefined,
     });
 
     if (fingerprint !== attempt.requestFingerprint) {
@@ -194,13 +224,32 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
+    if (fulfillmentType === "pickup") {
+      const who = clean(pickup.person);
+      if (!["recipient", "customer", "other"].includes(who)) return NextResponse.json({error:"Choose who is picking up."},{status:400});
+      if (who === "other" && (!clean(pickup.firstName) || !clean(pickup.lastName))) return NextResponse.json({error:"Pickup person's name is required."},{status:400});
+      if (who === "recipient" && (!clean(recipient.firstName) || !clean(recipient.lastName))) return NextResponse.json({error:"Recipient name is required."},{status:400});
+      const from = clean(pickup.timeFrom), to = clean(pickup.timeTo);
+      const validTime = (v:string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+      if ((from || to) && (!validTime(from) || !validTime(to) || from >= to)) return NextResponse.json({error:"Select a valid pickup time window."},{status:400});
+      if (clean(pickup.instructions).length > 500 || clean(pickup.firstName).length > 120 || clean(pickup.lastName).length > 120 || clean(pickup.phone).length > 50) return NextResponse.json({error:"Pickup details exceed the allowed length."},{status:400});
+    }
+    if (clean(recipient.email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean(recipient.email))) return NextResponse.json({error:"Invalid recipient email."},{status:400});
+
     const preflight = await validateBloomWebsiteCheckoutPreflight(input);
 
     const result = await prepareBloomWebsitePayment({
       attemptId,
       preflight,
       tipCents,
+      couponCode: hasCouponInput ? submittedCoupon : undefined,
       checkoutSnapshot: {
+        pickupDetails: fulfillmentType === "pickup" ? {
+          person: ["recipient", "customer", "other"].includes(clean(pickup.person)) ? clean(pickup.person) : "customer",
+          firstName: clean(pickup.firstName).slice(0,120), lastName: clean(pickup.lastName).slice(0,120), phone: clean(pickup.phone).slice(0,50),
+          instructions: clean(pickup.instructions).slice(0,500), timeFrom: clean(pickup.timeFrom), timeTo: clean(pickup.timeTo),
+        } : undefined,
+        recipientEmail: clean(recipient.email).slice(0,320),
         customer: input.customer,
         recipient: input.recipient,
         deliveryInstructions: input.deliveryInstructions,

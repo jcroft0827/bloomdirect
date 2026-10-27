@@ -26,6 +26,10 @@ export default function HomeFooter() {
               BloomWebsites
             </p>
             <ul className="mt-4 space-y-3">
+              <li><Link href="/florist-websites" className={linkClass}>Florist Website Builder</Link></li>
+              <li><Link href="/florist-ecommerce" className={linkClass}>Florist Ecommerce</Link></li>
+              <li><Link href="/switch-florist-website" className={linkClass}>Switch Website Providers</Link></li>
+              <li><Link href="/blog" className={linkClass}>Florist Guides</Link></li>
               <li><Link href="/#websites" className={linkClass}>Website Features</Link></li>
               <li><Link href="/#pricing" className={linkClass}>Pricing</Link></li>
               <li><Link href="/register" className={linkClass}>Build Free</Link></li>

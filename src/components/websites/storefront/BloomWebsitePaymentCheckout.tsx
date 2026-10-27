@@ -18,6 +18,8 @@ import {
   AlertCircle,
   ArrowLeft,
   CreditCard,
+  Tag,
+  CheckCircle2,
   Loader2,
   LockKeyhole,
   Mail,
@@ -30,6 +32,8 @@ import {
 } from "lucide-react";
 
 import Link from "next/link";
+import BloomSpinner from "@/components/BloomSpinner";
+import { formatPersonName, formatUsPhone } from "@/lib/bloom-websites/checkout/formatContactInput";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -208,6 +212,7 @@ export default function BloomWebsitePaymentCheckout({
     fulfillmentType,
     recipient,
     customer,
+    pickupDetails,
     deliveryAddress,
     requestedDate,
     pickupRequestedDate,
@@ -237,6 +242,20 @@ export default function BloomWebsitePaymentCheckout({
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
   const [preparedPayment, setPreparedPayment] =
     useState<PreparedPayment | null>(null);
+  const [tipSettings, setTipSettings] = useState<{ enabled: boolean; suggestedPercentages: number[] } | null>(null);
+  const [tipSettingsError, setTipSettingsError] = useState(false);
+  const [tipChoice, setTipChoice] = useState<"none" | "percent" | "custom">("none");
+  const [tipPercent, setTipPercent] = useState(0);
+  const [customTipDollars, setCustomTipDollars] = useState("");
+  const [couponInput, setCouponInput] = useState("");
+  const [couponPreview, setCouponPreview] = useState<{
+    code: string; discountCents: number; signature: string;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponTestEnabled, setCouponTestEnabled] = useState(false);
+  const [couponTestChecks, setCouponTestChecks] = useState<Record<string, boolean> | null>(null);
+
 
   const hasRevalidatedRef = useRef(false);
   const stripeRef = useRef<BloomStripe | null>(null);
@@ -247,8 +266,43 @@ export default function BloomWebsitePaymentCheckout({
   const deliveryHref = `${storefrontBasePath}/checkout/delivery`;
   const attemptStorageKey = `bloomwebsites-payment-attempt:${previewSlug}`;
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/websites/storefront/${encodeURIComponent(previewSlug)}/checkout/tip-settings`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load tipping options.");
+        return response.json() as Promise<{ enabled: boolean; suggestedPercentages: number[] }>;
+      })
+      .then((result) => {
+        if (!cancelled) setTipSettings(result);
+      })
+      .catch(() => {
+        if (!cancelled) setTipSettingsError(true);
+      });
+    return () => { cancelled = true; };
+  }, [previewSlug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/websites/storefront/${encodeURIComponent(previewSlug)}/checkout/coupon-test-status`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { enabled: false })
+      .then((data) => { if (!cancelled) { setCouponTestEnabled(data?.enabled === true); setCouponTestChecks(data?.checks ?? null); } })
+      .catch(() => { if (!cancelled) setCouponTestEnabled(false); });
+    return () => { cancelled = true; };
+  }, [previewSlug]);
+
   const selectedValidation =
     fulfillmentType === "pickup" ? validatedPickup : validatedDelivery;
+
+  const merchandiseSubtotalCents = selectedValidation?.cartSubtotalCents ?? 0;
+  const customTipValid = /^(?:0|[1-9]\d{0,2})(?:\.\d{1,2})?$/.test(customTipDollars.trim());
+  const tipCents = !tipSettings?.enabled || tipChoice === "none"
+    ? 0
+    : tipChoice === "percent"
+      ? Math.round(merchandiseSubtotalCents * tipPercent / 100)
+      : customTipValid
+        ? Math.round(Number(customTipDollars.trim()) * 100)
+        : 0;
 
   const requestedFulfillmentDate =
     fulfillmentType === "pickup" ? pickupRequestedDate : requestedDate;
@@ -279,6 +333,7 @@ export default function BloomWebsitePaymentCheckout({
         firstName: recipient.firstName.trim(),
         lastName: recipient.lastName.trim(),
         phone: recipient.phone.trim(),
+        email: recipient.email.trim().toLowerCase(),
       },
       deliveryAddress:
         fulfillmentType === "delivery"
@@ -296,6 +351,7 @@ export default function BloomWebsitePaymentCheckout({
               state: "",
               zip: "",
             },
+      pickupDetails: fulfillmentType === "pickup" ? pickupDetails : undefined,
       deliveryInstructions: deliveryInstructions.trim(),
       cardMessage: cardMessage.trim(),
       cardSignature: cardSignature.trim(),
@@ -314,6 +370,8 @@ export default function BloomWebsitePaymentCheckout({
       deliveryAddress.state,
       deliveryAddress.zip,
       deliveryInstructions,
+      pickupDetails,
+      recipient.email,
       fulfillmentType,
       recipient.firstName,
       recipient.lastName,
@@ -326,6 +384,39 @@ export default function BloomWebsitePaymentCheckout({
     () => JSON.stringify(checkoutPayload),
     [checkoutPayload],
   );
+
+  const activeCouponPreview = couponPreview?.signature === checkoutSignature
+    ? couponPreview : null;
+
+  const paymentAttemptSignature = `${checkoutSignature}::${activeCouponPreview?.code ?? ""}::${tipCents}`;
+
+  async function previewCoupon() {
+    if (couponLoading || preparedPayment) return;
+    const code = couponInput.trim().toUpperCase();
+    if (!code) { setCouponError("Enter a coupon code."); return; }
+    setCouponLoading(true);
+    setCouponError(null);
+    setCouponPreview(null);
+    const signature = checkoutSignature;
+    try {
+      const response = await fetch(`/api/websites/storefront/${encodeURIComponent(previewSlug)}/checkout/coupon-preview`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, items: cartItems, requestedDate: requestedFulfillmentDate }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.valid !== true) {
+        throw new Error(data?.error || "This coupon could not be applied.");
+      }
+      setCouponPreview({ code: data.code, discountCents: data.discountCents, signature });
+      setCouponInput(data.code);
+    } catch (error) {
+      setCouponError(error instanceof Error ? error.message : "Unable to validate coupon.");
+    } finally { setCouponLoading(false); }
+  }
+
+  function removeCoupon() {
+    setCouponInput(""); setCouponPreview(null); setCouponError(null);
+  }
 
   function readStoredAttempt(): StoredAttempt | null {
     try {
@@ -642,6 +733,10 @@ export default function BloomWebsitePaymentCheckout({
   }
 
   async function preparePayment() {
+    if (activeCouponPreview && !couponTestEnabled) {
+      setPaymentError("Discounted payments are available only to the signed-in florist in an isolated Stripe test environment. Remove this coupon to continue without a discount.");
+      return;
+    }
     const purchaserError = validatePurchaser();
 
     if (purchaserError) {
@@ -663,9 +758,9 @@ export default function BloomWebsitePaymentCheckout({
     try {
       const stored = readStoredAttempt();
       let attemptId =
-        stored?.signature === checkoutSignature ? stored.attemptId : "";
+        stored?.signature === paymentAttemptSignature ? stored.attemptId : "";
       let idempotencyKey =
-        stored?.signature === checkoutSignature
+        stored?.signature === paymentAttemptSignature
           ? stored.idempotencyKey
           : createIdempotencyKey();
 
@@ -703,7 +798,7 @@ export default function BloomWebsitePaymentCheckout({
         attemptId = preflight.attemptId;
 
         persistStoredAttempt({
-          signature: checkoutSignature,
+          signature: paymentAttemptSignature,
           idempotencyKey,
           attemptId,
         });
@@ -768,6 +863,13 @@ export default function BloomWebsitePaymentCheckout({
         }
       }
 
+      if (!tipSettings || tipSettingsError) {
+        throw new Error("Tipping settings are still loading. Please try again shortly.");
+      }
+      if (tipChoice === "custom" && tipSettings.enabled && !customTipValid) {
+        throw new Error("Enter a valid tip amount, such as 5 or 5.50 (maximum $999.99).");
+      }
+
       const prepareResponse = await fetch(
         `/api/websites/storefront/${encodeURIComponent(previewSlug)}/checkout/payment/prepare`,
         {
@@ -775,8 +877,9 @@ export default function BloomWebsitePaymentCheckout({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             attemptId,
+            ...(activeCouponPreview && couponTestEnabled ? { couponCode: activeCouponPreview.code } : {}),
             ...checkoutPayload,
-            tipCents: 0,
+            tipCents,
           }),
         },
       );
@@ -1156,7 +1259,7 @@ export default function BloomWebsitePaymentCheckout({
                     onChange={(event) =>
                       setCustomer({
                         ...customer,
-                        firstName: event.target.value,
+                        firstName: formatPersonName(event.target.value),
                       })
                     }
                     className={inputClassName}
@@ -1172,7 +1275,7 @@ export default function BloomWebsitePaymentCheckout({
                     value={customer.lastName}
                     disabled={formLocked}
                     onChange={(event) =>
-                      setCustomer({ ...customer, lastName: event.target.value })
+                      setCustomer({ ...customer, lastName: formatPersonName(event.target.value) })
                     }
                     className={inputClassName}
                     autoComplete="family-name"
@@ -1214,11 +1317,11 @@ export default function BloomWebsitePaymentCheckout({
                     value={customer.phone}
                     disabled={formLocked}
                     onChange={(event) =>
-                      setCustomer({ ...customer, phone: event.target.value })
+                      setCustomer({ ...customer, phone: formatUsPhone(event.target.value) })
                     }
                     className={inputClassName}
                     autoComplete="tel"
-                    placeholder="(555) 555-5555"
+                    placeholder="555-555-5555"
                   />
                 </label>
               </div>
@@ -1280,17 +1383,56 @@ export default function BloomWebsitePaymentCheckout({
               )}
             </div>
 
+            {tipSettings?.enabled && !preparedPayment && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6" aria-label="Optional tip">
+                <h2 className="text-base font-black text-gray-950">Add an optional tip</h2>
+                <p className="mt-1 text-sm text-gray-500">Support your local florist. Tips are entirely optional and calculated on your merchandise subtotal.</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" aria-pressed={tipChoice === "none"} onClick={() => setTipChoice("none")}
+                    className={`rounded-xl border px-4 py-2 text-sm font-bold ${tipChoice === "none" ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 text-gray-800"}`}>
+                    No tip
+                  </button>
+                  {tipSettings.suggestedPercentages.map((percent) => (
+                    <button type="button" key={percent} aria-pressed={tipChoice === "percent" && tipPercent === percent}
+                      onClick={() => { setTipPercent(percent); setTipChoice("percent"); }}
+                      className={`rounded-xl border px-4 py-2 text-sm font-bold ${tipChoice === "percent" && tipPercent === percent ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 text-gray-800"}`}>
+                      {percent}%
+                    </button>
+                  ))}
+                  <button type="button" aria-pressed={tipChoice === "custom"} onClick={() => setTipChoice("custom")}
+                    className={`rounded-xl border px-4 py-2 text-sm font-bold ${tipChoice === "custom" ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 text-gray-800"}`}>
+                    Custom
+                  </button>
+                </div>
+                {tipChoice === "custom" && (
+                  <label className="mt-4 block text-sm font-bold text-gray-700">
+                    Tip amount (USD)
+                    <input type="text" inputMode="decimal" maxLength={7} value={customTipDollars}
+                      onChange={(event) => setCustomTipDollars(event.target.value)}
+                      className="mt-2 w-full max-w-48 rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="5.00" />
+                    {!customTipValid && customTipDollars.trim() && <span className="mt-1 block text-xs text-red-600">Enter an amount between $0 and $999.99.</span>}
+                  </label>
+                )}
+                <p className="mt-3 text-sm font-semibold text-gray-700">Selected tip: {formatMoneyFromCents(tipCents)}</p>
+              </section>
+            )}
+
+            {activeCouponPreview && !couponTestEnabled && (
+              <p role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                Coupon redemption is not available for this checkout. Remove the coupon above to continue with payment without a discount.
+              </p>
+            )}
             {!preparedPayment ? (
               <button
                 type="button"
                 onClick={preparePayment}
-                disabled={isPreparingPayment || isRevalidating}
+                disabled={isPreparingPayment || isRevalidating || (!!activeCouponPreview && !couponTestEnabled) || !tipSettings || tipSettingsError || (tipSettings.enabled && tipChoice === "custom" && !customTipValid)}
                 className="flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-black text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ backgroundColor: "var(--bloom-primary)" }}
               >
                 {isPreparingPayment ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" />
+                    <BloomSpinner size={18} />
                     Preparing Secure Payment...
                   </>
                 ) : (
@@ -1309,7 +1451,7 @@ export default function BloomWebsitePaymentCheckout({
               >
                 {isSubmittingPayment ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" />
+                    <BloomSpinner size={18} />
                     Confirming Payment...
                   </>
                 ) : (
@@ -1455,6 +1597,51 @@ export default function BloomWebsitePaymentCheckout({
                 </div>
               )}
 
+              {!formLocked && (
+                <section className="border-t border-gray-100 px-5 py-5 sm:px-6" aria-label="Coupon code">
+                  <div className="flex items-center gap-2 text-sm font-black text-gray-950">
+                    <Tag size={16} /> Have a promo code?
+                  </div>
+                  {activeCouponPreview ? (
+                    <div className="mt-3 flex items-start justify-between gap-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 text-sm font-black text-green-900"><CheckCircle2 size={16} /> {activeCouponPreview.code}</p>
+                        <p className="mt-1 text-xs text-green-800">Eligible for {formatMoneyFromCents(activeCouponPreview.discountCents)} off merchandise.</p>
+                      </div>
+                      <button type="button" onClick={removeCoupon} disabled={formLocked} className="text-xs font-black text-green-900 underline underline-offset-2">Remove</button>
+                    </div>
+                  ) : (
+                    <form onSubmit={(event) => { event.preventDefault(); void previewCoupon(); }} className="mt-3 flex gap-2">
+                      <input aria-label="Promo code" autoComplete="off" maxLength={32} value={couponInput}
+                        disabled={formLocked} onChange={(event) => { setCouponInput(event.target.value.toUpperCase()); setCouponError(null); }}
+                        placeholder="WELCOME10" className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-3 text-sm font-semibold uppercase outline-none focus:border-gray-500" />
+                      <button type="submit" disabled={formLocked || couponLoading || !couponInput.trim()} className="rounded-xl bg-gray-950 px-4 py-3 text-sm font-black text-white disabled:opacity-50">
+                        {couponLoading ? "Checking…" : "Apply"}
+                      </button>
+                    </form>
+                  )}
+                  {couponError && <p role="alert" className="mt-2 text-xs font-semibold text-red-700">{couponError}</p>}
+                  {activeCouponPreview && !couponTestEnabled && (
+                    <div className="mt-2 space-y-2 text-xs leading-5 text-amber-800">
+                      <p>Coupon preview only: discounted payment testing is not enabled. Remove the coupon to continue without a discount.</p>
+                      {couponTestChecks && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3" role="status">
+                          <p className="font-bold">Development checkout checks (no credentials displayed):</p>
+                          <ul className="mt-1 list-inside list-disc">
+                            <li>Development server: {couponTestChecks.developmentMode ? "Ready" : "Not ready"}</li>
+                            <li>Stripe test key: {couponTestChecks.stripeTestKey ? "Ready" : "Not ready"}</li>
+                            <li>Approved test database: {couponTestChecks.developmentDatabase ? "Ready" : "Not ready"}</li>
+                            <li>Stripe payment provider: {couponTestChecks.stripeProvider ? "Ready" : "Not ready"}</li>
+                          </ul>
+                        </div>
+                      )}
+                      {!couponTestChecks && <p>The test configuration could not be verified for this storefront session. Make sure you're signed in to the website owner's dashboard.</p>}
+                    </div>
+                  )}
+                  {activeCouponPreview && couponTestEnabled && <p className="mt-2 text-xs leading-5 text-green-800">Test mode: the discount will be revalidated when preparing payment.</p>}
+                </section>
+              )}
+
               {selectedValidation && (
                 <div className="space-y-3 border-t border-gray-100 px-5 py-5 text-sm sm:px-6">
                   <div className="flex justify-between gap-4">
@@ -1469,6 +1656,12 @@ export default function BloomWebsitePaymentCheckout({
                     </span>
                   </div>
 
+                  {activeCouponPreview && (
+                    <div className="flex justify-between gap-4 text-green-800">
+                      <span className="font-semibold">{displayTotals ? "Coupon" : "Coupon preview"} ({activeCouponPreview.code})</span>
+                      <span className="font-black">−{formatMoneyFromCents(activeCouponPreview.discountCents)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-4">
                     <span className="font-semibold text-gray-500">
                       {fulfillmentType === "pickup" ? "Pickup" : "Delivery"}
@@ -1510,7 +1703,7 @@ export default function BloomWebsitePaymentCheckout({
                   <div className="flex items-end justify-between gap-4 border-t border-gray-100 pt-4">
                     <div>
                       <p className="font-black text-gray-950">
-                        {displayTotals ? "Order Total" : "Total before tax"}
+                        {displayTotals ? "Order Total" : activeCouponPreview ? "Discounted total before tax" : "Total before tax"}
                       </p>
                       <p className="mt-1 max-w-[190px] text-xs leading-5 text-gray-400">
                         {displayTotals
@@ -1524,7 +1717,7 @@ export default function BloomWebsitePaymentCheckout({
                     <span className="text-xl font-black tracking-tight text-gray-950">
                       {formatMoneyFromCents(
                         displayTotals?.totalCents ??
-                          selectedValidation.totalBeforeTaxCents,
+                          Math.max(0, selectedValidation.totalBeforeTaxCents - (activeCouponPreview?.discountCents ?? 0)),
                       )}
                     </span>
                   </div>

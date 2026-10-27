@@ -7,12 +7,27 @@ import {
   BloomElegantHeader,
 } from "@/components/websites/themes/BloomElegantChrome";
 import { getBloomWebsiteHeaderLogoClassName } from "@/lib/bloom-websites/storefront-theme";
-import type { BloomWebsiteStorefront } from "@/types/bloom-website";
+import type { BloomWebsiteStorefront, BloomWebsiteTextAlignment } from "@/types/bloom-website";
 
 type Props = {
   storefront: BloomWebsiteStorefront;
   basePath?: string;
+  editorPreview?: boolean;
 };
+
+function getTextAlignmentClass(alignment: BloomWebsiteTextAlignment) {
+  if (alignment === "center") return "text-center";
+  if (alignment === "right") return "text-right";
+  return "text-left";
+}
+
+function getResponsiveTextAlignmentClass(
+  mobile: BloomWebsiteTextAlignment,
+  desktop: BloomWebsiteTextAlignment,
+  breakpoint: "md" | "lg" = "md",
+) {
+  return `${getTextAlignmentClass(mobile)} ${breakpoint}:${getTextAlignmentClass(desktop)}`;
+}
 
 function paragraphs(value: string) {
   return value
@@ -24,6 +39,7 @@ function paragraphs(value: string) {
 export default function BloomWebsiteAboutStorefront({
   storefront,
   basePath = "",
+  editorPreview = false,
 }: Props) {
   const { website, shop } = storefront;
   const storefrontBasePath = basePath.replace(/\/$/, "");
@@ -64,6 +80,7 @@ export default function BloomWebsiteAboutStorefront({
           primaryColor={primaryColor}
           primaryForeground={primaryForeground}
           aboutEnabled={website.aboutPage?.enabled !== false}
+          editorPreview={editorPreview}
           announcement={{
             isActive: website.announcement.isActive,
             message: website.announcement.message,
@@ -96,13 +113,13 @@ export default function BloomWebsiteAboutStorefront({
             </div>
           </section>
 
-          {website.homepage.aboutImage ? (
+          {(website.aboutPage?.useCustomImage && website.aboutPage?.customImageUrl ? website.aboutPage.customImageUrl : website.homepage.aboutImage) ? (
             <section className="mx-auto max-w-[1500px] px-5 pt-10 sm:px-8 sm:pt-14 lg:px-10">
-              <div className="aspect-[16/7] min-h-[320px] overflow-hidden bg-stone-100">
+              <div className="relative w-full min-w-0 overflow-hidden bg-stone-100 aspect-[4/3] sm:aspect-[16/7]">
                 <img
-                  src={website.homepage.aboutImage}
+                  src={(website.aboutPage?.useCustomImage && website.aboutPage?.customImageUrl ? website.aboutPage.customImageUrl : website.homepage.aboutImage)}
                   alt={`${website.siteName} florist and shop`}
-                  className="h-full w-full object-cover"
+                  className="block h-full w-full max-w-full object-cover"
                 />
               </div>
             </section>
@@ -111,10 +128,14 @@ export default function BloomWebsiteAboutStorefront({
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-8 sm:py-24 lg:px-10 lg:py-28">
             {sections.length ? (
               <div className="divide-y divide-stone-200 border-y border-stone-200">
-                {sections.map((section, index) => (
+                {sections.map((section, index) => {
+                  const desktopAlignment = section.desktopTextAlignment ?? section.textAlignment ?? "left";
+                  const mobileAlignment = section.mobileTextAlignment ?? section.textAlignment ?? desktopAlignment;
+                  const alignmentClass = getResponsiveTextAlignmentClass(mobileAlignment, desktopAlignment, "lg");
+                  return (
                   <section
                     key={section.key}
-                    className="grid gap-6 py-12 sm:py-16 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16"
+                    className={`grid gap-6 py-12 sm:py-16 lg:grid-cols-[0.7fr_1.3fr] lg:gap-16 ${alignmentClass}`}
                   >
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-400">
@@ -130,7 +151,8 @@ export default function BloomWebsiteAboutStorefront({
                       ))}
                     </div>
                   </section>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <section className="border-y border-stone-200 py-16 text-center">
@@ -222,11 +244,15 @@ export default function BloomWebsiteAboutStorefront({
               <Link href={`${storefrontBasePath}/shop`} className="transition hover:opacity-60">Shop</Link>
               <Link href={`${storefrontBasePath}/about`} className="transition hover:opacity-60">About</Link>
             </nav>
-            <StorefrontCartButton
-              primaryColor={primaryColor}
-              primaryForeground={primaryForeground}
-              compact
-            />
+            {editorPreview ? (
+              <span aria-label="Cart (preview only)" className="flex h-11 items-center rounded-full px-4 text-sm font-black" style={{ backgroundColor: primaryColor, color: primaryForeground }}>Cart</span>
+            ) : (
+              <StorefrontCartButton
+                primaryColor={primaryColor}
+                primaryForeground={primaryForeground}
+                compact
+              />
+            )}
           </div>
         </div>
       </header>
@@ -256,22 +282,26 @@ export default function BloomWebsiteAboutStorefront({
           </div>
         </section>
 
-        {website.homepage.aboutImage ? (
+        {(website.aboutPage?.useCustomImage && website.aboutPage?.customImageUrl ? website.aboutPage.customImageUrl : website.homepage.aboutImage) ? (
           <section className="mx-auto max-w-6xl px-5 pt-10 sm:px-8 sm:pt-14">
-            <div className="aspect-[16/7] min-h-[300px] overflow-hidden rounded-[2rem] bg-gray-100 shadow-sm">
-              <img src={website.homepage.aboutImage} alt={`${website.siteName} florist and shop`} className="h-full w-full object-cover" />
+            <div className="relative w-full min-w-0 overflow-hidden rounded-2xl sm:rounded-[2rem] bg-gray-100 shadow-sm aspect-[4/3] sm:aspect-[16/7]">
+              <img src={(website.aboutPage?.useCustomImage && website.aboutPage?.customImageUrl ? website.aboutPage.customImageUrl : website.homepage.aboutImage)} alt={`${website.siteName} florist and shop`} className="block h-full w-full max-w-full object-cover" />
             </div>
           </section>
         ) : null}
 
         <div className="mx-auto max-w-5xl space-y-6 px-5 py-14 sm:px-8 sm:py-20">
           {sections.length ? (
-            sections.map((section, index) => (
+            sections.map((section, index) => {
+              const desktopAlignment = section.desktopTextAlignment ?? section.textAlignment ?? "left";
+              const mobileAlignment = section.mobileTextAlignment ?? section.textAlignment ?? desktopAlignment;
+              const alignmentClass = getResponsiveTextAlignmentClass(mobileAlignment, desktopAlignment);
+              return (
               <section
                 key={section.key}
                 className={`rounded-[2rem] border border-gray-200 p-7 shadow-sm sm:p-10 ${
                   index % 2 === 0 ? "bg-white" : "bg-[#faf9f7]"
-                }`}
+                } ${alignmentClass}`}
               >
                 <h2 className="text-2xl font-black tracking-tight text-gray-950 sm:text-3xl">
                   {section.title}
@@ -284,7 +314,8 @@ export default function BloomWebsiteAboutStorefront({
                   ))}
                 </div>
               </section>
-            ))
+              );
+            })
           ) : (
             <section className="rounded-[2rem] border border-gray-200 bg-white p-8 text-center shadow-sm">
               <h2 className="text-2xl font-black">A local florist you can count on.</h2>

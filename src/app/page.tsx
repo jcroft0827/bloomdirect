@@ -22,7 +22,7 @@ export const metadata: Metadata = {
       "BloomWebsites by GetBloomDirect | Florist Websites & Ecommerce",
   },
   description:
-    "Build a florist ecommerce website with online ordering, delivery and pickup, Stripe payments, tax tools, order workflows, refunds, recipes, and no Bloom order fees. Build free and pay when you launch.",
+    "Build a florist ecommerce website with online ordering, delivery and pickup, Stripe payments, tax tools, order workflows, refunds, recipes, and no Bloom order fees. Build and preview free; publishing is coming soon.",
   keywords: [
     "florist website builder",
     "florist ecommerce website",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     title:
       "BloomWebsites by GetBloomDirect | Florist Websites & Ecommerce",
     description:
-      "Build your florist website free. Launch for $129/month with $0 Bloom order fees.",
+      "Build and preview your florist website free. Publishing is coming soon.",
     images: [
       {
         url: "/og-image.png",

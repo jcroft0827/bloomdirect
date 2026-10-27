@@ -28,6 +28,7 @@ const ALLOWED_ASSET_TYPES = new Set([
   "product",
   "addon",
   "branding",
+  "wedding",
 ]);
 
 type UploadRequestBody = {
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
       product: "products",
       addon: "addons",
       branding: "branding",
+      wedding: "weddings",
     };
 
     const folder =

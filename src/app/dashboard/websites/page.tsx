@@ -191,6 +191,12 @@ export default async function WebsitesPage() {
               </p>
             </Link>
 
+            <Link href="/dashboard/websites/weddings" className="group bg-white p-6 transition hover:bg-purple-50/50">
+              <BookOpenText className="text-purple-700" size={23} />
+              <div className="mt-3 flex items-center gap-2"><p className="font-bold text-gray-950">Weddings & Events</p><ArrowRight size={15} className="text-gray-400 transition group-hover:translate-x-1 group-hover:text-purple-700" /></div>
+              <p className="mt-1 text-sm leading-6 text-gray-500">Showcase your wedding portfolio, services, and event design work.</p>
+            </Link>
+
             <Link
               href="/dashboard/websites/branding"
               className="group bg-white p-6 transition hover:bg-purple-50/50"

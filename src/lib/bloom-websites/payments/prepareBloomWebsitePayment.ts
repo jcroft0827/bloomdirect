@@ -1,4 +1,9 @@
 import BloomWebsiteCheckoutAttempt from "@/models/BloomWebsiteCheckoutAttempt";
+import { couponSandboxEnvironmentReady, couponOwnerUiSandboxReady } from "@/lib/bloom-websites/coupons/authorizeCouponSandboxPreparation";
+import BloomWebsiteCoupon from "@/models/BloomWebsiteCoupon";
+import { evaluateCoupon, normalizeCouponCode } from "@/lib/bloom-websites/coupons/evaluateCoupon";
+import { buildCouponPaymentSnapshot } from "@/lib/bloom-websites/coupons/buildCouponPaymentSnapshot";
+import { reserveCouponUse, releaseCouponUse } from "@/lib/bloom-websites/coupons/reserveCouponUse";
 import { connectToDB } from "@/lib/mongoose";
 import {
   reserveBloomWebsiteInventory,
@@ -35,12 +40,17 @@ export async function prepareBloomWebsitePayment({
   attemptId,
   preflight,
   tipCents,
+  couponCode,
   checkoutSnapshot,
 }: {
   attemptId: string;
   preflight: Preflight;
   tipCents: number;
+  /** Server-side integration point. Unavailable to checkout until atomic reservations ship. */
+  couponCode?: string;
   checkoutSnapshot: {
+    pickupDetails?: { person:string; firstName:string; lastName:string; phone:string; instructions:string; timeFrom:string; timeTo:string };
+    recipientEmail?: string;
     customer: {
       firstName: string;
       lastName: string;
@@ -144,11 +154,60 @@ export async function prepareBloomWebsitePayment({
     );
   }
 
+  // A direct caller cannot activate coupon payments in production. The API
+  // additionally requires a private sandbox token before passing couponCode.
+  if (couponCode && !(couponSandboxEnvironmentReady() || couponOwnerUiSandboxReady())) {
+    throw new BloomPreparePaymentError(
+      "COUPON_REDEMPTION_UNAVAILABLE",
+      "Coupon redemption is not available yet.",
+      409,
+    );
+  }
+
+  let evaluatedCoupon: { id: string; code: string; discountCents: number } | null = null;
+  if (couponCode) {
+    const code = normalizeCouponCode(couponCode);
+    if (!code) {
+      throw new BloomPreparePaymentError("INVALID_COUPON", "Invalid coupon code.", 400);
+    }
+    const coupon = await BloomWebsiteCoupon.findOne({
+      shop: preflight.shop._id,
+      website: preflight.website._id,
+      code,
+    }).lean<any>();
+    if (!coupon) {
+      throw new BloomPreparePaymentError("INVALID_COUPON", "Coupon is unavailable.");
+    }
+    const result = evaluateCoupon({
+      coupon,
+      code,
+      merchandiseSubtotalCents: preflight.totals.subtotalCents,
+    });
+    if (!result.ok) {
+      throw new BloomPreparePaymentError("COUPON_NOT_ELIGIBLE", "Coupon is not eligible for this order.");
+    }
+    evaluatedCoupon = { id: String(coupon._id), code: result.code, discountCents: result.discountCents };
+  }
+
   const tax = await calculateBloomWebsiteNativeCheckoutTax({
     attemptId,
     preflight,
     tipCents,
+    merchandiseDiscountCents: evaluatedCoupon?.discountCents ?? 0,
   });
+  const couponSnapshot = evaluatedCoupon
+    ? buildCouponPaymentSnapshot({
+        couponId: evaluatedCoupon.id,
+        code: evaluatedCoupon.code,
+        checkoutAttemptId: attemptId,
+        merchandiseSubtotalCents: preflight.totals.subtotalCents,
+        merchandiseDiscountCents: evaluatedCoupon.discountCents,
+        fulfillmentFeeCents: preflight.totals.fulfillmentFeeCents,
+        tipCents: tax.tipCents,
+        taxAmountCents: tax.taxAmountCents,
+        chargedTotalCents: tax.finalTotalCents,
+      })
+    : null;
 
   await BloomWebsiteCheckoutAttempt.updateOne(
     { _id: attempt._id, status: "validated" },
@@ -166,6 +225,8 @@ export async function prepareBloomWebsitePayment({
             customDomain: preflight.website.customDomain || "",
           },
           customer: checkoutSnapshot.customer,
+          pickupDetails: checkoutSnapshot.pickupDetails,
+          recipientEmail: checkoutSnapshot.recipientEmail,
           recipient: checkoutSnapshot.recipient,
           cardMessage: checkoutSnapshot.cardMessage,
           cardSignature: checkoutSnapshot.cardSignature,
@@ -189,6 +250,9 @@ export async function prepareBloomWebsitePayment({
       "MERCHANT_CONNECTION_MISSING",
       "The florist payment connection could not be found.",
     );
+  }
+  if (couponCode && readiness.provider !== "stripe") {
+    throw new BloomPreparePaymentError("COUPON_SANDBOX_STRIPE_ONLY", "Coupon testing requires Stripe sandbox.", 409);
   }
 
   const reservation = await reserveBloomWebsiteInventory({
@@ -223,6 +287,7 @@ export async function prepareBloomWebsitePayment({
         "payment.idempotencyKey": paymentIdempotencyKey,
         "payment.amountCents": tax.finalTotalCents,
         "payment.paymentStartedAt": paymentStartedAt,
+        couponSnapshot,
         "lastError.code": "",
         "lastError.message": "",
         "lastError.occurredAt": null,
@@ -243,7 +308,31 @@ export async function prepareBloomWebsitePayment({
     );
   }
 
+  let couponProviderRequestStarted = false;
   try {
+    // Claim the checkout attempt before reserving the coupon. The losing
+    // concurrent request must never release the winning request's hold.
+    // No processor request is allowed until this atomic reservation succeeds.
+    if (evaluatedCoupon) {
+      const couponReservation = await reserveCouponUse({
+        couponId: evaluatedCoupon.id,
+        shopId: String(preflight.shop._id),
+        websiteId: String(preflight.website._id),
+        attemptId: attempt.attemptId,
+        holdUntil: new Date(Date.now() + 30 * 60 * 1000),
+      });
+      if (couponReservation === "unavailable") {
+        throw new BloomPreparePaymentError(
+          "COUPON_CAPACITY_UNAVAILABLE",
+          "This coupon is no longer available. Please start a new checkout.",
+          409,
+        );
+      }
+    }
+
+    // From this point the provider may have accepted an idempotent payment
+    // even if our request times out before receiving or saving its ID.
+    couponProviderRequestStarted = evaluatedCoupon !== null;
     const payment: BloomCreatePaymentResult =
       await paymentProvider.createPayment({
         attemptId: attempt.attemptId,
@@ -341,6 +430,37 @@ export async function prepareBloomWebsitePayment({
       throw error;
     }
 
+    // A missing local provider ID does NOT prove the provider never created a
+    // payment. If we reached the create call, retain BOTH the coupon and
+    // inventory reservations and leave the attempt processing for reconciliation.
+    // Releasing only inventory here could oversell a paid coupon checkout.
+    if (evaluatedCoupon && couponProviderRequestStarted) {
+      await BloomWebsiteCheckoutAttempt.updateOne(
+        { _id: attempt._id, status: "payment_processing" },
+        { $set: {
+          "lastError.code": providerError?.code || "PAYMENT_PROVIDER_OUTCOME_UNKNOWN",
+          "lastError.message": "Payment creation outcome is uncertain; reservations held for reconciliation.",
+          "lastError.occurredAt": new Date(),
+        } },
+      ).catch(() => null);
+      throw new BloomPreparePaymentError(
+        "PAYMENT_RECONCILIATION_REQUIRED",
+        "Payment status is being checked. Please do not submit a new checkout yet.",
+        409,
+      );
+    }
+
+    // Provider creation was never invoked. It is safe to release the coupon
+    // reservation, if any, along with the inventory reservation below.
+    if (evaluatedCoupon) {
+      await releaseCouponUse({
+        couponId: evaluatedCoupon.id,
+        shopId: String(preflight.shop._id),
+        websiteId: String(preflight.website._id),
+        attemptId: attempt.attemptId,
+      });
+    }
+
     await releaseBloomWebsiteInventory({
       reservationId: reservation.reservationId,
       reason: "Payment provider could not start checkout.",
@@ -366,6 +486,9 @@ export async function prepareBloomWebsitePayment({
       },
     );
 
+    if (error instanceof BloomPreparePaymentError) {
+      throw error;
+    }
     throw new BloomPreparePaymentError(
       "CHECKOUT_ATTEMPT_FAILED",
       `${failureMessage} Please try again.`,

@@ -1,7 +1,8 @@
-import { ArrowLeft, Flower2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Flower2 } from "lucide-react";
 import Link from "next/link";
 
 import ProductConfigurator from "@/components/websites/storefront/ProductConfigurator";
+import ProductDetailsSections from "@/components/websites/storefront/ProductDetailsSections";
 import StorefrontCartButton from "@/components/websites/storefront/StorefrontCartButton";
 import WebsitePreviewBar from "@/components/websites/WebsitePreviewBar";
 import {
@@ -55,7 +56,7 @@ export default function BloomWebsiteProductStorefront({
           <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 sm:py-12 lg:px-10 lg:py-14">
             <nav
               aria-label="Breadcrumb"
-              className="mb-8 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500"
+              className="mb-7 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500 sm:mb-10"
             >
               <Link href={homeHref} className="transition hover:text-stone-900">
                 Home
@@ -75,44 +76,8 @@ export default function BloomWebsiteProductStorefront({
               variant="elegant"
             />
 
-            {product.description ? (
-              <section className="mt-16 border-t border-stone-200 py-14 sm:mt-20 sm:py-16">
-                <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:gap-16">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500">
-                      The details
-                    </p>
-                    <h2 className="mt-3 font-serif text-3xl font-medium tracking-tight text-stone-950 sm:text-4xl">
-                      Designed for the moment.
-                    </h2>
-                  </div>
-                  <p className="max-w-3xl whitespace-pre-line text-base leading-8 text-stone-600">
-                    {product.description}
-                  </p>
-                </div>
-              </section>
-            ) : null}
+            <ProductDetailsSections product={product} businessName={shop.businessName} elegant primaryColor={primaryColor} />
 
-            <section className="grid border-y border-stone-200 py-8 sm:grid-cols-2 sm:divide-x sm:divide-stone-200 sm:py-10">
-              <div className="flex gap-4 pb-6 sm:pb-0 sm:pr-10">
-                <Flower2 size={19} className="mt-0.5 shrink-0 text-stone-500" />
-                <div>
-                  <p className="font-serif text-xl text-stone-950">Designed locally</p>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-stone-500">
-                    Hand-designed by {shop.businessName}, not shipped from a warehouse.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-4 border-t border-stone-200 pt-6 sm:border-t-0 sm:pl-10 sm:pt-0">
-                <ShieldCheck size={19} className="mt-0.5 shrink-0 text-stone-500" />
-                <div>
-                  <p className="font-serif text-xl text-stone-950">Local florist delivery</p>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-stone-500">
-                    Prepared and delivered by a real local flower shop.
-                  </p>
-                </div>
-              </div>
-            </section>
           </div>
         </main>
 
@@ -190,7 +155,7 @@ export default function BloomWebsiteProductStorefront({
         <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
           <nav
             aria-label="Breadcrumb"
-            className="mb-7 flex flex-wrap items-center gap-2 text-sm text-gray-500"
+            className="mb-7 flex flex-wrap items-center gap-2 text-sm text-gray-500 sm:mb-9"
           >
             <Link
               href={homeHref}
@@ -211,63 +176,8 @@ export default function BloomWebsiteProductStorefront({
             accentColor={accentColor}
           />
 
-          {product.description && (
-            <section className="mx-auto mt-16 max-w-4xl border-t border-gray-100 pt-10 sm:mt-20">
-              <p
-                className="text-sm font-black uppercase tracking-[0.18em]"
-                style={{ color: primaryColor }}
-              >
-                About this arrangement
-              </p>
+          <ProductDetailsSections product={product} businessName={shop.businessName} primaryColor={primaryColor} />
 
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-gray-950 sm:text-3xl">
-                Designed for the moment.
-              </h2>
-
-              <p className="mt-5 whitespace-pre-line text-base leading-8 text-gray-600">
-                {product.description}
-              </p>
-            </section>
-          )}
-
-          <section className="mx-auto mt-12 grid max-w-4xl gap-3 border-t border-gray-100 pt-10 sm:grid-cols-2">
-            <div className="flex gap-3 rounded-2xl bg-gray-50 p-5">
-              <Flower2
-                size={21}
-                className="mt-0.5 shrink-0"
-                style={{ color: primaryColor }}
-              />
-
-              <div>
-                <p className="text-sm font-black text-gray-950">
-                  Designed locally
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-gray-500">
-                  Hand-designed by {shop.businessName}, not shipped from a
-                  warehouse.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 rounded-2xl bg-gray-50 p-5">
-              <ShieldCheck
-                size={21}
-                className="mt-0.5 shrink-0"
-                style={{ color: accentColor }}
-              />
-
-              <div>
-                <p className="text-sm font-black text-gray-950">
-                  Local florist delivery
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-gray-500">
-                  Prepared and delivered by a real local flower shop.
-                </p>
-              </div>
-            </div>
-          </section>
         </div>
       </main>
 

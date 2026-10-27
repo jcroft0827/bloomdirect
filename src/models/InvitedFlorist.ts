@@ -86,6 +86,8 @@ const invitedFloristSchema = new Schema(
       default: "registration",
     },
 
+    earlyAccessTokenHash: { type: String, default: "", select: false },
+    earlyAccessExpiresAt: { type: Date, default: null },
     invitationUrl: {
       type: String,
       trim: true,
@@ -99,6 +101,7 @@ const invitedFloristSchema = new Schema(
         "sent",
         "failed",
         "registered",
+        "claiming",
         "declined",
       ],
       default: "draft",

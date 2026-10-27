@@ -81,6 +81,13 @@ const bloomWebsiteCheckoutAttemptSchema = new Schema(
       default: null,
     },
 
+    // C2B: frozen, server-authoritative discount breakdown for paid recovery.
+    // Null means legacy/no-coupon checkout. Never populated from browser totals.
+    couponSnapshot: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+
     // ===============================
     // FINALIZATION STATE MACHINE
     // ===============================

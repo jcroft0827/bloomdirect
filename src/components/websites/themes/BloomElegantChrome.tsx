@@ -20,6 +20,7 @@ type ElegantHeaderProps = {
   primaryColor: string;
   primaryForeground: "#000000" | "#ffffff";
   aboutEnabled?: boolean;
+  editorPreview?: boolean;
   announcement?: {
     isActive: boolean;
     message: string;
@@ -55,6 +56,7 @@ export function BloomElegantHeader({
   primaryColor,
   primaryForeground,
   aboutEnabled = true,
+  editorPreview = false,
   announcement,
 }: ElegantHeaderProps) {
   const homeHref = basePath || "/";
@@ -107,12 +109,16 @@ export function BloomElegantHeader({
               Shop
             </Link>
 
-            <StorefrontCartButton
-              primaryColor={primaryColor}
-              primaryForeground={primaryForeground}
-              compact
-              variant="elegant"
-            />
+            {editorPreview ? (
+              <span aria-label="Shopping bag (preview only)" className="inline-flex min-h-10 items-center border-b border-stone-400 px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-700">Bag</span>
+            ) : (
+              <StorefrontCartButton
+                primaryColor={primaryColor}
+                primaryForeground={primaryForeground}
+                compact
+                variant="elegant"
+              />
+            )}
           </div>
         </div>
       </header>

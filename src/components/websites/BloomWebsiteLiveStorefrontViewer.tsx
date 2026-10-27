@@ -10,6 +10,7 @@ import type {
   BloomWebsiteHomepageSectionKey,
   BloomWebsiteHomepageSectionVisibility,
   BloomWebsiteLogoSize,
+  BloomWebsiteButtonCorners,
   BloomWebsiteThemeName,
   BloomWebsiteTrustPoint,
 } from "@/types/bloom-website";
@@ -19,6 +20,7 @@ type PreviewMode = "desktop" | "mobile";
 
 type Props = {
   previewSlug: string;
+  buttonCorners?: BloomWebsiteButtonCorners;
   theme: BloomWebsiteThemeName;
   siteName: string;
   logo: string;
@@ -64,6 +66,7 @@ const VIEWPORTS: Record<
 
 function buildPreviewUrl({
   previewSlug,
+  buttonCorners,
   theme,
   siteName,
   logo,
@@ -88,6 +91,7 @@ function buildPreviewUrl({
 
   params.set("builder", "1");
   params.set("embedded", "1");
+  if (buttonCorners) params.set("buttonCorners", buttonCorners);
   params.set("theme", theme);
   params.set("siteName", siteName);
   params.set("logo", logo);
@@ -132,8 +136,13 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
   const [previewLoading, setPreviewLoading] = useState(true);
   const [availableWidth, setAvailableWidth] = useState(0);
   const measureRef = useRef<HTMLDivElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const nextPreviewUrl = buildPreviewUrl(props);
+
+  // Draft button corners are applied by a client component inside the
+  // preview document after hydration, not by mutating the iframe on load.
+  // Its query-string prop already changes the iframe URL when edited.
 
   useEffect(() => {
     if (nextPreviewUrl === previewUrl) {
@@ -171,6 +180,40 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
     observer.observe(node);
 
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const frame = iframeRef.current;
+    if (!frame) return;
+    const securePreview = () => {
+      const doc = frame.contentDocument;
+      if (!doc) return;
+      // The preview is same-origin. Leave scroll, selection and text input
+      // intact while blocking links, cart actions and form submissions.
+      const blockClick = (event: MouseEvent) => {
+        const target = event.target;
+        if (!target || !(target as Element).closest) return;
+        if ((target as Element).closest('a, button, [role="button"], [type="submit"]')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      };
+      const blockSubmit = (event: Event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      doc.addEventListener('click', blockClick, true);
+      doc.addEventListener('submit', blockSubmit, true);
+      return () => {
+        doc.removeEventListener('click', blockClick, true);
+        doc.removeEventListener('submit', blockSubmit, true);
+      };
+    };
+    let cleanup: (() => void) | undefined;
+    const onLoad = () => { cleanup?.(); cleanup = securePreview(); };
+    frame.addEventListener('load', onLoad);
+    cleanup = securePreview();
+    return () => { frame.removeEventListener('load', onLoad); cleanup?.(); };
   }, []);
 
   const viewport = VIEWPORTS[mode];
@@ -246,6 +289,7 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
             }}
           >
             <iframe
+              ref={iframeRef}
               title={`${mode === "desktop" ? "Desktop" : "Mobile"} storefront preview`}
               src={previewUrl}
               onLoad={() => setPreviewLoading(false)}
@@ -277,8 +321,7 @@ export default function BloomWebsiteLiveStorefrontViewer(props: Props) {
         </div>
 
         <p className="mt-3 text-center text-[11px] leading-5 text-gray-500">
-          Preview viewport: {viewport.width} × {viewport.height}. Use the full
-          preview for checkout and navigation testing.
+          Preview viewport: {viewport.width} × {viewport.height}. Editing previews are read-only; use a separate authorized test storefront for checkout testing.
         </p>
       </div>
     </section>

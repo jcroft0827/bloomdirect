@@ -1,3 +1,4 @@
+import { isPrelaunchHoldEnabled, PRELAUNCH_HOLD_MESSAGE } from "@/lib/prelaunchHold";
 // app/api/register/route.ts
 
 import crypto from "crypto";
@@ -107,6 +108,7 @@ export async function POST(req: Request) {
 
     const {
       businessName,
+      earlyAccessToken,
       email,
       password,
       turnstileToken,
@@ -236,6 +238,27 @@ if (
       );
     }
 
+    // Public enrollment is paused: only a fresh emailed invitation for this exact email may register.
+    // Never authorize merely because an admin once entered the email in Customer Success.
+    let claimedInvitationId: string | null = null;
+    if (isPrelaunchHoldEnabled()) {
+      const token = typeof earlyAccessToken === "string" ? earlyAccessToken.trim() : "";
+      if (!/^[0-9a-f]{64}$/.test(token)) {
+        return NextResponse.json({ error: PRELAUNCH_HOLD_MESSAGE, code: "INVITATION_REQUIRED" }, { status: 403 });
+      }
+      const tokenHash = hashVerificationCode(token);
+      const claimed = await InvitedFlorist.findOneAndUpdate(
+        { email: normalizedEmail, status: "sent", earlyAccessTokenHash: tokenHash,
+          earlyAccessExpiresAt: { $gt: new Date() } },
+        { $set: { status: "claiming" } },
+        { new: true },
+      );
+      if (!claimed) {
+        return NextResponse.json({ error: "This early-access invitation is invalid, expired, or already used.", code: "INVITATION_INVALID" }, { status: 403 });
+      }
+      claimedInvitationId = claimed._id.toString();
+    }
+
     const verificationCode = generateVerificationCode();
 
     const emailVerificationCodeHash =
@@ -251,7 +274,9 @@ if (
      */
     const acceptedAt = new Date();
 
-    const shop = await Shop.create({
+    let shop;
+    try {
+      shop = await Shop.create({
       // Core identity
       businessName: normalizedBusinessName,
       email: normalizedEmail,
@@ -289,6 +314,19 @@ if (
         ordersDeclined: 0,
       },
     });
+    } catch (createError) {
+      if (claimedInvitationId) {
+        await InvitedFlorist.updateOne({ _id: claimedInvitationId, status: "claiming" },
+          { $set: { status: "sent" } }).catch(() => undefined);
+      }
+      throw createError;
+    }
+
+    if (claimedInvitationId) {
+      await InvitedFlorist.updateOne({ _id: claimedInvitationId, status: "claiming" },
+        { $set: { status: "registered", registeredShop: shop._id, convertedAt: acceptedAt },
+          $unset: { earlyAccessTokenHash: "", earlyAccessExpiresAt: "" } });
+    }
 
     /*
      * If this florist was previously invited through Customer Success,

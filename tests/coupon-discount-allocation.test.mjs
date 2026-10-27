@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { allocateMerchandiseDiscount as allocate } from '../src/lib/bloom-websites/coupons/allocateMerchandiseDiscount.ts';
+const lines=[{referenceId:'product:0',amountCents:7000},{referenceId:'addon:0',amountCents:3000}];
+test('proportional $10 discount reconciles across product and addon',()=>{const r=allocate(lines,1000);assert.deepEqual(r.map(x=>x.discountCents),[700,300]);assert.equal(r.reduce((n,x)=>n+x.discountedAmountCents,0),9000)});
+test('odd-cent discounts allocate exactly with deterministic reference tie break',()=>{const r=allocate([{referenceId:'b',amountCents:100},{referenceId:'a',amountCents:100}],1);assert.deepEqual(r.map(x=>x.discountCents),[0,1]);assert.equal(r.reduce((n,x)=>n+x.discountCents,0),1)});
+test('fully discounted merchandise becomes zero, never negative',()=>{const r=allocate(lines,10000);assert.deepEqual(r.map(x=>x.discountedAmountCents),[0,0])});
+test('zero discount and zero-value lines are valid',()=>{assert.deepEqual(allocate([{referenceId:'a',amountCents:0}],0)[0].discountedAmountCents,0)});
+test('rejects discounts above merchandise',()=>assert.throws(()=>allocate(lines,10001),/exceeds/));
+test('rejects negative or noninteger discounts',()=>{assert.throws(()=>allocate(lines,-1));assert.throws(()=>allocate(lines,1.5))});
+test('rejects duplicate IDs and invalid line values',()=>{assert.throws(()=>allocate([lines[0],lines[0]],1));assert.throws(()=>allocate([{referenceId:'x',amountCents:NaN}],1))});
+test('preserves line order and does not mutate caller input',()=>{const before=JSON.stringify(lines);assert.deepEqual(allocate(lines,333).map(x=>x.referenceId),['product:0','addon:0']);assert.equal(JSON.stringify(lines),before)});
+test('mixed taxability is retained by caller after applying allocations',()=>{const r=allocate([{referenceId:'taxable',amountCents:5000},{referenceId:'exempt',amountCents:5000}],1000);assert.deepEqual(r.map(x=>x.discountedAmountCents),[4500,4500])});
+test('very large safe-integer values do not lose cents to float precision',()=>{const r=allocate([{referenceId:'a',amountCents:9007199254740000},{referenceId:'b',amountCents:991}],12345);assert.equal(r.reduce((n,x)=>n+x.discountCents,0),12345)});

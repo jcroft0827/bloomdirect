@@ -6,6 +6,7 @@ import {
   releaseBloomWebsiteInventory,
 } from "@/lib/bloom-websites/bloomWebsiteInventoryReservations";
 import BloomWebsiteCheckoutAttempt from "@/models/BloomWebsiteCheckoutAttempt";
+import { releaseCouponUse } from "@/lib/bloom-websites/coupons/reserveCouponUse";
 import BloomWebsiteInventoryReservation from "@/models/BloomWebsiteInventoryReservation";
 
 import { finalizeBloomWebsitePayment } from "./finalizeBloomWebsitePayment";
@@ -64,7 +65,7 @@ export async function recoverExpiredBloomWebsiteInventoryReservations({
       reservation.checkoutAttempt,
     )
       .select(
-        "attemptId website status order payment inventory lastError",
+        "attemptId website shop status order payment inventory lastError couponSnapshot",
       )
       .lean<any>();
 
@@ -285,36 +286,80 @@ export async function recoverExpiredBloomWebsiteInventoryReservations({
     }
 
     /*
-     * No live processor payment exists. It is safe to return the reserved
-     * inventory and close the stale checkout attempt.
+     * No provider ID is not proof that no payment exists. A provider call may
+     * have succeeded before its reference was stored. Retain BOTH holds for
+     * payment_processing and any otherwise ambiguous status; require manual
+     * provider reconciliation rather than potentially overselling inventory
+     * or reissuing a limited-use coupon.
+     *
+     * Only created/validated checkouts have not entered the payment-creation
+     * stage, so their expired reservations can be safely released.
      */
+    if (attempt.status !== "created" && attempt.status !== "validated") {
+      const extendedTo = processingExtensionFromNow();
+      await BloomWebsiteInventoryReservation.updateOne(
+        { _id: reservation._id, status: "active" },
+        { $set: { expiresAt: extendedTo } },
+      );
+      results.push({
+        attemptId: attempt.attemptId,
+        action: "held_for_payment_review",
+        code: "PAYMENT_STATUS_NOT_PROVEN_TERMINAL",
+      });
+      continue;
+    }
+
+    // Close the attempt FIRST with a conditional update. Payment preparation
+    // may have claimed it after the read above; never release its inventory
+    // or coupon if that race was won by payment preparation.
+    const closed = await BloomWebsiteCheckoutAttempt.updateOne(
+      { _id: attempt._id, status: { $in: ["created", "validated"] } },
+      {
+        $set: {
+          status: "failed",
+          "lastError.code": "CHECKOUT_EXPIRED",
+          "lastError.message": "Checkout expired before payment completed.",
+          "lastError.occurredAt": new Date(),
+        },
+      },
+    );
+    if (closed.modifiedCount !== 1) {
+      await BloomWebsiteInventoryReservation.updateOne(
+        { _id: reservation._id, status: "active" },
+        { $set: { expiresAt: processingExtensionFromNow() } },
+      );
+      results.push({
+        attemptId: attempt.attemptId,
+        action: "held_for_payment_review",
+        code: "CHECKOUT_EXPIRY_RACE_RECHECK_REQUIRED",
+      });
+      continue;
+    }
+
     const released = await releaseBloomWebsiteInventory({
       reservationId,
-      reason: "Checkout inventory reservation expired before payment completed.",
+      reason: "Checkout expired before payment preparation started.",
     });
 
-    if (
-      released.released &&
-      attempt.status !== "failed" &&
-      attempt.status !== "order_committed"
-    ) {
-      await BloomWebsiteCheckoutAttempt.updateOne(
-        {
-          _id: attempt._id,
-          status: {
-            $in: ["created", "validated", "payment_processing"],
-          },
-        },
-        {
-          $set: {
-            status: "failed",
-            "lastError.code": "CHECKOUT_EXPIRED",
-            "lastError.message":
-              "Checkout expired before payment completed.",
-            "lastError.occurredAt": new Date(),
-          },
-        },
-      );
+    // A created/validated checkout never entered the payment-provider call.
+    // Release any coupon hold only once the inventory has been released and
+    // the attempt has been durably closed (or was already failed).
+    if (released.released && attempt.couponSnapshot?.couponId) {
+      try {
+          await releaseCouponUse({
+            couponId: String(attempt.couponSnapshot.couponId),
+            shopId: id(attempt.shop),
+            websiteId: id(attempt.website),
+            attemptId: attempt.attemptId,
+          });
+      } catch (error: any) {
+        results.push({
+          attemptId: attempt.attemptId,
+          action: "error",
+          code: "COUPON_EXPIRED_CHECKOUT_RELEASE_FAILED",
+        });
+        continue;
+      }
     }
 
     results.push({

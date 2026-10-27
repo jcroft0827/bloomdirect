@@ -53,6 +53,7 @@ export default function BloomWebsiteThemeSurface({
     <div
       style={style}
       data-bloom-background={theme.backgroundStyle}
+      data-bloom-button-corners={theme.buttonCorners}
       className={`relative isolate min-h-screen overflow-hidden bg-white text-gray-950 ${className}`}
     >
       {getBackgroundDecoration(theme.backgroundStyle)}

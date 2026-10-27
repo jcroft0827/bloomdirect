@@ -31,7 +31,7 @@ declare global {
   }
 }
 
-export default function Register() {
+export default function Register({ earlyAccessToken = "" }: { earlyAccessToken?: string }) {
   const router = useRouter();
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -159,6 +159,7 @@ export default function Register() {
 
         body: JSON.stringify({
           ...form,
+          earlyAccessToken,
 
           turnstileToken,
 

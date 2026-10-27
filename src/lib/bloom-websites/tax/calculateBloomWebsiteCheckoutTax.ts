@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { buildDiscountedTaxLines } from "@/lib/bloom-websites/coupons/buildDiscountedTaxLines";
 
 import { connectToDB } from "@/lib/mongoose";
 import BloomWebsiteCheckoutAttempt from "@/models/BloomWebsiteCheckoutAttempt";
@@ -20,6 +21,8 @@ export type CalculateBloomWebsiteCheckoutTaxInput = {
   attemptId: string;
   preflight: CheckoutPreflightResult;
   tipCents?: number;
+  /** Server-evaluated discount only; never pass storefront-submitted amounts here. */
+  merchandiseDiscountCents?: number;
   provider: BloomTaxProvider;
 };
 
@@ -27,6 +30,7 @@ export type CalculateBloomWebsiteCheckoutTaxResult = {
   calculation: BloomTaxCalculationResult;
   inputFingerprint: string;
   merchandiseAndFulfillmentCents: number;
+  merchandiseDiscountCents: number;
   tipCents: number;
   taxAmountCents: number;
   finalTotalCents: number;
@@ -356,9 +360,19 @@ export async function calculateBloomWebsiteCheckoutTax({
   attemptId,
   preflight,
   tipCents: rawTipCents,
+  merchandiseDiscountCents: rawDiscountCents = 0,
   provider,
 }: CalculateBloomWebsiteCheckoutTaxInput): Promise<CalculateBloomWebsiteCheckoutTaxResult> {
   const tipCents = normalizeTipCents(rawTipCents);
+  if (!Number.isSafeInteger(rawDiscountCents) || rawDiscountCents < 0 ||
+      rawDiscountCents > preflight.totals.subtotalCents) {
+    throw new BloomWebsiteCheckoutTaxError(
+      "INVALID_MERCHANDISE_DISCOUNT",
+      "The merchandise discount is invalid for this checkout.",
+      400,
+    );
+  }
+  const merchandiseDiscountCents = rawDiscountCents;
 
   if (
     tipCents > 0 &&
@@ -420,6 +434,23 @@ export async function calculateBloomWebsiteCheckoutTax({
 
   const exemptionVerified = attempt.taxExemption?.status === "verified";
 
+  // Apply only to product/add-on lines. Delivery and gratuities are never
+  // discounted, and the line taxability/rate stays attached to each item.
+  const originalTaxLines = buildTaxLines(preflight, tipCents);
+  const taxLines = merchandiseDiscountCents > 0
+    ? buildDiscountedTaxLines(originalTaxLines, merchandiseDiscountCents)
+    : originalTaxLines;
+  const originalMerchandiseTotal = originalTaxLines
+    .filter(line => line.kind === "product" || line.kind === "addon")
+    .reduce((sum, line) => sum + line.amountCents, 0);
+  if (originalMerchandiseTotal !== preflight.totals.subtotalCents) {
+    throw new BloomWebsiteCheckoutTaxError(
+      "MERCHANDISE_TAX_LINES_MISMATCH",
+      "Merchandise tax lines do not match the validated cart.",
+      409,
+    );
+  }
+
   const calculationInput: BloomTaxCalculationInput = {
     shopId,
     websiteId,
@@ -429,7 +460,7 @@ export async function calculateBloomWebsiteCheckoutTax({
     customerAddress,
     fulfillmentType: preflight.fulfillment.type,
     requestedDate: preflight.fulfillment.requestedDate,
-    lines: buildTaxLines(preflight, tipCents),
+    lines: taxLines,
     deliveryFeeCents: preflight.totals.fulfillmentFeeCents,
     tipCents,
     exemption: {
@@ -459,7 +490,7 @@ export async function calculateBloomWebsiteCheckoutTax({
   }
 
   const merchandiseAndFulfillmentCents =
-    preflight.totals.subtotalCents +
+    preflight.totals.subtotalCents - merchandiseDiscountCents +
     preflight.totals.fulfillmentFeeCents;
 
   const finalTotalCents =
@@ -504,6 +535,7 @@ export async function calculateBloomWebsiteCheckoutTax({
     calculation,
     inputFingerprint,
     merchandiseAndFulfillmentCents,
+    merchandiseDiscountCents,
     tipCents,
     taxAmountCents: calculation.taxAmountCents,
     finalTotalCents,

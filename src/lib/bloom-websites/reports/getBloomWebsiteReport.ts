@@ -21,6 +21,8 @@ export type BloomWebsiteReportOrderRow = {
   addonSubtotalCents: number;
   deliveryCents: number;
   tipCents: number;
+  couponCode: string;
+  couponDiscountCents: number;
   taxableSubtotalCents: number;
   taxCents: number;
   totalCents: number;
@@ -82,6 +84,8 @@ export type BloomWebsiteReport = {
     deliveryOrders: number;
     pickupOrders: number;
     merchandiseSalesCents: number;
+    couponDiscountsCents: number;
+    netMerchandiseSalesCents: number;
     deliverySalesCents: number;
     grossSalesCents: number;
     tipsCents: number;
@@ -367,6 +371,7 @@ export async function getBloomWebsiteReport({
   let tipsTaxCents = 0;
   let taxCollectedCents = 0;
   let totalChargedCents = 0;
+  let couponDiscountsCents = 0;
   let exemptOrderCount = 0;
   let disputedOrderCount = 0;
   let taxLineCoverageOrderCount = 0;
@@ -378,6 +383,10 @@ export async function getBloomWebsiteReport({
     const addonSubtotalCents = cents(order?.totals?.addonSubtotalCents);
     const deliveryCents = cents(order?.totals?.fulfillmentFeeCents);
     const orderTipsCents = cents(order?.totals?.tipCents);
+    const couponCode = typeof order?.couponSnapshot?.code === "string" ? order.couponSnapshot.code : "";
+    const couponDiscountCents = order?.couponSnapshot?.version === 1 ?
+      Math.min(cents(order?.couponSnapshot?.discountCents), productSubtotalCents + addonSubtotalCents) : 0;
+    couponDiscountsCents += couponDiscountCents;
     const orderTaxableCents = cents(order?.totals?.taxableSubtotalCents);
     const orderTaxCents = cents(order?.totals?.taxAmountCents);
     const orderTotalCents = cents(order?.totals?.totalCents);
@@ -439,6 +448,8 @@ export async function getBloomWebsiteReport({
       addonSubtotalCents,
       deliveryCents,
       tipCents: orderTipsCents,
+      couponCode,
+      couponDiscountCents,
       taxableSubtotalCents: orderTaxableCents,
       taxCents: orderTaxCents,
       totalCents: orderTotalCents,
@@ -636,6 +647,8 @@ export async function getBloomWebsiteReport({
       deliveryOrders,
       pickupOrders,
       merchandiseSalesCents,
+      couponDiscountsCents,
+      netMerchandiseSalesCents: merchandiseSalesCents - couponDiscountsCents,
       deliverySalesCents,
       grossSalesCents: merchandiseSalesCents + deliverySalesCents,
       tipsCents,
@@ -667,7 +680,7 @@ export async function getBloomWebsiteReport({
       pendingRefundsCents,
       taxRefundedCents,
       netReceiptsBeforeTaxCents:
-        merchandiseSalesCents +
+        merchandiseSalesCents - couponDiscountsCents +
         deliverySalesCents +
         tipsCents -
         (successfulRefundsCents - taxRefundedCents),

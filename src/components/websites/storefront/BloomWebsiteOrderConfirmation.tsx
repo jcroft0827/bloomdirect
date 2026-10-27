@@ -10,6 +10,7 @@ import { notFound } from "next/navigation";
 import { connectToDB } from "@/lib/mongoose";
 import BloomWebsiteCheckoutAttempt from "@/models/BloomWebsiteCheckoutAttempt";
 import BloomWebsiteOrder from "@/models/BloomWebsiteOrder";
+import { getOrderCouponSummary } from "@/lib/bloom-websites/coupons/orderCouponSummary";
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -46,6 +47,8 @@ export default async function BloomWebsiteOrderConfirmation({
   if (!order) {
     notFound();
   }
+
+  const coupon = getOrderCouponSummary(order);
 
   return (
     <main className="min-h-[70vh] bg-gray-50 px-5 py-10 sm:px-8 lg:py-16">
@@ -138,6 +141,14 @@ export default async function BloomWebsiteOrderConfirmation({
                     </p>
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 space-y-2 border-t border-gray-200 pt-4 text-sm">
+                <div className="flex justify-between"><span>Merchandise subtotal</span><strong>{money(order.totals.subtotalCents)}</strong></div>
+                {coupon && <div className="flex justify-between text-green-700"><span>Coupon ({coupon.code})</span><strong>−{money(coupon.discountCents)}</strong></div>}
+                <div className="flex justify-between"><span>{order.fulfillment.type === "pickup" ? "Pickup" : "Delivery"}</span><strong>{money(order.totals.fulfillmentFeeCents)}</strong></div>
+                {order.totals.tipCents > 0 && <div className="flex justify-between"><span>Gratuity</span><strong>{money(order.totals.tipCents)}</strong></div>}
+                <div className="flex justify-between"><span>Sales tax</span><strong>{money(order.totals.taxAmountCents)}</strong></div>
+                <div className="flex justify-between border-t border-gray-200 pt-3 text-base font-black"><span>Total paid</span><span>{money(order.totals.totalCents)}</span></div>
               </div>
             </div>
 

@@ -1,3 +1,4 @@
+import { randomBytes, createHash } from "node:crypto";
 import { sendAdminFloristInvitationEmail } from "@/lib/email/adminFloristInvitationEmail";
 import { EmailEvent } from "@/models/EmailEvent";
 import InvitedFlorist from "@/models/InvitedFlorist";
@@ -36,6 +37,11 @@ export async function sendFloristInvitation({
     throw new Error("Invited florist not found.");
   }
 
+  // A fresh invitation link expires after 30 days; resending invalidates the previous link.
+  const rawToken = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://getbloomdirect.com").replace(/\/$/, "");
+  const inviteUrl = `${appUrl}/register?earlyAccess=${encodeURIComponent(rawToken)}`;
   const subject = `${invitation.shopName}, you’re invited to join GetBloomDirect`;
 
   try {
@@ -43,7 +49,7 @@ export async function sendFloristInvitation({
       to: invitation.email,
       shopName: invitation.shopName,
       contactName: invitation.contactName,
-      inviteLink: invitation.invitationUrl,
+      inviteLink: inviteUrl,
       invitedByName,
       personalMessage: personalMessage?.trim(),
     });
@@ -51,6 +57,9 @@ export async function sendFloristInvitation({
     const resendEmailId = emailResult.data?.id || "";
     const sentAt = new Date();
 
+    invitation.earlyAccessTokenHash = tokenHash;
+    invitation.earlyAccessExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    invitation.invitationUrl = inviteUrl;
     invitation.status = "sent";
     invitation.lastSentAt = sentAt;
     invitation.lastContactedAt = sentAt;

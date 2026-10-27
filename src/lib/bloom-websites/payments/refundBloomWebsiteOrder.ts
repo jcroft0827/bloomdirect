@@ -240,7 +240,11 @@ export function getBloomWebsiteRefundAvailability(
       clean(productTaxLine?.referenceId) ||
       productReference(item, itemIndex);
     const originalQuantity = Number(item.quantity || 0);
-    const originalPrincipalCents = cents(item.productSubtotalCents);
+    const originalPrincipalCents = Math.min(
+      cents(item.productSubtotalCents),
+      Number.isSafeInteger(productTaxLine?.amountCents) && productTaxLine.amountCents >= 0
+        ? productTaxLine.amountCents : cents(item.productSubtotalCents),
+    );
     const principalUsed = principalRefunded.get(productRef) || 0;
     const quantityUsed =
       quantityRefunded.get(productRef) ||
@@ -283,7 +287,11 @@ export function getBloomWebsiteRefundAvailability(
         clean(addonTaxLine?.referenceId) ||
         addonReference(item, itemIndex, addon, addonIndex);
       const originalAddonQuantity = Number(addon.quantity || 0);
-      const originalAddonPrincipal = cents(addon.lineTotalCents);
+      const originalAddonPrincipal = Math.min(
+        cents(addon.lineTotalCents),
+        Number.isSafeInteger(addonTaxLine?.amountCents) && addonTaxLine.amountCents >= 0
+          ? addonTaxLine.amountCents : cents(addon.lineTotalCents),
+      );
       const addonPrincipalUsed = principalRefunded.get(addonRef) || 0;
       const addonQuantityUsed =
         quantityRefunded.get(addonRef) ||
@@ -531,8 +539,12 @@ function buildStructuredRefundPlan(
       }
 
       quantity = requestedQuantity;
-      principalAmountCents =
-        component.unitAmountCents * requestedQuantity;
+      // Coupon orders can have a discounted line amount that does not divide
+      // evenly by quantity. Refund the final remaining quantity at the exact
+      // remaining principal; earlier quantities receive a proportional share.
+      principalAmountCents = requestedQuantity === component.workingQuantity
+        ? component.workingPrincipalCents
+        : Math.floor(component.workingPrincipalCents * requestedQuantity / component.workingQuantity);
 
       if (principalAmountCents > component.workingPrincipalCents) {
         throw new BloomWebsiteRefundError(

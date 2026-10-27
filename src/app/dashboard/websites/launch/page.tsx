@@ -1,3 +1,4 @@
+import { areNewBloomWebsiteActivationsPaused, WEBSITE_ACTIVATION_PAUSED_MESSAGE } from "@/lib/prelaunchHold";
 // src/app/dashboard/websites/launch/page.tsx
 
 import Link from "next/link";
@@ -421,6 +422,7 @@ export default async function WebsiteLaunchPage({
       )}
 
       <BloomWebsiteBillingCard
+        activationsPaused={areNewBloomWebsiteActivationsPaused()}
         websiteId={refreshedWebsite._id.toString()}
         billing={{
           status: refreshedWebsite.billing?.status || "",
@@ -434,6 +436,13 @@ export default async function WebsiteLaunchPage({
           ),
         }}
       />
+
+      {areNewBloomWebsiteActivationsPaused() && refreshedWebsite.status === "preview" && (
+        <section className="rounded-2xl border border-purple-200 bg-purple-50 p-5 text-purple-950" role="status">
+          <p className="text-lg font-bold">Build now. Publishing coming soon.</p>
+          <p className="mt-2 text-sm leading-6">{WEBSITE_ACTIVATION_PAUSED_MESSAGE} New paid BloomWebsites activations are temporarily unavailable.</p>
+        </section>
+      )}
 
       <section
         className={`rounded-3xl border p-6 sm:p-8 ${
@@ -484,12 +493,12 @@ export default async function WebsiteLaunchPage({
             </div>
           </div>
 
-          <BloomWebsiteLaunchActions
+          {!(areNewBloomWebsiteActivationsPaused() && refreshedWebsite.status === "preview") && <BloomWebsiteLaunchActions
             websiteId={refreshedWebsite._id.toString()}
             status={refreshedWebsite.status}
             readyToPublish={readiness.readyToPublish}
             customDomain={refreshedWebsite.customDomain || ""}
-          />
+          />}
         </div>
       </section>
 

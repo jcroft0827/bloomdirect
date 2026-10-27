@@ -103,6 +103,7 @@ export async function updateBloomWebsiteOrderStatus({
   internalNote = "",
   customerNote = "",
   notifyCustomer,
+  notificationPhotoId = "",
   source = "portal",
   actorId = "",
   actorLabel = "",
@@ -114,6 +115,7 @@ export async function updateBloomWebsiteOrderStatus({
   internalNote?: string;
   customerNote?: string;
   notifyCustomer?: boolean;
+  notificationPhotoId?: string;
   source?: BloomWebsiteFulfillmentEventSource;
   actorId?: string;
   actorLabel?: string;
@@ -131,6 +133,14 @@ export async function updateBloomWebsiteOrderStatus({
       "BloomWebsite order could not be found.",
       404,
     );
+  }
+
+  if (notificationPhotoId) {
+    const eligibleStatus = ["ready_for_pickup", "preparation_complete", "out_for_delivery", "fulfilled"].includes(nextStatus);
+    const photoExists = Array.isArray(order.arrangementPhotos) && order.arrangementPhotos.some((photo: any) => photo.photoId === notificationPhotoId);
+    if (!notifyCustomer || !eligibleStatus || !photoExists) {
+      throw new BloomWebsiteOrderStatusError("INVALID_NOTIFICATION_PHOTO", "Choose an uploaded arrangement photo and enable customer notification.", 400);
+    }
   }
 
   const currentStatus = order.status as BloomWebsiteOrderStatus;
@@ -303,6 +313,7 @@ export async function updateBloomWebsiteOrderStatus({
         await sendBloomWebsiteDeliveryConfirmation(String(order._id), {
           customerNote: resolvedCustomerNote,
           scope: eventId,
+          notificationPhotoId,
         }).catch((error) => {
           console.error("BloomWebsite delivery confirmation failed:", error);
           return false;
@@ -313,6 +324,7 @@ export async function updateBloomWebsiteOrderStatus({
         await sendBloomWebsiteStatusNotification(String(order._id), {
           customerNote: resolvedCustomerNote,
           scope: eventId,
+          notificationPhotoId,
         }).catch((error) => {
           console.error("BloomWebsite status notification failed:", error);
           return false;

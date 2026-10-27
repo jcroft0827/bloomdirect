@@ -256,6 +256,13 @@ export const NavLinks = ({
           })}
 
           {navLink({
+            href: "/dashboard/websites/coupons",
+            label: "Coupons",
+            icon: <ShoppingBag className={iconClass} aria-hidden="true" />,
+            active: pathname === "/dashboard/websites/coupons",
+          })}
+
+          {navLink({
             href: "/dashboard/websites/reports",
             label: "Reports",
             icon: <BarChart3 className={iconClass} aria-hidden="true" />,
@@ -281,6 +288,13 @@ export const NavLinks = ({
             label: "About Page",
             icon: <BookOpenText className={iconClass} aria-hidden="true" />,
             active: pathname === "/dashboard/websites/about",
+          })}
+
+          {navLink({
+            href: "/dashboard/websites/weddings",
+            label: "Weddings & Events",
+            icon: <BookOpenText className={iconClass} aria-hidden="true" />,
+            active: pathname.startsWith("/dashboard/websites/weddings"),
           })}
 
           {navLink({

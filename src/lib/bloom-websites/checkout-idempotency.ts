@@ -40,6 +40,8 @@ export type BloomWebsiteCheckoutFingerprintInput = {
   deliveryInstructions?: string;
   cardMessage?: string;
   cardSignature?: string;
+  recipientEmail?: string;
+  pickupDetails?: { person:string; firstName:string; lastName:string; phone:string; instructions:string; timeFrom:string; timeTo:string };
   items: Array<{
     productId: string;
     tier: "standard" | "deluxe" | "premium";
@@ -102,6 +104,13 @@ export function normalizeBloomWebsiteCheckoutFingerprintInput(
           }
         : null,
 
+    recipientEmail: normalizeEmail(input.recipientEmail),
+    pickupDetails: input.fulfillmentType === "pickup" ? {
+      person: clean(input.pickupDetails?.person),
+      firstName: clean(input.pickupDetails?.firstName), lastName: clean(input.pickupDetails?.lastName),
+      phone: clean(input.pickupDetails?.phone), instructions: clean(input.pickupDetails?.instructions),
+      timeFrom: clean(input.pickupDetails?.timeFrom), timeTo: clean(input.pickupDetails?.timeTo),
+    } : null,
     deliveryInstructions: clean(input.deliveryInstructions),
     cardMessage: clean(input.cardMessage),
     cardSignature: clean(input.cardSignature),

@@ -5,6 +5,7 @@ export type BloomWebsiteStatus = "preview" | "live" | "paused";
 export type BloomWebsiteThemeName = "bloom-classic" | "bloom-elegant";
 
 export type BloomWebsiteLogoSize = "small" | "standard" | "large" | "xlarge";
+export type BloomWebsiteButtonCorners = "subtle" | "rounded" | "pill";
 
 
 export type BloomWebsiteHeroTextStyle = "light" | "dark";
@@ -47,6 +48,7 @@ export type BloomWebsiteStorefrontTheme = {
 
   logo: string;
   logoSize: BloomWebsiteLogoSize;
+  buttonCorners: BloomWebsiteButtonCorners;
 
   primaryColor: string;
   accentColor: string;
@@ -158,9 +160,16 @@ export type BloomWebsiteLocalSeoContent = {
 export type BloomWebsiteAboutSectionKey =
   | "story"
   | "specialties"
-  | "community";
+  | "community"
+  | "extra1" | "extra2" | "extra3";
+
+export type BloomWebsiteTextAlignment = "left" | "center" | "right";
 
 export type BloomWebsiteAboutSection = {
+  /** Legacy single alignment value retained for backward compatibility. */
+  textAlignment?: BloomWebsiteTextAlignment;
+  desktopTextAlignment?: BloomWebsiteTextAlignment;
+  mobileTextAlignment?: BloomWebsiteTextAlignment;
   key: BloomWebsiteAboutSectionKey;
   enabled: boolean;
   title: string;
@@ -206,6 +215,31 @@ export type BloomWebsiteStorefrontProduct = {
   soldOut: boolean;
 };
 
+export type BloomWebsiteWeddingFloralDecoration =
+  | "none"
+  | "softBorder";
+
+export type BloomWebsiteWeddingsPage = {
+  floralDecoration?: BloomWebsiteWeddingFloralDecoration;
+  /** Legacy single alignment values retained for backward compatibility. */
+  headingAlignment?: BloomWebsiteTextAlignment;
+  contentAlignment?: BloomWebsiteTextAlignment;
+  headingAlignmentDesktop?: BloomWebsiteTextAlignment;
+  headingAlignmentMobile?: BloomWebsiteTextAlignment;
+  contentAlignmentDesktop?: BloomWebsiteTextAlignment;
+  contentAlignmentMobile?: BloomWebsiteTextAlignment;
+  enabled: boolean;
+  heading: string;
+  introduction: string;
+  services: string;
+  eventTypes: string;
+  serviceArea: string;
+  consultationText: string;
+  portfolioHeading: string;
+  portfolioDescription: string;
+  portfolio: Array<{ url: string; alt: string; caption: string }>;
+};
+
 export type BloomWebsiteStorefrontWebsite = {
   id: string;
 
@@ -226,6 +260,7 @@ export type BloomWebsiteStorefrontWebsite = {
   branding: {
     logo: string;
     logoSize: BloomWebsiteLogoSize;
+    buttonCorners: BloomWebsiteButtonCorners;
 
     tagline: string;
 
@@ -256,7 +291,11 @@ export type BloomWebsiteStorefrontWebsite = {
     merchandisingSections: BloomWebsiteHomepageMerchandisingSection[];
   };
 
+  weddingsPage?: BloomWebsiteWeddingsPage;
+
   aboutPage?: {
+    useCustomImage?: boolean;
+    customImageUrl?: string;
     enabled: boolean;
     heading: string;
     contentMode: "custom" | "guided";

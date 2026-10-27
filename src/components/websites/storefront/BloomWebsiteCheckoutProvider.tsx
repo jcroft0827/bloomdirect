@@ -15,6 +15,7 @@ export type BloomWebsiteCheckoutRecipient = {
   firstName: string;
   lastName: string;
   phone: string;
+  email: string;
 };
 
 export type BloomWebsiteCheckoutCustomer = {
@@ -22,6 +23,16 @@ export type BloomWebsiteCheckoutCustomer = {
   lastName: string;
   email: string;
   phone: string;
+};
+
+export type BloomWebsitePickupDetails = {
+  person: "recipient" | "customer" | "other";
+  firstName: string;
+  lastName: string;
+  phone: string;
+  instructions: string;
+  timeFrom: string;
+  timeTo: string;
 };
 
 export type BloomWebsiteCheckoutDeliveryAddress = {
@@ -86,6 +97,7 @@ type BloomWebsiteCheckoutContextValue = {
   requestedDate: string;
 
   pickupRequestedDate: string;
+  pickupDetails: BloomWebsitePickupDetails;
 
   deliveryInstructions: string;
 
@@ -108,6 +120,7 @@ type BloomWebsiteCheckoutContextValue = {
   setRequestedDate: (requestedDate: string) => void;
 
   setPickupRequestedDate: (requestedDate: string) => void;
+  setPickupDetails: (details: BloomWebsitePickupDetails) => void;
 
   setDeliveryInstructions: (instructions: string) => void;
 
@@ -150,6 +163,7 @@ type StoredCheckoutState = {
   requestedDate: string;
 
   pickupRequestedDate: string;
+  pickupDetails: BloomWebsitePickupDetails;
 
   deliveryInstructions: string;
 
@@ -162,10 +176,13 @@ type StoredCheckoutState = {
   validatedPickup: BloomWebsiteValidatedPickup | null;
 };
 
+const EMPTY_PICKUP: BloomWebsitePickupDetails = { person: "customer", firstName: "", lastName: "", phone: "", instructions: "", timeFrom: "", timeTo: "" };
+
 const EMPTY_RECIPIENT: BloomWebsiteCheckoutRecipient = {
   firstName: "",
   lastName: "",
   phone: "",
+  email: "",
 };
 
 const EMPTY_CUSTOMER: BloomWebsiteCheckoutCustomer = {
@@ -204,6 +221,7 @@ function parseStoredRecipient(value: unknown): BloomWebsiteCheckoutRecipient {
     lastName: cleanString(value.lastName),
 
     phone: cleanString(value.phone),
+    email: cleanString(value.email),
   };
 }
 
@@ -377,6 +395,7 @@ export default function BloomWebsiteCheckoutProvider({
   const [requestedDate, setRequestedDateState] = useState("");
 
   const [pickupRequestedDate, setPickupRequestedDateState] = useState("");
+  const [pickupDetails, setPickupDetailsState] = useState<BloomWebsitePickupDetails>(EMPTY_PICKUP);
 
   const [deliveryInstructions, setDeliveryInstructionsState] = useState("");
 
@@ -416,6 +435,7 @@ export default function BloomWebsiteCheckoutProvider({
         setRequestedDateState("");
 
         setPickupRequestedDateState("");
+        setPickupDetailsState({ ...EMPTY_PICKUP });
 
         setDeliveryInstructionsState("");
 
@@ -452,6 +472,12 @@ export default function BloomWebsiteCheckoutProvider({
       setRequestedDateState(cleanString(parsed.requestedDate));
 
       setPickupRequestedDateState(cleanString(parsed.pickupRequestedDate));
+      const pd = isRecord(parsed.pickupDetails) ? parsed.pickupDetails : {};
+      setPickupDetailsState({
+        person: pd.person === "recipient" || pd.person === "other" ? pd.person : "customer",
+        firstName: cleanString(pd.firstName), lastName: cleanString(pd.lastName), phone: cleanString(pd.phone),
+        instructions: cleanString(pd.instructions), timeFrom: cleanString(pd.timeFrom), timeTo: cleanString(pd.timeTo),
+      });
 
       setDeliveryInstructionsState(cleanString(parsed.deliveryInstructions));
 
@@ -488,6 +514,7 @@ export default function BloomWebsiteCheckoutProvider({
       setRequestedDateState("");
 
       setPickupRequestedDateState("");
+      setPickupDetailsState({ ...EMPTY_PICKUP });
 
       setDeliveryInstructionsState("");
 
@@ -516,6 +543,7 @@ export default function BloomWebsiteCheckoutProvider({
       deliveryAddress,
       requestedDate,
       pickupRequestedDate,
+      pickupDetails,
       deliveryInstructions,
       cardMessage,
       cardSignature,
@@ -542,6 +570,7 @@ export default function BloomWebsiteCheckoutProvider({
     recipient,
     requestedDate,
     pickupRequestedDate,
+    pickupDetails,
     storageKey,
     validatedDelivery,
     validatedPickup,
@@ -595,6 +624,8 @@ export default function BloomWebsiteCheckoutProvider({
     invalidatePickupValidation();
   }
 
+  function setPickupDetails(details: BloomWebsitePickupDetails) { setPickupDetailsState(details); invalidatePickupValidation(); }
+
   function setDeliveryInstructions(instructions: string) {
     setDeliveryInstructionsState(instructions);
   }
@@ -643,6 +674,7 @@ export default function BloomWebsiteCheckoutProvider({
     setRequestedDateState("");
 
     setPickupRequestedDateState("");
+    setPickupDetailsState({...EMPTY_PICKUP});
 
     setDeliveryInstructionsState("");
 
@@ -672,6 +704,7 @@ export default function BloomWebsiteCheckoutProvider({
       deliveryAddress,
       requestedDate,
       pickupRequestedDate,
+      pickupDetails,
       deliveryInstructions,
       cardMessage,
       cardSignature,
@@ -684,6 +717,7 @@ export default function BloomWebsiteCheckoutProvider({
       setDeliveryAddress,
       setRequestedDate,
       setPickupRequestedDate,
+      setPickupDetails,
       setDeliveryInstructions,
       setCardMessage,
       setCardSignature,
@@ -707,6 +741,7 @@ export default function BloomWebsiteCheckoutProvider({
 
       fulfillmentType,
       pickupRequestedDate,
+      pickupDetails,
       validatedPickup,
     ],
   );

@@ -211,6 +211,17 @@ export async function PATCH(request: Request) {
     /*
      * Normal order-policy fields.
      */
+    if (body.section === "pageVisibility") {
+      const page = data.page;
+      const enabled = data.enabled;
+      if ((page !== "aboutPage" && page !== "weddingsPage") || typeof enabled !== "boolean") {
+        return NextResponse.json({ error: "Invalid page visibility setting." }, { status: 400 });
+      }
+      website.set(`${page}.enabled`, enabled);
+      await website.save();
+      return NextResponse.json({ success: true, enabled });
+    }
+
     if (body.section === "orderPolicy") {
       if ("allowsSameDay" in data) {
         if (typeof data.allowsSameDay !== "boolean") {
@@ -726,6 +737,75 @@ export async function PATCH(request: Request) {
       website.announcement.endsAtTime = scheduleEnabled
         ? String(endsAtTime || "")
         : "";
+    } else if (body.section === "weddingsPage") {
+      const stringLimits: Record<string, number> = {
+        heading: 140,
+        introduction: 1600,
+        services: 2000,
+        eventTypes: 1200,
+        serviceArea: 600,
+        consultationText: 600,
+        portfolioHeading: 120,
+        portfolioDescription: 220,
+      };
+      if (typeof data.enabled !== "boolean" || !Array.isArray(data.portfolio) || data.portfolio.length > 18) {
+        return NextResponse.json({ error: "Invalid Weddings & Events settings." }, { status: 400 });
+      }
+      const copy: Record<string, string> = {};
+      for (const [key, limit] of Object.entries(stringLimits)) {
+        if (typeof data[key] !== "string" || (data[key] as string).length > limit) {
+          return NextResponse.json({ error: `Invalid ${key}.` }, { status: 400 });
+        }
+        copy[key] = (data[key] as string).trim();
+      }
+      if (!copy.heading) return NextResponse.json({ error: "Page heading is required." }, { status: 400 });
+      const portfolio: Array<{url: string; alt: string; caption: string}> = [];
+      for (const item of data.portfolio) {
+        if (!item || typeof item !== "object" || typeof item.url !== "string" ||
+            typeof item.alt !== "string" || typeof item.caption !== "string" ||
+            item.url.length > 2000 || item.alt.length > 180 || item.caption.length > 240) {
+          return NextResponse.json({ error: "Invalid portfolio entry." }, { status: 400 });
+        }
+        let parsed: URL;
+        try { parsed = new URL(item.url); } catch {
+          return NextResponse.json({ error: "Portfolio images need valid HTTPS URLs." }, { status: 400 });
+        }
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+          return NextResponse.json({ error: "Portfolio images must use HTTPS." }, { status: 400 });
+        }
+        portfolio.push({ url: parsed.toString(), alt: item.alt.trim(), caption: item.caption.trim() });
+      }
+      const floralDecoration = data.floralDecoration ?? "none";
+      const headingAlignmentDesktop = data.headingAlignmentDesktop ?? data.headingAlignment ?? "center";
+      const headingAlignmentMobile = data.headingAlignmentMobile ?? data.headingAlignmentDesktop ?? data.headingAlignment ?? headingAlignmentDesktop;
+      const contentAlignmentDesktop = data.contentAlignmentDesktop ?? data.contentAlignment ?? "left";
+      const contentAlignmentMobile = data.contentAlignmentMobile ?? data.contentAlignmentDesktop ?? data.contentAlignment ?? contentAlignmentDesktop;
+      if (
+        typeof floralDecoration !== "string" ||
+        !["none", "softBorder"].includes(floralDecoration) ||
+        typeof headingAlignmentDesktop !== "string" ||
+        !["left", "center", "right"].includes(headingAlignmentDesktop) ||
+        typeof headingAlignmentMobile !== "string" ||
+        !["left", "center", "right"].includes(headingAlignmentMobile) ||
+        typeof contentAlignmentDesktop !== "string" ||
+        !["left", "center", "right"].includes(contentAlignmentDesktop) ||
+        typeof contentAlignmentMobile !== "string" ||
+        !["left", "center", "right"].includes(contentAlignmentMobile)
+      ) {
+        return NextResponse.json({ error: "Invalid wedding page design options." }, { status: 400 });
+      }
+      website.set("weddingsPage", {
+        ...copy,
+        floralDecoration,
+        headingAlignment: headingAlignmentDesktop,
+        contentAlignment: contentAlignmentDesktop,
+        headingAlignmentDesktop,
+        headingAlignmentMobile,
+        contentAlignmentDesktop,
+        contentAlignmentMobile,
+        enabled: data.enabled,
+        portfolio,
+      });
     } else if (body.section === "aboutPage") {
       const enabled = data.enabled;
       const heading = data.heading;
@@ -801,21 +881,24 @@ export async function PATCH(request: Request) {
         );
       }
 
-      if (!Array.isArray(sections) || sections.length !== 3) {
+      if (!Array.isArray(sections) || sections.length < 3 || sections.length > 6) {
         return NextResponse.json(
-          { error: "About page must include the three supported sections." },
+          { error: "About page must include three to six sections." },
           { status: 400 },
         );
       }
 
-      const allowedKeys = ["story", "specialties", "community"] as const;
+      const allowedKeys = ["story", "specialties", "community", "extra1", "extra2", "extra3"] as const;
       const seenKeys = new Set<string>();
       const cleanedSections: Array<{
-        key: "story" | "specialties" | "community";
+        key: "story" | "specialties" | "community" | "extra1" | "extra2" | "extra3";
         enabled: boolean;
         title: string;
         body: string;
         sortOrder: number;
+        textAlignment: "left" | "center" | "right";
+        desktopTextAlignment: "left" | "center" | "right";
+        mobileTextAlignment: "left" | "center" | "right";
       }> = [];
 
       for (const rawSection of sections) {
@@ -837,6 +920,9 @@ export async function PATCH(request: Request) {
           typeof key !== "string" ||
           !allowedKeys.includes(key as (typeof allowedKeys)[number]) ||
           seenKeys.has(key) ||
+          (section.textAlignment !== undefined && !["left", "center", "right"].includes(String(section.textAlignment))) ||
+          (section.desktopTextAlignment !== undefined && !["left", "center", "right"].includes(String(section.desktopTextAlignment))) ||
+          (section.mobileTextAlignment !== undefined && !["left", "center", "right"].includes(String(section.mobileTextAlignment))) ||
           typeof section.enabled !== "boolean" ||
           typeof section.title !== "string" ||
           !section.title.trim() ||
@@ -852,15 +938,36 @@ export async function PATCH(request: Request) {
 
         seenKeys.add(key);
 
+        const legacyAlignment = ["left", "center", "right"].includes(String(section.textAlignment ?? "left"))
+          ? (section.textAlignment ?? "left") as "left" | "center" | "right"
+          : "left";
+        const desktopTextAlignment = ["left", "center", "right"].includes(String(section.desktopTextAlignment ?? legacyAlignment))
+          ? (section.desktopTextAlignment ?? legacyAlignment) as "left" | "center" | "right"
+          : legacyAlignment;
+        const mobileTextAlignment = ["left", "center", "right"].includes(String(section.mobileTextAlignment ?? legacyAlignment))
+          ? (section.mobileTextAlignment ?? legacyAlignment) as "left" | "center" | "right"
+          : legacyAlignment;
+
         cleanedSections.push({
-          key: key as "story" | "specialties" | "community",
+          key: key as "story" | "specialties" | "community" | "extra1" | "extra2" | "extra3",
           enabled: section.enabled,
+          textAlignment: desktopTextAlignment,
+          desktopTextAlignment,
+          mobileTextAlignment,
           title: section.title.trim(),
           body: section.body.trim(),
           sortOrder: cleanedSections.length,
         });
       }
 
+      if (!["story", "specialties", "community"].every(key => seenKeys.has(key))) {
+        return NextResponse.json({ error: "The three core About sections are required." }, { status: 400 });
+      }
+      if (typeof data.useCustomImage !== "boolean" || typeof data.customImageUrl !== "string" || data.customImageUrl.length > 4096 || (data.customImageUrl && !/^https:\/\/[^\s]+$/i.test(data.customImageUrl))) {
+        return NextResponse.json({ error: "Invalid About page photograph settings." }, { status: 400 });
+      }
+      website.set("aboutPage.useCustomImage", data.useCustomImage);
+      website.set("aboutPage.customImageUrl", data.customImageUrl.trim());
       website.set("aboutPage.enabled", enabled);
       website.set("aboutPage.heading", heading.trim());
       website.set("aboutPage.contentMode", contentMode);

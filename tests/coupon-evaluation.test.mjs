@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { evaluateCoupon, normalizeCouponCode } from '../src/lib/bloom-websites/coupons/evaluateCoupon.ts';
+const base={code:'WELCOME10',discountType:'percentage',amount:1000,minimumMerchandiseCents:0,startsAt:null,expiresAt:null,usageLimit:null,redemptionCount:0,isActive:true};
+const run=(coupon={},amount=10000,code='welcome10',now=new Date('2026-10-20T12:00:00.000Z'))=>evaluateCoupon({coupon:{...base,...coupon},merchandiseSubtotalCents:amount,code,now});
+test('coupon code normalization and format',()=>{assert.equal(normalizeCouponCode(' welcome10 '),'WELCOME10');assert.equal(normalizeCouponCode('!!'),null)});
+test('percentage basis points',()=>{assert.deepEqual(run(),{ok:true,code:'WELCOME10',discountCents:1000,merchandiseAfterDiscountCents:9000})});
+test('fixed discount capped by merchandise',()=>{assert.equal(run({discountType:'fixed',amount:3000},2000).discountCents,2000)});
+test('minimum merchandise',()=>{assert.equal(run({minimumMerchandiseCents:10001}).reason,'MINIMUM_NOT_MET')});
+test('inactive and wrong code',()=>{assert.equal(run({isActive:false}).reason,'INACTIVE');assert.equal(run({},10000,'OTHER').reason,'INVALID_CODE')});
+test('usage limit',()=>{assert.equal(run({usageLimit:2,redemptionCount:2}).reason,'USAGE_LIMIT')});
+test('start boundary',()=>{assert.equal(run({startsAt:'2026-10-21T00:00:00.000Z'}).reason,'NOT_STARTED')});
+test('expiry inclusive calendar date',()=>{assert.equal(run({expiresAt:'2026-10-20T00:00:00.000Z'}).ok,true);assert.equal(run({expiresAt:'2026-10-19T00:00:00.000Z'}).reason,'EXPIRED'); assert.equal(run({expiresAt:new Date('2026-10-20T00:00:00.000Z')}).ok,true)});
+test('invalid configuration',()=>{assert.equal(run({amount:10001}).reason,'INVALID_CONFIGURATION');assert.equal(run({},NaN).reason,'INVALID_CONFIGURATION')});
+test('no tax, fee or tip included in discount basis',()=>{assert.equal(run({},10000).discountCents,1000)});

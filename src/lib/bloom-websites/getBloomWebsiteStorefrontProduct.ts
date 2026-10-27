@@ -50,6 +50,7 @@ type WebsiteLean = {
   branding?: {
     logo?: string;
     logoSize?: string;
+    buttonCorners?: string;
 
     tagline?: string;
 
@@ -611,6 +612,7 @@ export async function getBloomWebsiteStorefrontProduct(
 
     logo: website.branding?.logo,
     logoSize: website.branding?.logoSize,
+    buttonCorners: website.branding?.buttonCorners,
 
     tagline: website.branding?.tagline,
 
@@ -636,6 +638,7 @@ export async function getBloomWebsiteStorefrontProduct(
       branding: {
         logo: storefrontTheme.logo,
         logoSize: storefrontTheme.logoSize,
+        buttonCorners: storefrontTheme.buttonCorners,
 
         tagline: storefrontTheme.tagline,
 

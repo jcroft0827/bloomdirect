@@ -1,6 +1,7 @@
 import type {
   BloomWebsiteBackgroundStyle,
   BloomWebsiteLogoSize,
+  BloomWebsiteButtonCorners,
   BloomWebsiteStorefrontTheme,
   BloomWebsiteThemeName,
 } from "@/types/bloom-website";
@@ -13,6 +14,11 @@ export const DEFAULT_BLOOM_WEBSITE_THEME_NAME: BloomWebsiteThemeName =
   "bloom-classic";
 
 export const DEFAULT_BLOOM_WEBSITE_LOGO_SIZE: BloomWebsiteLogoSize = "standard";
+
+export const DEFAULT_BLOOM_WEBSITE_BUTTON_CORNERS: BloomWebsiteButtonCorners = "pill";
+export function normalizeBloomWebsiteButtonCorners(value: string | null | undefined): BloomWebsiteButtonCorners {
+  return value === "subtle" || value === "rounded" || value === "pill" ? value : DEFAULT_BLOOM_WEBSITE_BUTTON_CORNERS;
+}
 
 export const BLOOM_WEBSITE_LOGO_SIZES: readonly BloomWebsiteLogoSize[] =
   ["small", "standard", "large", "xlarge"] as const;
@@ -28,6 +34,7 @@ type NormalizeBloomWebsiteStorefrontThemeInput = {
 
   logo?: string | null;
   logoSize?: string | null;
+  buttonCorners?: string | null;
 
   primaryColor?: string | null;
   accentColor?: string | null;
@@ -249,6 +256,7 @@ export function normalizeBloomWebsiteStorefrontTheme(
 
     logo: input.logo?.trim() || "",
     logoSize: normalizeBloomWebsiteLogoSize(input.logoSize),
+    buttonCorners: normalizeBloomWebsiteButtonCorners(input.buttonCorners),
 
     primaryColor,
     accentColor,

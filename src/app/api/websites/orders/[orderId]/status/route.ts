@@ -47,6 +47,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         ? body.notifyCustomer
         : undefined;
 
+    const notificationPhotoId = typeof body?.notificationPhotoId === "string"
+      ? body.notificationPhotoId.trim()
+      : "";
+    if (notificationPhotoId.length > 100) {
+      return NextResponse.json({ error: "Invalid arrangement photo selection." }, { status: 400 });
+    }
+
     if (!allowedStatuses.has(nextStatus)) {
       return NextResponse.json(
         { error: "Invalid order status.", code: "INVALID_STATUS" },
@@ -62,6 +69,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       internalNote,
       customerNote,
       notifyCustomer,
+      notificationPhotoId,
       source: "portal",
       actorId: session.user.id,
       actorLabel:
