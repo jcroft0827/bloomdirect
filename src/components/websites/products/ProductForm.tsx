@@ -1020,7 +1020,7 @@ export default function ProductForm({
   ];
 
   return (
-    <div className="mx-auto min-h-0 min-w-0 w-full max-w-7xl">
+    <div className="mx-auto min-h-0 min-w-0 w-full max-w-7xl overflow-x-clip">
       <Link
         href="/dashboard/websites/products"
         className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-gray-900"
@@ -1049,9 +1049,9 @@ export default function ProductForm({
 
       <form
         onSubmit={handleSubmit}
-        className="mt-7 min-h-0 min-w-0 max-w-full"
+        className="mt-7 min-h-0 min-w-0 w-full max-w-full"
       >
-        <div className="min-h-0 xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start xl:gap-6 2xl:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="min-h-0 min-w-0 w-full max-w-full xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start xl:gap-6 2xl:grid-cols-[240px_minmax(0,1fr)]">
           <ProductFormQuickNavigation
             items={quickNavItems}
             isSaving={isSaving}
@@ -2619,13 +2619,13 @@ export default function ProductForm({
         <div
           className={
             isEditing
-              ? "sticky bottom-0 z-30 -mx-2 flex flex-col-reverse gap-3 border-t border-gray-200 bg-white/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:py-4 shadow-[0_-12px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:flex-row sm:justify-end"
+              ? "sticky bottom-0 z-30 flex flex-row items-center justify-end gap-2 border-t border-gray-200 bg-white/95 px-1 py-1 sm:gap-3 sm:px-2 sm:py-3 shadow-[0_-12px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:flex-row sm:justify-end"
               : "flex flex-col-reverse gap-3 pb-6 sm:flex-row sm:justify-end"
           }
         >
           <Link
             href="/dashboard/websites/products"
-            className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-6 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
+            className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-bold sm:px-6 sm:py-3.5 text-gray-700 transition hover:bg-gray-50"
           >
             Cancel
           </Link>
@@ -2636,7 +2636,7 @@ export default function ProductForm({
               isSaving ||
               uploadingImage
             }
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-6 py-3.5 text-sm font-black text-white transition hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-3 py-2 text-sm font-black sm:px-6 sm:py-3.5 text-white transition hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? (
               <>
