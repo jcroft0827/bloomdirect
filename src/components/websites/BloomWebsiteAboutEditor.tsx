@@ -208,7 +208,7 @@ export default function BloomWebsiteAboutEditor({
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 pb-12">
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(380px,1fr)]"><div className="min-w-0 space-y-6">
-      <div>
+      <div className="px-2 md:px-0">
         <p className="text-sm font-bold uppercase tracking-[0.18em] text-purple-600">BloomWebsites</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">About page</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">

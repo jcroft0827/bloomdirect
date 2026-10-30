@@ -210,7 +210,7 @@ export default function DashboardClient() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-10">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 px-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-600">
             Bloom home
@@ -269,7 +269,7 @@ export default function DashboardClient() {
           </div>
         </section>
       ) : setupComplete ? (
-        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+        <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 px-2">
           <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           Your Bloom account setup is complete.
         </div>

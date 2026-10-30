@@ -271,7 +271,7 @@ export default async function BloomWebsiteReportsPage({ searchParams }: PageProp
         <div className="print:hidden">
           <Link
             href="/dashboard/websites"
-            className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-purple-700"
+            className="px-2 md:px-0 inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-purple-700"
           >
             <ArrowLeft size={16} />
             BloomWebsites

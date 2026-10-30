@@ -283,7 +283,7 @@ export default async function BloomWebsiteOrdersPage({ searchParams }: PageProps
   );
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div>
+      <div className="px-2 md:px-0">
         <p className="text-sm font-black uppercase tracking-[0.16em] text-purple-700">
           BloomWebsites
         </p>
@@ -297,19 +297,19 @@ export default async function BloomWebsiteOrdersPage({ searchParams }: PageProps
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="sm:rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <ShoppingBag size={20} className="text-purple-700" />
           <p className="mt-3 text-2xl font-black text-gray-950">{orders.length}</p>
           <p className="text-sm text-gray-500">
             {hasFilters ? "Matching orders" : "Website orders"}
           </p>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="sm:rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <PackageCheck size={20} className="text-purple-700" />
           <p className="mt-3 text-2xl font-black text-gray-950">{openOrders}</p>
           <p className="text-sm text-gray-500">Need fulfillment</p>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="sm:rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <CalendarDays size={20} className="text-purple-700" />
           <p className="mt-3 text-2xl font-black text-gray-950">
             {money(paidTotalCents)}

@@ -273,7 +273,7 @@ export default async function WebsiteLaunchPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <div>
+      <div className="px-2 md:px-0">
         <Link
           href="/dashboard/websites"
           className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-gray-900"

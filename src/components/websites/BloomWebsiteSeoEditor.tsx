@@ -249,7 +249,7 @@ export default function BloomWebsiteSeoEditor({
 
   return (
     <div className="mx-auto max-w-6xl space-y-7 pb-12">
-      <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+      <header className="flex flex-col justify-between gap-5 px-2 md:px-0 lg:flex-row lg:items-end">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-purple-600">
             <Search size={17} />

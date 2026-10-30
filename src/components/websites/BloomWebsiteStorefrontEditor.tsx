@@ -431,7 +431,7 @@ export default function BloomWebsiteStorefrontEditor({
 
   return (
     <div className="pb-28">
-      <div className="mb-6">
+      <div className="mb-6 px-2 md:px-0">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-purple-600">Storefront Editor</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-950">Build the website your customers see.</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500">

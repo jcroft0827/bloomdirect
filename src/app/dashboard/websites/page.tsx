@@ -73,7 +73,7 @@ export default async function WebsitesPage() {
   if (website) {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
-        <div>
+        <div className="px-2 md:px-0">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-purple-600">
             BloomWebsites
           </p>

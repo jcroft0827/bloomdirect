@@ -8,13 +8,13 @@ export default function TfposIntegrationPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <Link
         href="/dashboard/websites"
-        className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-purple-700"
+        className="px-2 md:px-0 inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-purple-700"
       >
         <ArrowLeft size={16} />
         BloomWebsites
       </Link>
 
-      <div>
+      <div className="px-2 md:px-0">
         <p className="text-sm font-bold uppercase tracking-[0.18em] text-purple-600">
           BloomWebsites Integration
         </p>

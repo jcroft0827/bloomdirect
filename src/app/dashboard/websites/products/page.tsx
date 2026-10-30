@@ -128,14 +128,14 @@ export default async function WebsiteProductsPage() {
       <div>
         <Link
           href={`/dashboard/websites/launch?website=${website._id.toString()}`}
-          className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-gray-900"
+          className="px-2 md:px-0 inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-gray-900"
         >
           <ArrowLeft size={17} />
           Back to Launch Setup
         </Link>
 
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
+          <div className="px-2 md:px-0">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-purple-600">
               BloomWebsites
             </p>
@@ -149,7 +149,7 @@ export default async function WebsiteProductsPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 px-2 md:px-0 sm:flex-row">
             <Link
               href="/dashboard/websites/products/import-export"
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-black text-purple-700 transition hover:border-purple-300 hover:bg-purple-100"

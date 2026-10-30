@@ -147,7 +147,7 @@ export default function BloomWebsiteBrandIdentityEditor({ previewSlug, initialVa
 
   return (
     <div className="mx-auto max-w-[1800px] space-y-6 pb-28">
-      <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+      <header className="flex flex-col justify-between gap-5 px-2 md:px-0 lg:flex-row lg:items-end">
         <div>
           <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-purple-600"><Palette size={17} /> Branding</div>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-950 sm:text-4xl">Make the brand unmistakably yours.</h1>
