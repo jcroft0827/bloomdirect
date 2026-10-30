@@ -110,7 +110,7 @@ export default function ProductFormQuickNavigation({
     <nav
       ref={navRef}
       aria-label="Product editor sections"
-      className="sticky top-0 z-30 -mx-1 overflow-x-auto border-b border-gray-200/80 bg-gray-50/95 px-1 py-2 shadow-sm backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:top-5 xl:mx-0 xl:overflow-visible xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none xl:backdrop-blur-none"
+      className="sticky top-0 z-30 w-full min-w-0 max-w-full overflow-x-auto border-b border-gray-200/80 bg-gray-50/95 px-1 py-2 shadow-sm backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:top-5 xl:mx-0 xl:overflow-visible xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none xl:backdrop-blur-none"
     >
       <div className="flex min-w-max items-center gap-2 rounded-2xl border border-gray-200 bg-white p-2 shadow-sm xl:min-w-0 xl:flex-col xl:items-stretch xl:gap-1.5 xl:p-3">
         <div className="hidden px-2 pb-2 pt-1 xl:block">

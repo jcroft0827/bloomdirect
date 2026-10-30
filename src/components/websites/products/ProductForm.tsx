@@ -1020,7 +1020,7 @@ export default function ProductForm({
   ];
 
   return (
-    <div className="mx-auto min-h-0 max-w-7xl">
+    <div className="mx-auto min-h-0 min-w-0 w-full max-w-7xl">
       <Link
         href="/dashboard/websites/products"
         className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 transition hover:text-gray-900"
@@ -1049,7 +1049,7 @@ export default function ProductForm({
 
       <form
         onSubmit={handleSubmit}
-        className="mt-7 min-h-0"
+        className="mt-7 min-h-0 min-w-0 max-w-full"
       >
         <div className="min-h-0 xl:grid xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start xl:gap-6 2xl:grid-cols-[240px_minmax(0,1fr)]">
           <ProductFormQuickNavigation
@@ -1059,11 +1059,11 @@ export default function ProductForm({
             saveLabel={isEditing ? "Save Changes" : "Create Product"}
           />
 
-          <div className="min-h-0 min-w-0 space-y-5">
+          <div className="min-h-0 min-w-0 max-w-full space-y-5">
         {/* PRODUCT DETAILS */}
         <section
           id="product-details"
-          className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+          className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
@@ -1418,7 +1418,7 @@ export default function ProductForm({
         {/* PRICING */}
         <section
           id="product-pricing"
-          className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+          className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <h2 className="text-lg font-black text-gray-950">
             Pricing
@@ -1467,7 +1467,7 @@ export default function ProductForm({
         {/* DESIGN RECIPES */}
         <section
           id="product-recipes"
-          className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+          className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <h2 className="text-lg font-black text-gray-950">
             Design Recipes
@@ -1505,7 +1505,7 @@ export default function ProductForm({
         {/* ORDERING & AVAILABILITY */}
         <section
           id="product-ordering"
-          className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+          className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <h2 className="text-lg font-black text-gray-950">
             Ordering & Availability
@@ -1817,7 +1817,7 @@ export default function ProductForm({
         {/* WHERE IT APPEARS */}
         <section
           id="product-placement"
-          className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+          className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <h2 className="text-lg font-black text-gray-950">
             Where It Appears
@@ -1971,7 +1971,7 @@ export default function ProductForm({
         {isEditing && (
           <section
             id="product-addons"
-            className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+            className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
           >
             <h2 className="text-lg font-black text-gray-950">
               Available Add-ons
@@ -2264,7 +2264,7 @@ export default function ProductForm({
         {/* SEARCH & SEO */}
         <section
           id="product-seo"
-          className="scroll-mt-28 xl:scroll-mt-6 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+          className="scroll-mt-28 xl:scroll-mt-6 min-w-0 max-w-full rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -2619,7 +2619,7 @@ export default function ProductForm({
         <div
           className={
             isEditing
-              ? "sticky bottom-0 z-30 -mx-2 flex flex-col-reverse gap-3 border-t border-gray-200 bg-white/95 px-2 py-4 shadow-[0_-12px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:flex-row sm:justify-end"
+              ? "sticky bottom-0 z-30 -mx-2 flex flex-col-reverse gap-3 border-t border-gray-200 bg-white/95 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:py-4 shadow-[0_-12px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur sm:flex-row sm:justify-end"
               : "flex flex-col-reverse gap-3 pb-6 sm:flex-row sm:justify-end"
           }
         >

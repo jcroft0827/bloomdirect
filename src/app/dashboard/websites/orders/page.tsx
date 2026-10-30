@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
+  ChevronDown,
   CalendarDays,
   PackageCheck,
   ShoppingBag,
@@ -249,7 +250,7 @@ export default async function BloomWebsiteOrdersPage({ searchParams }: PageProps
       .sort(sortSpec)
       .limit(250)
       .select(
-        "orderNumber customer recipient fulfillment totals status payment placedAt itemCount",
+        "orderNumber customer recipient fulfillment totals status payment placedAt itemCount items couponSnapshot",
       )
       .lean<any[]>(),
     BloomWebsiteProduct.find({
@@ -356,43 +357,59 @@ export default async function BloomWebsiteOrdersPage({ searchParams }: PageProps
         ) : (
           <div className="divide-y divide-gray-100">
             {orders.map((order) => (
-              <Link
-                key={String(order._id)}
-                href={`/dashboard/websites/orders/${order._id}`}
-                className="grid gap-4 px-5 py-5 transition hover:bg-purple-50/40 sm:grid-cols-[1.2fr_0.9fr_0.85fr_auto] sm:items-center sm:px-7"
-              >
-                <div className="min-w-0">
-                  <p className="font-black text-gray-950">{order.orderNumber}</p>
-                  <p className="mt-1 truncate text-sm text-gray-600">
-                    {order.customer.firstName} {order.customer.lastName}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-gray-400">
-                    Ordered {formatPlacedAt(order.placedAt, order.fulfillment?.timezone)}
-                  </p>
+              <details key={String(order._id)} className="group px-4 py-4 open:bg-purple-50/30 sm:px-7">
+                <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-600 [&::-webkit-details-marker]:hidden sm:items-center">
+                  <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[1.2fr_0.9fr_0.85fr] sm:items-center">
+                    <div className="min-w-0">
+                      <p className="font-black text-gray-950">{order.orderNumber}</p>
+                      <p className="mt-1 truncate text-sm text-gray-600">
+                        {order.customer?.firstName} {order.customer?.lastName}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-gray-400">
+                        Ordered {formatPlacedAt(order.placedAt, order.fulfillment?.timezone)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold capitalize text-gray-800">{order.fulfillment?.type}</p>
+                      <p className="mt-1 text-xs text-gray-500">{formatDateOnly(order.fulfillment?.requestedDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-gray-950">{money(order.totals?.totalCents || 0)}</p>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[11px] font-black ${statusClasses(order.status)}`}>
+                        {statusLabel(order.status, order.fulfillment?.type)}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown size={20} className="mt-1 shrink-0 text-gray-500 transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div className="mt-4 space-y-3 border-t border-purple-100 pt-4 text-sm text-gray-700">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <p className="font-bold text-gray-950">Customer</p>
+                      <p>{order.customer?.firstName} {order.customer?.lastName}</p>
+                      {order.customer?.email ? <p className="break-all">{order.customer.email}</p> : null}
+                      {order.customer?.phone ? <p>{order.customer.phone}</p> : null}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-950">Recipient / fulfillment</p>
+                      <p>{[order.recipient?.firstName, order.recipient?.lastName].filter(Boolean).join(" ") || "Not separately specified"}</p>
+                      {order.recipient?.phone ? <p>{order.recipient.phone}</p> : null}
+                      <p className="capitalize">{order.fulfillment?.type} — {formatDateOnly(order.fulfillment?.requestedDate)}</p>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-950">Order summary</p>
+                      <p>{Array.isArray(order.items) ? order.items.length : order.itemCount || 0} line items</p>
+                      {order.couponSnapshot?.code && order.couponSnapshot?.discountCents > 0 ? (
+                        <p>Coupon {order.couponSnapshot.code}: −{money(order.couponSnapshot.discountCents)}</p>
+                      ) : null}
+                      <p className="font-semibold">Total: {money(order.totals?.totalCents || 0)}</p>
+                    </div>
+                  </div>
+                  <Link href={`/dashboard/websites/orders/${order._id}`} className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-2.5 font-bold text-white hover:bg-purple-800">
+                    Open full order <ArrowRight size={16} aria-hidden="true" />
+                  </Link>
                 </div>
-
-                <div>
-                  <p className="text-sm font-bold capitalize text-gray-800">
-                    {order.fulfillment.type}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {formatDateOnly(order.fulfillment.requestedDate)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-black text-gray-950">
-                    {money(order.totals.totalCents)}
-                  </p>
-                  <span
-                    className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[11px] font-black ${statusClasses(order.status)}`}
-                  >
-                    {statusLabel(order.status, order.fulfillment.type)}
-                  </span>
-                </div>
-
-                <ArrowRight size={18} className="text-gray-400" />
-              </Link>
+              </details>
             ))}
           </div>
         )}

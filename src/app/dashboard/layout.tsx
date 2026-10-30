@@ -352,6 +352,7 @@ export default function DashboardLayout({
             </button>
           </div>
 
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 [-webkit-overflow-scrolling:touch]">
           <NavLinks
             slug={shop?.slug || ""}
             pro={shop?.isPro || false}
@@ -359,6 +360,7 @@ export default function DashboardLayout({
             onClose={() => setShowNav(false)}
             role={shop?.role || ""}
           />
+          </div>
         </aside>
 
         {/* Main Dashboard Workspace */}
